@@ -1,6 +1,6 @@
 package qchar
 
-// TODO: decomposition()  wait qstring
+// TODO: QChar::decomposition() → QString. Pending qstring package.
 
 // GCC < 16 & Clang ignoring unknown -Wno-*
 // cgo CXXFLAGS: -std=c++17 -fPIC -Wno-sfinae-incomplete
@@ -109,6 +109,8 @@ func (c QChar) ToUpper() QChar      { return QChar(C.qchar_to_upper(C.uint16_t(c
 func (c QChar) ToTitleCase() QChar  { return QChar(C.qchar_to_title(C.uint16_t(c))) }
 func (c QChar) ToCaseFolded() QChar { return QChar(C.qchar_to_case_folded(C.uint16_t(c))) }
 
+func (q QChar) EqualLatin1(c byte) bool { return q.Unicode() == uint16(c) }
+
 // ---- Static helpers by UCS-4 (mirrors Qt static API) ----------------------
 
 func CategoryOf(ucs4 rune) Category             { return Category(C.qchar_static_category(C.uint32_t(ucs4))) }
@@ -169,5 +171,3 @@ func LowSurrogate(ucs4 rune) QChar {
 func SurrogateToUcs4(high, low QChar) rune {
     return rune(C.qchar_surrogate_to_ucs4(C.uint16_t(high), C.uint16_t(low)))
 }
-
-// TODO: QChar::decomposition() → QString. Pending qstring package.
