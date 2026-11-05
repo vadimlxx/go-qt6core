@@ -1,6 +1,8 @@
 package qbytearraylist
 
 /*
+ QList::at() возвращает const T&. Копия изолирует Go-пользователя от мутаций списка; поведение совпадает с семантикой Qt (const ref).
+
  Что сознательно не вошло
  Java-style итераторы (QByteArrayListIterator, QMutableByteArrayListIterator) — не идиоматичны в Go; используйте ToSlice() или методы по индексу.
 

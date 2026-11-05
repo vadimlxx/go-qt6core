@@ -3,22 +3,22 @@ package qbytearray
 // TODO: QByteArray::decomposition() wait QString
 
 /*
-Не предоставлен FromRawData -- Требует пиннинга Go-памяти (runtime.Pinner) и явного владения; добавим отдельно, когда появится необходимость. Используйте FromBytes (копирует).
-Split возвращает []*QByteArray -- Каждый элемент — отдельный владеемый handle; массив освобождается в C сразу после переноса владения.
-nullptr-строки -- В Qt 6.11 data() для null-QByteArray возвращает указатель на статическую пустую строку; C.GoStringN с n=0 даёт "". Ок.
+ Не предоставлен FromRawData -- Требует пиннинга Go-памяти (runtime.Pinner) и явного владения; добавим отдельно, когда появится необходимость. Используйте FromBytes (копирует).
+ Split возвращает []*QByteArray -- Каждый элемент — отдельный владеемый handle; массив освобождается в C сразу после переноса владения.
+ nullptr-строки -- В Qt 6.11 data() для null-QByteArray возвращает указатель на статическую пустую строку; C.GoStringN с n=0 даёт "". Ок.
 
-Что не вошло (сознательно)
-Итераторы (begin/end/rbegin/rend, std::reverse_iterator) — не идиоматичны в Go; используйте Bytes().
+ Что не вошло (сознательно)
+ Итераторы (begin/end/rbegin/rend, std::reverse_iterator) — не идиоматичны в Go; используйте Bytes().
 
-operator[] через синтаксис — Go не поддерживает перегрузку операторов; используйте At/SetAt.
+ operator[] через синтаксис — Go не поддерживает перегрузку операторов; используйте At/SetAt.
 
-Неявные конверсии (operator const char*, operator std::string_view) — Go не поддерживает; используйте Bytes()/String().
+ Неявные конверсии (operator const char*, operator std::string_view) — Go не поддерживает; используйте Bytes()/String().
 
-fromRawData, setRawData — нужны runtime.Pinner + явное владение. TODO.
+ fromRawData, setRawData — нужны runtime.Pinner + явное владение. TODO.
 
-fromCFData/toNSData/fromEcmaUint8Array — платформо-специфично (Darwin/WASM).
+ fromCFData/toNSData/fromEcmaUint8Array — платформо-специфично (Darwin/WASM).
 
-QByteArrayView как отдельный тип — используем []byte на границе.
+ QByteArrayView как отдельный тип — используем []byte на границе.
 */
 
 // GCC < 16 & Clang ignoring unknown -Wno-*
