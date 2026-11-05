@@ -767,31 +767,3 @@ func (q *QByteArray) Split(sep byte) []*QByteArray {
     }
     return out
 }
-
-// UnsafePtr returns the underlying C++ QByteArray pointer as unsafe.Pointer.
-// For interop with other subpackages (e.g. qbytearraylist) only.
-// The pointed-to C++ object is owned by this QByteArray; caller must not free.
-func (q *QByteArray) UnsafePtr() unsafe.Pointer {
-	return unsafe.Pointer(q.p)
-}
-
-// AdoptUnsafePtr wraps a C++ QByteArray pointer into a Go wrapper.
-// The wrapper takes ownership: its finalizer will delete the C++ object.
-// Used by other subpackages (like qbytearraylist) when returning
-// QByteArray values they constructed internally.
-func AdoptUnsafePtr(p unsafe.Pointer) *QByteArray {
-	if p == nil {
-		return nil
-	}
-	return wrap((*C.QByteArray)(p))
-}
-
-// ConstDataUnsafe returns the raw C++ QByteArray data pointer.
-// Valid until the QByteArray is mutated, resized, or Close()d.
-//
-// WARNING: unsafe. The returned pointer aliases internal storage.
-// The caller must keep q alive (and unmutated) for as long as the pointer
-// is used. Intended for zero-copy QByteArrayView construction only.
-func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
-	return unsafe.Pointer(C.qbytearray_data(q.p))
-}

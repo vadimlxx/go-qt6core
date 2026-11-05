@@ -89,7 +89,17 @@ func FromString(s string) QByteArrayView {
 }
 
 // FromQByteArray returns a zero-copy view into q's internal buffer.
-// The view keeps q alive. Do NOT mutate or Close q while the view exists.
+// The view keeps q alive via its keepAlive field.
+//
+// Lifetime contract (equivalent to qbytearray.ConstDataUnsafe):
+//   - Do NOT mutate q (SetAt, AppendBytes, Resize, ...) while the view
+//     or any of its slices is alive — the buffer may reallocate, and the
+//     view will dangle.
+//   - Do NOT Close q while the view is alive for the same reason.
+//   - The safe pattern is: create view → use view → discard view → then
+//     mutate/Close q.
+//
+// For a lifetime-independent snapshot, use q.ToByteArray() instead.
 func FromQByteArray(q *qbytearray.QByteArray) QByteArrayView {
 	if q == nil || q.IsNull() {
 		return Empty()

@@ -1,12 +1,9 @@
-#include "qchar_c.h"
-
-#include <QtCore/qglobal.h>
-#if !defined(QT_VERSION) || QT_VERSION < QT_VERSION_CHECK(6, 11, 0)
-#  error "qt6core requires Qt >= 6.11"
-#endif
+#include "../internal/qt6core/check_qt_version.h"
 
 #include <QChar>
 #include <QtCore/QLatin1Char>
+
+#include "qchar_c.h"
 
 namespace {
 constexpr QChar C(uint16_t u) noexcept { return QChar::fromUcs2(static_cast<char16_t>(u)); }

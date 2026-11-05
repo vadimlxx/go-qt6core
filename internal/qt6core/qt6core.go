@@ -132,7 +132,13 @@ func QByteArrayFromQString(q unsafe.Pointer) unsafe.Pointer {
 // QStringDelete frees a QString* created by any QStringFrom* function.
 func QStringDelete(q unsafe.Pointer) { C.qt6core_qstring_delete(q) }
 
-// QByteArrayDelete frees a QByteArray* created by QByteArrayFromQString.
+// QByteArrayDelete frees a QByteArray* created by any bridge function.
+//
+// Most packages should NOT call this directly — wrap the result with
+// qbytearray.AdoptUnsafePtr and let qbytearray's finalizer own the lifetime.
+// QByteArrayDelete exists for the rare case where a package needs to
+// construct a QByteArray via the bridge and free it without going through
+// the qbytearray package (e.g. inside a C-callback in qstring).
 func QByteArrayDelete(ba unsafe.Pointer) { C.qt6core_qbytearray_delete(ba) }
 
 // ---- Diagnostics --------------------------------------------------------

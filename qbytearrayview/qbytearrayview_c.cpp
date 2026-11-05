@@ -1,8 +1,5 @@
 /* Order: real Qt headers first, then our C ABI wrapper. */
-#include <QtCore/qglobal.h>
-#if !defined(QT_VERSION) || QT_VERSION < QT_VERSION_CHECK(6, 11, 0)
-#  error "go-qt6core requires Qt >= 6.11"
-#endif
+#include "../internal/qt6core/check_qt_version.h"
 
 #include <QByteArray>       // brings QByteArrayView + QByteArrayView::toByteArray()
 #include <QByteArrayView>
