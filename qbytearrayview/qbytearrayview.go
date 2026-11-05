@@ -1,9 +1,9 @@
 package qbytearrayview
 
 /*
- В Qt есть first() (синоним front, deprecated) и first(qsizetype n) (subview). В Go перегрузки нет → используем Front()/Back() для байт, First(n)/Last(n) для подviews — как в qbytearray.
+ В Qt есть first() (синоним front, deprecated) и first(qsizetype n) (subview). В Go перегрузки нет → используем Front()/Back() для байт, First(n)/Last(n) для subviews — как в qbytearray.
 
- Что сознательно не вошло                                                                          *
+ Что сознательно не вошло
  STL-итераторы (begin/end/rbegin/rend) — не идиоматичны в Go; Bytes() — замена.
 
  operator std::string_view — не идиоматичен; String()/Bytes().

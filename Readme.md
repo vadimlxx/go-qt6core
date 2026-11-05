@@ -1,4 +1,4 @@
-# Qt6 QtCore binding for Golang, in development
+# Qt6 QtCore binding for Golang, under construction
 
 Qt 6.11
 
