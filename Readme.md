@@ -7,8 +7,15 @@ Qt 6.11
 - QChar
 - QByteArray
 
-go not supported operator[], use At/SetAt
+Go not supported operator[], use At/SetAt
+
 no FromRawData, use FromBytes
+
+- QByteArrayList
+
+QList::begin/end -- Go not supported, replaced with ToSlice()
+
+operator+ -- use ToSlice + FromQByteArrays.
 
 ### License
 
