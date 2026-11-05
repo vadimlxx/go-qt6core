@@ -1,5 +1,7 @@
 package qchar
 
+// TODO: decomposition() вернёт QString, появится вместе с подпакетом qstring
+
 /*
 #cgo pkg-config: Qt6Core
 #cgo CXXFLAGS: -std=c++17 -fPIC
