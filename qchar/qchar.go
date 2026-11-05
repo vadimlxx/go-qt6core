@@ -1,6 +1,10 @@
 package qchar
 
-// TODO: decomposition() вернёт QString, появится вместе с подпакетом qstring
+// TODO: decomposition()  wait qstring
+
+// GCC < 16 & Clang ignoring unknown -Wno-*
+// cgo CXXFLAGS: -std=c++17 -fPIC -Wno-sfinae-incomplete
+// replaced on pragma
 
 /*
 #cgo pkg-config: Qt6Core

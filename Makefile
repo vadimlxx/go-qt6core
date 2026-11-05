@@ -7,4 +7,5 @@ test-lib:
 	pkg-config --modversion Qt6Core
 	
 test:
-	go test ./... -v
+	# go test -v -race ./...
+	go test ./...

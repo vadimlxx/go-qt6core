@@ -7,6 +7,8 @@ Qt 6.11
 - QChar
 - QByteArray
 
+go not supported operator[], use At/SetAt
+no FromRawData, use FromBytes
 
 ### License
 
