@@ -785,3 +785,13 @@ func AdoptUnsafePtr(p unsafe.Pointer) *QByteArray {
 	}
 	return wrap((*C.QByteArray)(p))
 }
+
+// ConstDataUnsafe returns the raw C++ QByteArray data pointer.
+// Valid until the QByteArray is mutated, resized, or Close()d.
+//
+// WARNING: unsafe. The returned pointer aliases internal storage.
+// The caller must keep q alive (and unmutated) for as long as the pointer
+// is used. Intended for zero-copy QByteArrayView construction only.
+func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
+	return unsafe.Pointer(C.qbytearray_data(q.p))
+}

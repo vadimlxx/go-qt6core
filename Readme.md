@@ -9,13 +9,19 @@ Qt 6.11
 
 Go not supported operator[], use At/SetAt
 
-no FromRawData, use FromBytes
+No FromRawData, use FromBytes
 
 - QByteArrayList
 
 QList::begin/end -- Go not supported, replaced with ToSlice()
 
 operator+ -- use ToSlice + FromQByteArrays.
+
+- QByteArrayView
+
+Use Front()/Back() for bytes, First(n)/Last(n) for subviews — as in qbytearray.
+
+STL-iterators (begin/end/rbegin/rend) replaced with Bytes()
 
 ### License
 
