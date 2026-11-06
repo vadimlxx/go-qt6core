@@ -89,6 +89,23 @@ func FromString(s string) QStringView {
 	}
 }
 
+// NewUnsafeWithOwner builds a view over raw UTF-16 data and attaches an
+// owner reference that keeps the underlying buffer alive for as long as
+// the view (or its slices) is referenced.
+//
+// Advanced usage: intended for sibling go-qt6core subpackages
+// (e.g. qstring) that need a zero-copy view over their internal storage.
+// The owner is typically the *QString that provided data.
+func NewUnsafeWithOwner(data unsafe.Pointer, size int, owner any) QStringView {
+	if size < 0 {
+		panic("qstringview: NewUnsafeWithOwner negative size")
+	}
+	if size > 0 && data == nil {
+		panic("qstringview: NewUnsafeWithOwner nil data with non-zero size")
+	}
+	return QStringView{data: data, size: size, keepAlive: owner}
+}
+
 // ---- accessors -----------------------------------------------------------
 
 func (v QStringView) Size() int    { return v.size }

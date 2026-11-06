@@ -30,6 +30,11 @@ STL-iterators (begin/end/rbegin/rend) replaced with Bytes()
 
 toWCharArray()   — wchar_t platform size mismatch
 
+- QString
+
+Go-panic on out-of-range for At/First/Last/Sliced/SlicedN/Chopped
+Left/Right/Mid without panic
+
 
 ### License
 
