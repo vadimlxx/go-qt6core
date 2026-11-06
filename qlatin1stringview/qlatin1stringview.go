@@ -601,3 +601,17 @@ func (v QLatin1StringView) ToUtf8() *qbytearray.QByteArray {
 
 // MaxSize mirrors QLatin1StringView::maxSize().
 func MaxSize() int { return int(C.qlatin1stringview_max_size()) }
+
+// NewUnsafeWithOwner builds a view over raw Latin-1 data and attaches an owner reference
+// keeping the underlying buffer alive for as long as the view (or its slices) is referenced.
+//
+// Advanced usage: intended for sibling go-qt6core subpackages (e.g. qanystringview).
+func NewUnsafeWithOwner(data unsafe.Pointer, size int, owner any) QLatin1StringView {
+	if size < 0 {
+		panic("qlatin1stringview: NewUnsafeWithOwner negative size")
+	}
+	if size > 0 && data == nil {
+		panic("qlatin1stringview: NewUnsafeWithOwner nil data with non-zero size")
+	}
+	return QLatin1StringView{data: data, size: size, keepAlive: owner}
+}

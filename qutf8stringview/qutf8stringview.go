@@ -416,3 +416,17 @@ func (v QUtf8StringView) ToString() *qstring.QString {
 
 // MaxSize mirrors QUtf8StringView::maxSize().
 func MaxSize() int { return int(C.qutf8stringview_max_size()) }
+
+// NewUnsafeWithOwner builds a view over raw UTF-8 data and attaches an owner reference
+// keeping the underlying buffer alive for as long as the view (or its slices) is referenced.
+//
+// Advanced usage: intended for sibling go-qt6core subpackages (e.g. qanystringview).
+func NewUnsafeWithOwner(data unsafe.Pointer, size int, owner any) QUtf8StringView {
+	if size < 0 {
+		panic("qutf8stringview: NewUnsafeWithOwner negative size")
+	}
+	if size > 0 && data == nil {
+		panic("qutf8stringview: NewUnsafeWithOwner nil data with non-zero size")
+	}
+	return QUtf8StringView{data: data, size: size, keepAlive: owner}
+}

@@ -44,6 +44,8 @@ No reverse_iterator methods (rbegin/rend/crbegin/crend)
 
 QString overloads of compare/equal (side) — would create an import cycle with qstringview; use qstring.QString → .Utf8() → FromQByteArray, or convert to QStringView / QLatin1StringView first
 
+- QAnyStringView
+
 
 ### License
 
