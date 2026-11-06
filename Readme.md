@@ -19,10 +19,17 @@ QList::begin/end -- Go not supported, replaced with ToSlice()
 operator+ -- use ToSlice + FromQByteArrays.
 
 - QByteArrayView
+- QLatin1Char
+- QStringView
 
 Use Front()/Back() for bytes, First(n)/Last(n) for subviews — as in qbytearray.
 
 STL-iterators (begin/end/rbegin/rend) replaced with Bytes()
+
+- QLatin1StringView ( = QLatin1String)
+
+toWCharArray()   — wchar_t platform size mismatch
+
 
 ### License
 
