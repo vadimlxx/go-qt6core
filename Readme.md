@@ -5,6 +5,7 @@ Qt 6.11
 #### Order:
 
 - QChar
+- QLatin1Char
 - QByteArray
 
 Go not supported operator[], use At/SetAt
