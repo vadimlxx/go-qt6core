@@ -98,6 +98,9 @@ uint16_t qchar_from_ucs2(uint16_t ucs2);
  * code units; the second is 0 if the input fit into a single QChar. */
 void qchar_from_ucs4(uint32_t ucs4, uint16_t out[2]);
 
+/* --- Decomposition (returns new QString* via out pointer) --- */
+void qchar_decomposition(uint32_t ucs4, void **out_qstring);
+
 #ifdef __cplusplus
 }
 #endif

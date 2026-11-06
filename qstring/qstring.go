@@ -649,3 +649,29 @@ func MaxSize() int { return int(C.qstring_max_size()) }
 
 func (q *QString) IsRightToLeft() bool { return bool(C.qstring_is_right_to_left(q.p)) }
 func (q *QString) IsValidUtf16() bool  { return bool(C.qstring_is_valid_utf16(q.p)) }
+
+// FromDecomposition returns a QString containing the Unicode decomposition
+// of c, or an empty string if c has no decomposition.
+// Equivalent to QChar::decomposition() in Qt.
+//
+// This helper lives in qstring because qchar cannot import qstring
+// (qstring imports qchar for At/Front/Back). qchar exposes the raw
+// QString* via c.Decompose() as unsafe.Pointer; this wraps it into an
+// owned *QString.
+func FromDecomposition(c qchar.QChar) *QString {
+	return AdoptUnsafePtr(c.Decompose())
+}
+
+// FromQChar constructs a QString of length 1 containing c
+// (mirrors QString(QChar c)).
+func FromQChar(c qchar.QChar) *QString {
+	return FromUtf16([]uint16{uint16(c)})
+}
+
+// FromRepeat constructs a QString of length n with every character set to c
+// (mirrors QString(qsizetype size, QChar c)).
+func FromRepeat(n int, c qchar.QChar) *QString {
+	s := New()
+	s.ResizeFill(n, c)
+	return s
+}

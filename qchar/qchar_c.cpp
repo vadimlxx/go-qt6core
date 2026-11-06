@@ -1,6 +1,7 @@
 #include "../internal/qt6core/check_qt_version.h"
 
 #include <QChar>
+#include <QString>
 #include <QtCore/QLatin1Char>
 
 #include "qchar_c.h"
@@ -120,6 +121,11 @@ void qchar_from_ucs4(uint32_t ucs4, uint16_t out[2]) {
         out[0] = static_cast<uint16_t>(QChar::highSurrogate(U(ucs4)));
         out[1] = static_cast<uint16_t>(QChar::lowSurrogate(U(ucs4)));
     }
+}
+
+/* --- Decomposition --- */
+void qchar_decomposition(uint32_t ucs4, void **out_qstring) {
+	*out_qstring = static_cast<void *>(new QString(QChar::decomposition(U(ucs4))));
 }
 
 } // extern "C"
