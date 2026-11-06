@@ -33,7 +33,16 @@ toWCharArray()   — wchar_t platform size mismatch
 - QString
 
 Go-panic on out-of-range for At/First/Last/Sliced/SlicedN/Chopped
+
 Left/Right/Mid without panic
+
+- QUtf8StringView
+
+fromArray()  — trivial; use FromBytes instead
+
+No reverse_iterator methods (rbegin/rend/crbegin/crend)
+
+QString overloads of compare/equal (side) — would create an import cycle with qstringview; use qstring.QString → .Utf8() → FromQByteArray, or convert to QStringView / QLatin1StringView first
 
 
 ### License

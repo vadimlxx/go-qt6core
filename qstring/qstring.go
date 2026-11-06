@@ -134,6 +134,19 @@ func (q *QString) Clone() *QString {
 	return wrap(unsafe.Pointer(C.qstring_new_copy(q.p)))
 }
 
+// AdoptUnsafePtr wraps a heap-allocated C++ QString* into a Go wrapper.
+// The Go wrapper takes ownership: its finalizer (and explicit Close())
+// will delete the C++ object.
+//
+// Intended for sibling go-qt6core subpackages (e.g. qutf8stringview)
+// that need to return *QString values constructed by their own C++ helpers.
+func AdoptUnsafePtr(p unsafe.Pointer) *QString {
+	if p == nil {
+		return nil
+	}
+	return wrap(p)
+}
+
 // ---- accessors -----------------------------------------------------------
 
 func (q *QString) Size() int  { return int(C.qstring_size(q.p)) }
