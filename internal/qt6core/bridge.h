@@ -32,8 +32,12 @@ void qt6core_qstring_to_utf16  (const void *q, uint16_t **out_data, ptrdiff_t *o
 void qt6core_qstring_to_latin1 (const void *q, char **out_data, ptrdiff_t *out_size);
 
 /* ---- QByteArray <-> QString (return new object of target type) ---- */
-void* qt6core_qbytearray_to_qstring (const void *ba);  /* new QString*    */
-void* qt6core_qstring_to_qbytearray (const void *q);   /* new QByteArray* */
+void* qt6core_qbytearray_to_qstring         (const void *ba);  /* QString::fromUtf8(QByteArrayView) */
+void* qt6core_qbytearray_to_qstring_latin1  (const void *ba);  /* QString::fromLatin1(QByteArrayView) */
+void* qt6core_qbytearray_to_qstring_local8bit(const void *ba); /* QString::fromLocal8Bit(QByteArrayView) */
+void* qt6core_qstring_to_qbytearray         (const void *q);   /* QString::toUtf8() */
+void* qt6core_qstring_to_qbytearray_latin1  (const void *q);   /* QString::toLatin1() */
+void* qt6core_qstring_to_qbytearray_local8bit(const void *q);  /* QString::toLocal8Bit() */
 
 /* ---- Destructors for objects created above ---- */
 void qt6core_qstring_delete    (void *q);

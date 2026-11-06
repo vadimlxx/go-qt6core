@@ -155,6 +155,13 @@ QByteArray* qbytearray_uncompress(const QByteArray *self);
 QByteArray** qbytearray_split(const QByteArray *self, char sep, ptrdiff_t *out_len);
 void         qbytearray_split_free_array(QByteArray **arr);
 
+/* --- null-termination --- */
+void        qbytearray_null_terminate(QByteArray *self);
+QByteArray* qbytearray_null_terminated(const QByteArray *self);
+
+/* --- sharing inspection --- */
+bool qbytearray_is_shared_with(const QByteArray *self, const QByteArray *other);
+
 #ifdef __cplusplus
 }
 #endif

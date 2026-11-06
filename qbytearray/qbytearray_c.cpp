@@ -331,4 +331,14 @@ void qbytearray_split_free_array(QByteArray **arr) {
     std::free(arr);
 }
 
+void qbytearray_null_terminate(QByteArray *self) {
+	self->nullTerminate();
+}
+QByteArray* qbytearray_null_terminated(const QByteArray *self) {
+	return new QByteArray(self->nullTerminated());
+}
+bool qbytearray_is_shared_with(const QByteArray *self, const QByteArray *other) {
+	return self->isSharedWith(*other);
+}
+
 } // extern "C"

@@ -73,9 +73,25 @@ void *qt6core_qbytearray_to_qstring(const void *ba) {
     if (!ba) return nullptr;
     return toVoid(new QString(QString::fromUtf8(*B(ba))));
 }
+void *qt6core_qbytearray_to_qstring_latin1(const void *ba) {
+	if (!ba) return nullptr;
+	return toVoid(new QString(QString::fromLatin1(*B(ba))));
+}
+void *qt6core_qbytearray_to_qstring_local8bit(const void *ba) {
+	if (!ba) return nullptr;
+	return toVoid(new QString(QString::fromLocal8Bit(*B(ba))));
+}
 void *qt6core_qstring_to_qbytearray(const void *q) {
     if (!q) return nullptr;
     return toVoid(new QByteArray(Q(q)->toUtf8()));
+}
+void *qt6core_qstring_to_qbytearray_latin1(const void *q) {
+	if (!q) return nullptr;
+	return toVoid(new QByteArray(Q(q)->toLatin1()));
+}
+void *qt6core_qstring_to_qbytearray_local8bit(const void *q) {
+	if (!q) return nullptr;
+	return toVoid(new QByteArray(Q(q)->toLocal8Bit()));
 }
 
 /* ---- Destructors ---- */
@@ -90,5 +106,6 @@ void qt6core_get_version(int *major, int *minor, int *patch) {
     *minor = (QT_VERSION >>  8) & 0xFF;
     *patch =  QT_VERSION        & 0xFF;
 }
+
 
 } // extern "C"

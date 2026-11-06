@@ -121,10 +121,22 @@ func QStringToLatin1(q unsafe.Pointer) []byte {
 func QStringFromQByteArray(ba unsafe.Pointer) unsafe.Pointer {
 	return C.qt6core_qbytearray_to_qstring(ba)
 }
+func QStringFromQByteArrayLatin1(ba unsafe.Pointer) unsafe.Pointer {
+	return C.qt6core_qbytearray_to_qstring_latin1(ba)
+}
+func QStringFromQByteArrayLocal8Bit(ba unsafe.Pointer) unsafe.Pointer {
+	return C.qt6core_qbytearray_to_qstring_local8bit(ba)
+}
 
 // QByteArrayFromQString returns a new QByteArray* with q encoded as UTF-8.
 func QByteArrayFromQString(q unsafe.Pointer) unsafe.Pointer {
 	return C.qt6core_qstring_to_qbytearray(q)
+}
+func QByteArrayFromQStringLatin1(q unsafe.Pointer) unsafe.Pointer {
+	return C.qt6core_qstring_to_qbytearray_latin1(q)
+}
+func QByteArrayFromQStringLocal8Bit(q unsafe.Pointer) unsafe.Pointer {
+	return C.qt6core_qstring_to_qbytearray_local8bit(q)
 }
 
 // ---- Destructors --------------------------------------------------------
