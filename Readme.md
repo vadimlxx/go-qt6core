@@ -46,6 +46,22 @@ QString overloads of compare/equal (side) — would create an import cycle with 
 
 - QAnyStringView
 
+fromArray() — use FromBytes / FromString
+
+Comparison operators (==, !=, <, <=, >, >=) — use Compare / Equal
+
+operator std::string_view / operator std::u8string_view — use Bytes()
+
+- QStringBuilder
+
+operator% (a % b): Go has no user-defined operators. Use Concat or Append.
+
+operator+ (with QT_USE_QSTRINGBUILDER): same; use Concat / AppendPart.
+
+QStringBuilder<A,B>::size() and ::isNull(): not exposed (semantics are "approximate" in Qt — upper bound rather than exact), use ToQString().Size() / ToQByteArray().Size() instead.
+
+QStringBuilderCommon::toUpper() / toLower(): not exposed as builder methods (return type depends on flavor). Use ToQString().ToUpper() / ToLower() or ToQByteArray().ToUpper() / ToLower().
+
 
 ### License
 

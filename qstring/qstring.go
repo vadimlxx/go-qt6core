@@ -675,3 +675,13 @@ func FromRepeat(n int, c qchar.QChar) *QString {
 	s.ResizeFill(n, c)
 	return s
 }
+
+// UnsafePtr returns the underlying C++ QString* as unsafe.Pointer. The caller does not take
+// ownership: the C++ object stays alive as long as this Go wrapper is not Close()d.
+//
+// Used by sibling subpackages (e.g. qstringbuilder) that need to pass the QString to their own
+// C++ helpers. Not part of the regular API.
+func (q *QString) UnsafePtr() unsafe.Pointer {
+	return unsafe.Pointer(q.p)
+}
+
