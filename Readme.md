@@ -28,7 +28,7 @@ STL-iterators (begin/end/rbegin/rend) replaced with Bytes()
 
 - QLatin1StringView ( = QLatin1String)
 
-toWCharArray()   — wchar_t platform size mismatch
+toWCharArray() — wchar_t platform size mismatch
 
 - QString
 
@@ -56,12 +56,21 @@ operator std::string_view / operator std::u8string_view — use Bytes()
 
 operator% (a % b): Go has no user-defined operators. Use Concat or Append.
 
-operator+ (with QT_USE_QSTRINGBUILDER): same; use Concat / AppendPart.
+operator+ : same; use Concat / AppendPart.
 
 QStringBuilder<A,B>::size() and ::isNull(): not exposed (semantics are "approximate" in Qt — upper bound rather than exact), use ToQString().Size() / ToQByteArray().Size() instead.
 
 QStringBuilderCommon::toUpper() / toLower(): not exposed as builder methods (return type depends on flavor). Use ToQString().ToUpper() / ToLower() or ToQByteArray().ToUpper() / ToLower().
 
+- QStringConverter
+
+Invoking Interface::{toUtf16, toUtf16Len, fromUtf16, fromUtf16Len} from Go — requires cgo function-pointer support; the pointers are exposed as unsafe.Pointer, but calling them is not implemented.
+
+operator|, operator& — Go has no operator overloading; use Flags.Has(flag).
+
+
+
+All details see in doc.go files
 
 ### License
 

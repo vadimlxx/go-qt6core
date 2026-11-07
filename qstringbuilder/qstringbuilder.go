@@ -1,22 +1,24 @@
 package qstringbuilder
 
 // Package qstringbuilder предоставляет Go-биндинг для Qt 6.11 QtCore/QStringBuilder.
-//
-// TODO (на будущее, не реализовано):
-//   - operator% и operator+ (QT_USE_QSTRINGBUILDER) — в Go нет перегрузки операторов;
-//     используйте Concat / AppendPart / Append.
-//   - QConcatenable<T>-специализации — внутренний механизм C++, не экспортируется.
-//   - ExactSize-оптимизация — внутренняя деталь C++; в Go материализация всегда даёт точный
-//     результат, resize делается в C++.
-//   - QStringBuilder::size() и ::isNull() — не экспортируются (в Qt семантика "приблизительная",
-//     верхняя граница); используйте ToQString().Size() / ToQByteArray().Size().
-//   - toUpper()/toLower() как методы builder'а — тип результата зависит от flavor;
-//     используйте ToQString().ToUpper() / ToLower() или ToQByteArray().ToUpper() / ToLower().
-//   - operator std::string_view / std::u16string_view — неприменимо в Go.
-//   - QDebug operator<< — неприменимо.
-//   - QUtf8StringView / QAnyStringView как части — в Qt 6.11 не входят в QStringBuilder;
-//     при передаче таких объектов — panic.
-//   - QStringBuilder<A, B> с более чем двумя операндами — покрывается Concat(...) или цепочкой Append.
+
+/*
+ не реализовано:
+   - operator% и operator+ (QT_USE_QSTRINGBUILDER) — в Go нет перегрузки операторов;
+     используйте Concat / AppendPart / Append.
+   - QConcatenable<T>-специализации — внутренний механизм C++, не экспортируется.
+   - ExactSize-оптимизация — внутренняя деталь C++; в Go материализация всегда даёт точный
+     результат, resize делается в C++.
+   - QStringBuilder::size() и ::isNull() — не экспортируются (в Qt семантика "приблизительная",
+     верхняя граница); используйте ToQString().Size() / ToQByteArray().Size().
+   - toUpper()/toLower() как методы builder'а — тип результата зависит от flavor;
+     используйте ToQString().ToUpper() / ToLower() или ToQByteArray().ToUpper() / ToLower().
+   - operator std::string_view / std::u16string_view — неприменимо в Go.
+   - QDebug operator<< — неприменимо.
+   - QUtf8StringView / QAnyStringView как части — в Qt 6.11 не входят в QStringBuilder;
+     при передаче таких объектов — panic.
+   - QStringBuilder<A, B> с более чем двумя операндами — покрывается Concat(...) или цепочкой Append.
+*/
 
 /*
 #cgo pkg-config: Qt6Core
