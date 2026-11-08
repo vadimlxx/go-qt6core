@@ -74,7 +74,13 @@ QStringEncoder::operator()  Go has no operator(); use Encode / EncodeView.
 
 QStringEncoder::encode(const QString&) vs encode(QStringView): Go has one method per input type; no overload set.
 
+- QStringDecoder
 
+QStringDecoder::operator() Go has no operator(); use Decode / DecodeView.
+
+QStringDecoder::decode(const QByteArray&) vs decode(QByteArrayView): Go has one method per input type; no overload set.
+
+EncodedData<T> as a public type: not exposed; Decode / DecodeView return the materialized QString directly.
 
 
 All details see in doc.go files
