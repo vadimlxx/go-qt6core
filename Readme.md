@@ -68,6 +68,13 @@ Invoking Interface::{toUtf16, toUtf16Len, fromUtf16, fromUtf16Len} from Go — r
 
 operator|, operator& — Go has no operator overloading; use Flags.Has(flag).
 
+- QStringEncoder
+
+QStringEncoder::operator()  Go has no operator(); use Encode / EncodeView.
+
+QStringEncoder::encode(const QString&) vs encode(QStringView): Go has one method per input type; no overload set.
+
+
 
 
 All details see in doc.go files

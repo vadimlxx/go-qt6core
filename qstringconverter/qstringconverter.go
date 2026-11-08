@@ -73,6 +73,11 @@ type Interface struct {
 // IsNil reports whether i wraps a null pointer.
 func (i Interface) IsNil() bool { return i.p == nil }
 
+// UnsafePtr returns the raw const QStringConverter::Interface* as unsafe.Pointer.
+// Used by sibling subpackages (qstringencoder) that need to pass the interface to their
+// own C++ helpers. Not part of the regular public API.
+func (i Interface) UnsafePtr() unsafe.Pointer { return i.p }
+
 // Name returns the encoding name ("UTF-16", "ISO-8859-1", etc.), or "" for a null Interface.
 func (i Interface) Name() string {
 	if i.p == nil {
@@ -127,7 +132,8 @@ func (i Interface) FromUtf16LenPtr() unsafe.Pointer {
 // non-owning view over the same C++ object; the *QStringConverter wrapper owns it.
 type QStringConverter struct {
 	*QStringConverterBase
-	p *C.go_qsc_t
+	p         *C.go_qsc_t
+	ownedByGo bool
 }
 
 func newQStringConverterFromC(c *C.go_qsc_t) *QStringConverter {
@@ -136,18 +142,19 @@ func newQStringConverterFromC(c *C.go_qsc_t) *QStringConverter {
 	}
 	base := &QStringConverterBase{
 		p:         (*C.go_qscbase_t)(unsafe.Pointer(c)),
-		ownedByGo: false,
+		ownedByGo: false, // the *QStringConverter wrapper owns
 	}
 	qsc := &QStringConverter{
 		QStringConverterBase: base,
 		p:                     c,
+		ownedByGo:             true,
 	}
 	runtime.SetFinalizer(qsc, finalizeQStringConverter)
 	return qsc
 }
 
 func finalizeQStringConverter(qsc *QStringConverter) {
-	if qsc.p != nil {
+	if qsc.p != nil && qsc.ownedByGo {
 		C.qstringconverter_delete(qsc.p)
 		qsc.p = nil
 		if qsc.QStringConverterBase != nil {
@@ -197,8 +204,9 @@ func NewQStringConverterFromIface(i Interface) *QStringConverter {
 }
 
 // Close frees the underlying C++ object immediately and disables the finalizer.
+// For a converter obtained via AdoptUnsafePtr (non-owning), Close is a no-op.
 func (q *QStringConverter) Close() {
-	if q.p != nil {
+	if q.p != nil && q.ownedByGo {
 		C.qstringconverter_delete(q.p)
 		q.p = nil
 		if q.QStringConverterBase != nil {
@@ -392,3 +400,42 @@ func EncodingForHtml(data qbytearrayview.QByteArrayView) (Encoding, bool) {
 }
 
 // TODO: AvailableCodecs() []string — needs qstringlist package for QStringList result.
+
+// UnsafePtr returns the underlying C++ QStringConverter* as unsafe.Pointer.
+// The caller does not take ownership: the C++ object stays alive as long as this Go wrapper
+// (or the owning wrapper that adopted it, e.g. *qstringencoder.QStringEncoder) is not
+// Close()d.
+//
+// Intended for sibling subpackages (qstringencoder, qstringdecoder) that need to pass the
+// converter to their own C++ helpers via cgo.
+func (q *QStringConverter) UnsafePtr() unsafe.Pointer {
+	if q == nil || q.p == nil {
+		return nil
+	}
+	return unsafe.Pointer(q.p)
+}
+
+// AdoptUnsafePtr wraps an existing C++ QStringConverter* as a *QStringConverter that does
+// NOT own the object: no finalizer is installed and Close() is a no-op.
+//
+// The caller must keep the C++ object alive (typically by owning it through a derived
+// wrapper, e.g. *qstringencoder.QStringEncoder, which embeds this *QStringConverter for API
+// parity with Qt's class hierarchy).
+//
+// Intended for sibling subpackages (qstringencoder, qstringdecoder), not for end users.
+func AdoptUnsafePtr(p unsafe.Pointer) *QStringConverter {
+	if p == nil {
+		return nil
+	}
+	base := &QStringConverterBase{
+		p:         (*C.go_qscbase_t)(p),
+		ownedByGo: false,
+	}
+	qsc := &QStringConverter{
+		QStringConverterBase: base,
+		p:                    (*C.go_qsc_t)(p),
+		ownedByGo:            false,
+	}
+	// No SetFinalizer: not owned by this wrapper.
+	return qsc
+}
