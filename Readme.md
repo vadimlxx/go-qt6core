@@ -83,6 +83,15 @@ QStringDecoder::decode(const QByteArray&) vs decode(QByteArrayView): Go has one 
 EncodedData<T> as a public type: not exposed; Decode / DecodeView return the materialized QString directly.
 
 - QStringMatcher
+- QBitArray
+- QBitRef
+
+Operator overloads & / | / ^ / ~ / &= / |= / ^=: Go has no operator overloading. Use package functions And(a, b) / Or(a, b) / Xor(a, b) / Not(a) and methods (*QBitArray).AndAssign(other) / OrAssign / XorAssign. They are semantically equivalent.
+
+QBitRef::operator bool() / operator!() / operator=(bool) / operator=(const QBitRef&): exposed as methods Bool() / Not() / Set(bool) / Assign(*QBitRef).
+
+QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size().
+
 
 
 All details see in doc.go files
