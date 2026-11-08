@@ -82,6 +82,8 @@ QStringDecoder::decode(const QByteArray&) vs decode(QByteArrayView): Go has one 
 
 EncodedData<T> as a public type: not exposed; Decode / DecodeView return the materialized QString directly.
 
+- QStringMatcher
+
 
 All details see in doc.go files
 
