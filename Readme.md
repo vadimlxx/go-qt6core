@@ -2,7 +2,7 @@
 
 Qt 6.11
 
-#### Order:
+#### All string classes are assigned to QText:
 
 - QChar
 - QLatin1Char

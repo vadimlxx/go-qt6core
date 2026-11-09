@@ -30,11 +30,7 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qchar"
-	"github.com/vadimlxx/go-qt6core/qlatin1stringview"
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringview"
+	"github.com/vadimlxx/go-qt6core/qtext"
 	"github.com/vadimlxx/go-qt6core/qutf8stringview"
 )
 
@@ -102,7 +98,7 @@ func FromString(s string) QAnyStringView {
 }
 
 // FromQByteArray returns a zero-copy UTF-8 view over q's internal buffer. The view keeps q alive.
-func FromQByteArray(q *qbytearray.QByteArray) QAnyStringView {
+func FromQByteArray(q *qtext.QByteArray) QAnyStringView {
 	if q == nil || q.IsNull() {
 		return Empty()
 	}
@@ -118,7 +114,7 @@ func FromQUtf8StringView(v qutf8stringview.QUtf8StringView) QAnyStringView {
 }
 
 // FromQLatin1StringView wraps a QLatin1StringView (KindLatin1).
-func FromQLatin1StringView(v qlatin1stringview.QLatin1StringView) QAnyStringView {
+func FromQLatin1StringView(v qtext.QLatin1StringView) QAnyStringView {
 	if v.IsNull() {
 		return Empty()
 	}
@@ -126,7 +122,7 @@ func FromQLatin1StringView(v qlatin1stringview.QLatin1StringView) QAnyStringView
 }
 
 // FromQStringView wraps a QStringView (KindUtf16).
-func FromQStringView(v qstringview.QStringView) QAnyStringView {
+func FromQStringView(v qtext.QStringView) QAnyStringView {
 	if v.IsNull() {
 		return Empty()
 	}
@@ -191,23 +187,23 @@ func (v QAnyStringView) Bytes() []byte {
 // ---- element access ------------------------------------------------------
 
 // Front returns the first character as a QChar. Panics if empty.
-func (v QAnyStringView) Front() qchar.QChar {
+func (v QAnyStringView) Front() qtext.QChar {
 	if v.size == 0 {
 		panic("qanystringview: Front on empty view")
 	}
 	r := C.qanystringview_front(v.data, C.ptrdiff_t(v.size), C.int(v.kind))
 	runtime.KeepAlive(v)
-	return qchar.New(uint16(r))
+	return qtext.NewQChar(uint16(r))
 }
 
 // Back returns the last character as a QChar. Panics if empty.
-func (v QAnyStringView) Back() qchar.QChar {
+func (v QAnyStringView) Back() qtext.QChar {
 	if v.size == 0 {
 		panic("qanystringview: Back on empty view")
 	}
 	r := C.qanystringview_back(v.data, C.ptrdiff_t(v.size), C.int(v.kind))
 	runtime.KeepAlive(v)
-	return qchar.New(uint16(r))
+	return qtext.NewQChar(uint16(r))
 }
 
 // ---- slicing -------------------------------------------------------------
@@ -334,26 +330,26 @@ func (v *QAnyStringView) SliceN(pos, n int) { *v = v.SlicedN(pos, n) }
 // ---- dispatch to concrete type ------------------------------------------
 
 // AsQStringView returns the underlying QStringView and true if Kind is Utf16,
-// or (qstringview.Empty(), false) otherwise.
-func (v QAnyStringView) AsQStringView() (qstringview.QStringView, bool) {
+// or (qtext.Empty(), false) otherwise.
+func (v QAnyStringView) AsQStringView() (qtext.QStringView, bool) {
 	if v.kind != KindUtf16 {
-		return qstringview.Empty(), false
+		return qtext.Empty(), false
 	}
 	if v.data == nil {
-		return qstringview.Empty(), true
+		return qtext.Empty(), true
 	}
-	return qstringview.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
+	return qtext.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
 }
 
 // AsQLatin1StringView returns the underlying QLatin1StringView and true if Kind is Latin1.
-func (v QAnyStringView) AsQLatin1StringView() (qlatin1stringview.QLatin1StringView, bool) {
+func (v QAnyStringView) AsQLatin1StringView() (qtext.QLatin1StringView, bool) {
 	if v.kind != KindLatin1 {
-		return qlatin1stringview.Empty(), false
+		return qtext.Empty(), false
 	}
 	if v.data == nil {
-		return qlatin1stringview.Empty(), true
+		return qtext.Empty(), true
 	}
-	return qlatin1stringview.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
+	return qtext.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
 }
 
 // AsQUtf8StringView returns the underlying QUtf8StringView and true if Kind is Utf8.
@@ -395,11 +391,11 @@ func Equal(lhs, rhs QAnyStringView) bool {
 
 // ---- conversion ----------------------------------------------------------
 
-// ToString returns a fresh *qstring.QString by decoding the contents according to Kind.
+// ToString returns a fresh *qtext.QString by decoding the contents according to Kind.
 // Equivalent to QAnyStringView::toString() (dispatches to QString::fromUtf8/fromLatin1/fromUtf16).
-func (v QAnyStringView) ToString() *qstring.QString {
+func (v QAnyStringView) ToString() *qtext.QString {
 	var out unsafe.Pointer
 	C.qanystringview_to_qstring(v.data, C.ptrdiff_t(v.size), C.int(v.kind), &out)
 	runtime.KeepAlive(v)
-	return qstring.AdoptUnsafePtr(out)
+	return qtext.AdoptUnsafePtr(out)
 }
