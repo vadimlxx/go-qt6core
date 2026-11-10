@@ -45,28 +45,35 @@ type QStringMatcher struct {
 	p *C.go_qsm_t
 }
 
-func wrap(p *C.go_qsm_t) *QStringMatcher {
+func wrapQStringMatcher(p *C.go_qsm_t) *QStringMatcher {
 	if p == nil {
 		return nil
 	}
 	m := &QStringMatcher{p: p}
-	runtime.SetFinalizer(m, finalize)
+	runtime.SetFinalizer(m, finalizeQStringMatcher)
 	return m
 }
 
-func finalize(m *QStringMatcher) {
+func finalizeQStringMatcher(m *QStringMatcher) {
 	if m.p != nil {
 		C.qstringmatcher_delete(m.p)
 		m.p = nil
 	}
 }
 
+func csMInt(caseSensitive bool) C.int {
+	if caseSensitive {
+		return 1 // Qt::CaseSensitive
+	}
+	return 0 // Qt::CaseInsensitive
+}
+
 // ---- constructors --------------------------------------------------------
 
 // New creates an empty QStringMatcher (empty pattern, Qt::CaseSensitive).
 // Mirrors QStringMatcher().
-func New() *QStringMatcher {
-	return wrap(C.qstringmatcher_new_default())
+func NewQStringMatcher() *QStringMatcher {
+	return wrapQStringMatcher(C.qstringmatcher_new_default())
 }
 
 // FromQString creates a QStringMatcher from a QString pattern.
@@ -77,7 +84,7 @@ func QStringMatcherFromQString(pattern *QString, caseSensitive bool) *QStringMat
 	if pattern != nil {
 		p = pattern.UnsafePtr()
 	}
-	m := wrap(C.qstringmatcher_new_from_qstring(p, csInt(caseSensitive)))
+	m := wrapQStringMatcher(C.qstringmatcher_new_from_qstring(p, csMInt(caseSensitive)))
 	runtime.KeepAlive(pattern)
 	return m
 }
@@ -92,7 +99,7 @@ func QStringMatcherFromQStringView(pattern QStringView, caseSensitive bool) *QSt
 	if n > 0 {
 		p = (*C.uint16_t)(pattern.Utf16Unsafe())
 	}
-	m := wrap(C.qstringmatcher_new_from_utf16(p, C.ptrdiff_t(n), csInt(caseSensitive)))
+	m := wrapQStringMatcher(C.qstringmatcher_new_from_utf16(p, C.ptrdiff_t(n), csMInt(caseSensitive)))
 	runtime.KeepAlive(pattern)
 	return m
 }
@@ -105,7 +112,7 @@ func QStringMatcherFromUtf16(units []uint16, caseSensitive bool) *QStringMatcher
 	if len(units) > 0 {
 		p = (*C.uint16_t)(unsafe.Pointer(&units[0]))
 	}
-	m := wrap(C.qstringmatcher_new_from_utf16(p, C.ptrdiff_t(len(units)), csInt(caseSensitive)))
+	m := wrapQStringMatcher(C.qstringmatcher_new_from_utf16(p, C.ptrdiff_t(len(units)), csMInt(caseSensitive)))
 	runtime.KeepAlive(units)
 	return m
 }
@@ -124,7 +131,7 @@ func (m *QStringMatcher) Close() {
 
 // Clone returns a copy of m (via the C++ copy constructor).
 func (m *QStringMatcher) Clone() *QStringMatcher {
-	r := wrap(C.qstringmatcher_new_copy(m.p))
+	r := wrapQStringMatcher(C.qstringmatcher_new_copy(m.p))
 	runtime.KeepAlive(m)
 	return r
 }
@@ -158,7 +165,7 @@ func (m *QStringMatcher) SetPattern(q *QString) {
 // SetCaseSensitivity sets case sensitivity (true = Qt::CaseSensitive, false =
 // Qt::CaseInsensitive). Mirrors setCaseSensitivity(Qt::CaseSensitivity).
 func (m *QStringMatcher) SetCaseSensitivity(caseSensitive bool) {
-	C.qstringmatcher_set_case_sensitivity(m.p, csInt(caseSensitive))
+	C.qstringmatcher_set_case_sensitivity(m.p, csMInt(caseSensitive))
 	runtime.KeepAlive(m)
 }
 

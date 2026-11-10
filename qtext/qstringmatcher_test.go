@@ -6,7 +6,7 @@ import (
 )
 
 func TestQStringMatcherDefault(t *testing.T) {
-	m := New()
+	m := NewQStringMatcher()
 	defer m.Close()
 	// No crash, no panic. PatternView of default (empty pattern) is fine.
 	v := m.PatternView()
@@ -82,7 +82,7 @@ func TestQStringMatcherCaseSensitivity(t *testing.T) {
 }
 
 func TestQStringMatcherSetPattern(t *testing.T) {
-	m := New()
+	m := NewQStringMatcher()
 	defer m.Close()
 
 	haystack := QStringFromString("the quick brown fox")
@@ -201,7 +201,7 @@ func TestQStringMatcherIndexInMultiByte(t *testing.T) {
 }
 
 func TestQStringMatcherEmptyPattern(t *testing.T) {
-	m := New()
+	m := NewQStringMatcher()
 	defer m.Close()
 
 	haystack := QStringFromString("hello")

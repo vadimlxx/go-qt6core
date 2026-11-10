@@ -1,4 +1,4 @@
-package qbitarray
+package qtext
 
 // Package qbitarray: QBitArray — массив битов с COW-семантикой (handle-модель в Go).
 
@@ -43,16 +43,16 @@ type QBitArray struct {
 	p *C.go_qbitarray_t
 }
 
-func wrap(p *C.go_qbitarray_t) *QBitArray {
+func wrapQBitArray(p *C.go_qbitarray_t) *QBitArray {
 	if p == nil {
 		return nil
 	}
 	a := &QBitArray{p: p}
-	runtime.SetFinalizer(a, finalize)
+	runtime.SetFinalizer(a, finalizeQBitArray)
 	return a
 }
 
-func finalize(a *QBitArray) {
+func finalizeQBitArray(a *QBitArray) {
 	if a.p != nil {
 		C.qbitarray_delete(a.p)
 		a.p = nil
@@ -62,14 +62,14 @@ func finalize(a *QBitArray) {
 // ---- construction --------------------------------------------------------
 
 // New returns an empty (null and empty) QBitArray. Mirrors QBitArray().
-func New() *QBitArray {
-	return wrap(C.qbitarray_new_empty())
+func NewQBitArray() *QBitArray {
+	return wrapQBitArray(C.qbitarray_new_empty())
 }
 
 // NewSized returns a QBitArray of the given size, with all bits initialized to val.
 // Mirrors QBitArray(qsizetype size, bool val = false).
-func NewSized(size int, val bool) *QBitArray {
-	return wrap(C.qbitarray_new_sized(C.ptrdiff_t(size), C.bool(val)))
+func NewQBitArraySized(size int, val bool) *QBitArray {
+	return wrapQBitArray(C.qbitarray_new_sized(C.ptrdiff_t(size), C.bool(val)))
 }
 
 // ---- lifecycle -----------------------------------------------------------
@@ -86,7 +86,7 @@ func (a *QBitArray) Close() {
 
 // Clone returns a shallow COW copy (refcount++; cheap). Mirrors QBitArray(const QBitArray&).
 func (a *QBitArray) Clone() *QBitArray {
-	r := wrap(C.qbitarray_new_copy(a.p))
+	r := wrapQBitArray(C.qbitarray_new_copy(a.p))
 	runtime.KeepAlive(a)
 	return r
 }
@@ -254,7 +254,7 @@ func (a *QBitArray) XorAssign(other *QBitArray) {
 
 // And returns a fresh QBitArray equal to a & b. Mirrors operator&(const QBitArray&, const QBitArray&).
 func And(a, b *QBitArray) *QBitArray {
-	r := wrap(C.qbitarray_op_and(a.p, b.p))
+	r := wrapQBitArray(C.qbitarray_op_and(a.p, b.p))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(b)
 	return r
@@ -262,7 +262,7 @@ func And(a, b *QBitArray) *QBitArray {
 
 // Or returns a fresh QBitArray equal to a | b. Mirrors operator|(const QBitArray&, const QBitArray&).
 func Or(a, b *QBitArray) *QBitArray {
-	r := wrap(C.qbitarray_op_or(a.p, b.p))
+	r := wrapQBitArray(C.qbitarray_op_or(a.p, b.p))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(b)
 	return r
@@ -270,7 +270,7 @@ func Or(a, b *QBitArray) *QBitArray {
 
 // Xor returns a fresh QBitArray equal to a ^ b. Mirrors operator^(const QBitArray&, const QBitArray&).
 func Xor(a, b *QBitArray) *QBitArray {
-	r := wrap(C.qbitarray_op_xor(a.p, b.p))
+	r := wrapQBitArray(C.qbitarray_op_xor(a.p, b.p))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(b)
 	return r
@@ -279,7 +279,7 @@ func Xor(a, b *QBitArray) *QBitArray {
 // Not returns a fresh QBitArray equal to ~a (all bits inverted).
 // Mirrors operator~(QBitArray a).
 func Not(a *QBitArray) *QBitArray {
-	r := wrap(C.qbitarray_inverted(a.p))
+	r := wrapQBitArray(C.qbitarray_inverted(a.p))
 	runtime.KeepAlive(a)
 	return r
 }
@@ -346,7 +346,7 @@ func FromBits(data []byte, bitLen int) *QBitArray {
 	if need > 0 {
 		p = (*C.char)(unsafe.Pointer(&data[0]))
 	}
-	r := wrap(C.qbitarray_from_bits(p, C.ptrdiff_t(bitLen)))
+	r := wrapQBitArray(C.qbitarray_from_bits(p, C.ptrdiff_t(bitLen)))
 	runtime.KeepAlive(data)
 	return r
 }

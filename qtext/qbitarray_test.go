@@ -1,12 +1,12 @@
-package qbitarray
+package qtext
 
 import (
 	"bytes"
 	"testing"
 )
 
-func TestNewEmpty(t *testing.T) {
-	a := New()
+func TestQBitArrayNewEmpty(t *testing.T) {
+	a := NewQBitArray()
 	defer a.Close()
 
 	if a.Size() != 0 {
@@ -23,8 +23,8 @@ func TestNewEmpty(t *testing.T) {
 	}
 }
 
-func TestNewSized(t *testing.T) {
-	a := NewSized(10, false)
+func TestNewQBitArraySized(t *testing.T) {
+	a := NewQBitArraySized(10, false)
 	defer a.Close()
 
 	if a.Size() != 10 {
@@ -40,15 +40,15 @@ func TestNewSized(t *testing.T) {
 		t.Fatalf("CountSet(true): %d, want 0", a.CountSet(true))
 	}
 
-	b := NewSized(7, true)
+	b := NewQBitArraySized(7, true)
 	defer b.Close()
 	if b.CountSet(true) != 7 {
 		t.Fatalf("CountSet(true): %d, want 7", b.CountSet(true))
 	}
 }
 
-func TestSetClearToggle(t *testing.T) {
-	a := NewSized(8, false)
+func TestQBitArraySetClearToggle(t *testing.T) {
+	a := NewQBitArraySized(8, false)
 	defer a.Close()
 
 	if a.TestBit(3) {
@@ -71,8 +71,8 @@ func TestSetClearToggle(t *testing.T) {
 	}
 }
 
-func TestResize(t *testing.T) {
-	a := NewSized(4, true)
+func TestQBitArrayResize(t *testing.T) {
+	a := NewQBitArraySized(4, true)
 	defer a.Close()
 
 	a.Resize(8)
@@ -89,8 +89,8 @@ func TestResize(t *testing.T) {
 	}
 }
 
-func TestFill(t *testing.T) {
-	a := NewSized(5, false)
+func TestQBitArrayFill(t *testing.T) {
+	a := NewQBitArraySized(5, false)
 	defer a.Close()
 
 	a.Fill(true)
@@ -104,8 +104,8 @@ func TestFill(t *testing.T) {
 	}
 }
 
-func TestFillRange(t *testing.T) {
-	a := NewSized(10, false)
+func TestQBitArrayFillRange(t *testing.T) {
+	a := NewQBitArraySized(10, false)
 	defer a.Close()
 
 	a.FillRange(true, 2, 7)
@@ -120,10 +120,10 @@ func TestFillRange(t *testing.T) {
 	}
 }
 
-func TestAndOrXorNot(t *testing.T) {
-	a := NewSized(8, false)
+func TestQBitArrayAndOrXorNot(t *testing.T) {
+	a := NewQBitArraySized(8, false)
 	defer a.Close()
-	b := NewSized(8, false)
+	b := NewQBitArraySized(8, false)
 	defer b.Close()
 
 	a.SetBit(0)
@@ -160,10 +160,10 @@ func TestAndOrXorNot(t *testing.T) {
 	}
 }
 
-func TestAndAssign(t *testing.T) {
-	a := NewSized(8, true)
+func TestQBitArrayAndAssign(t *testing.T) {
+	a := NewQBitArraySized(8, true)
 	defer a.Close()
-	b := NewSized(8, false)
+	b := NewQBitArraySized(8, false)
 	defer b.Close()
 	b.SetBit(3)
 
@@ -173,8 +173,8 @@ func TestAndAssign(t *testing.T) {
 	}
 }
 
-func TestBitsRoundTrip(t *testing.T) {
-	a := NewSized(12, false)
+func TestQBitArrayBitsRoundTrip(t *testing.T) {
+	a := NewQBitArraySized(12, false)
 	defer a.Close()
 	a.SetBit(0)
 	a.SetBit(5)
@@ -195,9 +195,9 @@ func TestBitsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestBitsFormat(t *testing.T) {
+func TestQBitArrayBitsFormat(t *testing.T) {
 	// Qt bit layout: bit i = (data[i/8] >> (i % 8)) & 1.
-	a := NewSized(8, false)
+	a := NewQBitArraySized(8, false)
 	defer a.Close()
 	for i := 0; i < 8; i++ {
 		a.SetBit(i)
@@ -208,8 +208,8 @@ func TestBitsFormat(t *testing.T) {
 	}
 }
 
-func TestToUInt32(t *testing.T) {
-	a := NewSized(32, false)
+func TestQBitArrayToUInt32(t *testing.T) {
+	a := NewQBitArraySized(32, false)
 	defer a.Close()
 	// Bits 0..7 set => byte 0 = 0xFF, rest 0.
 	for i := 0; i < 8; i++ {
@@ -233,8 +233,8 @@ func TestToUInt32(t *testing.T) {
 	}
 }
 
-func TestEqual(t *testing.T) {
-	a := NewSized(8, false)
+func TestQBitArrayEqual(t *testing.T) {
+	a := NewQBitArraySized(8, false)
 	defer a.Close()
 	a.SetBit(2)
 
@@ -244,17 +244,17 @@ func TestEqual(t *testing.T) {
 		t.Fatal("equal arrays")
 	}
 
-	c := NewSized(8, false)
+	c := NewQBitArraySized(8, false)
 	defer c.Close()
 	if a.Equal(c) {
 		t.Fatal("different arrays must not be equal")
 	}
 }
 
-func TestSwap(t *testing.T) {
-	a := NewSized(4, true)
+func TestQBitArraySwap(t *testing.T) {
+	a := NewQBitArraySized(4, true)
 	defer a.Close()
-	b := NewSized(4, false)
+	b := NewQBitArraySized(4, false)
 	defer b.Close()
 	b.SetBit(0)
 
@@ -268,7 +268,7 @@ func TestSwap(t *testing.T) {
 }
 
 func TestBitRef(t *testing.T) {
-	a := NewSized(8, false)
+	a := NewQBitArraySized(8, false)
 	defer a.Close()
 
 	r := a.BitRef(3)
@@ -295,7 +295,7 @@ func TestBitRef(t *testing.T) {
 }
 
 func TestCloneIsIndependent(t *testing.T) {
-	a := NewSized(8, true)
+	a := NewQBitArraySized(8, true)
 	defer a.Close()
 	c := a.Clone()
 	defer c.Close()
@@ -311,7 +311,7 @@ func TestCloneIsIndependent(t *testing.T) {
 }
 
 func TestPanicsOnOutOfRange(t *testing.T) {
-	a := NewSized(4, false)
+	a := NewQBitArraySized(4, false)
 	defer a.Close()
 
 	funcs := []func(){

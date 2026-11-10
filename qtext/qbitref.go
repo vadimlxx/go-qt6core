@@ -1,4 +1,4 @@
-package qbitarray
+package qtext
 
 // Package qbitarray: QBitRef — прокси к одиночному биту внутри QBitArray.
 
