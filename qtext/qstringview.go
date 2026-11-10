@@ -1,6 +1,30 @@
 package qtext
 
 /*
+ Сознательно не реализовано:
+
+   - visit() — паттерн visitor из C++ не переносится в Go;
+     используйте Kind() + AsQStringView/AsQLatin1StringView/AsQUtf8StringView.
+   - arg() — вариативный шаблон QString::arg; появится с QString.Arg.
+   - Одиночные символьные конструкторы QAnyStringView(Char) —
+     используйте FromString(string(c)).
+   - fromArray() — используйте FromBytes / FromString.
+   - Неявные конструкторы с capacity-hint — используйте FromQString / FromQByteArray.
+   - Операторы сравнения (==, <) — используйте QAnyStringViewCompare / QAnyStringViewEqual.
+   - Неявные конверсии в QString / QByteArray — используйте ToString() / As*().
+   - operator std::string_view — используйте Bytes().
+   - Итераторы — используйте конкретные view-типы (As*()).
+   - detects_US_ASCII_at_compile_time — неактуально в Go.
+
+ Дизайн:
+
+   - QAnyStringView — primitive (data, size, kind, keepAlive), без финализатора.
+   - Слайсинг сохраняет Kind (как в Qt).
+   - Mid() может вернуть null-view (tag = KindUtf8), как QContainerImplHelper::mid().
+   - Truncate/Chop/Slice/SliceN мутируют приёмник.
+*/
+
+/*
 #cgo pkg-config: Qt6Core
 #cgo CXXFLAGS: -std=c++17 -fPIC -Wno-sfinae-incomplete
 #cgo LDFLAGS: -lstdc++

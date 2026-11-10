@@ -100,7 +100,7 @@ uint16_t qchar_from_ucs2(uint16_t ucs2);
 void qchar_from_ucs4(uint32_t ucs4, uint16_t out[2]);
 
 /* --- Decomposition (returns new QString* via out pointer) --- */
-go_qt6core_qstring_t* qchar_decomposition(uint32_t ucs4);
+QString* qchar_decomposition(uint32_t ucs4);
 
 #ifdef __cplusplus
 }

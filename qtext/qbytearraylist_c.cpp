@@ -10,142 +10,116 @@
 
 #include "qbytearraylist_c.h"
 
-namespace {
-
-inline QByteArrayList       *L(go_qt6core_qbytearraylist_t       *p) { return reinterpret_cast<QByteArrayList *>(p); }
-inline const QByteArrayList *L(const go_qt6core_qbytearraylist_t *p) { return reinterpret_cast<const QByteArrayList *>(p); }
-
-inline QByteArray       *Q(go_qt6core_qbytearray_t       *p) { return reinterpret_cast<QByteArray *>(p); }
-inline const QByteArray *Q(const go_qt6core_qbytearray_t *p) { return reinterpret_cast<const QByteArray *>(p); }
-
-inline go_qt6core_qbytearraylist_t *toHandle(QByteArrayList *l) {
-    return reinterpret_cast<go_qt6core_qbytearraylist_t *>(l);
-}
-inline go_qt6core_qbytearray_t *toHandle(QByteArray *q) {
-    return reinterpret_cast<go_qt6core_qbytearray_t *>(q);
-}
-
-} // namespace
-
 extern "C" {
 
 /* --- lifecycle --- */
-go_qt6core_qbytearraylist_t *qbytearraylist_new() {
-    return toHandle(new QByteArrayList());
+QByteArrayList* qbytearraylist_new() {
+    return new QByteArrayList();
 }
-go_qt6core_qbytearraylist_t *qbytearraylist_new_copy(const go_qt6core_qbytearraylist_t *other) {
-    return toHandle(new QByteArrayList(*L(other)));
+QByteArrayList* qbytearraylist_new_copy(const QByteArrayList* other) {
+    return new QByteArrayList(*other);
 }
-void qbytearraylist_delete(go_qt6core_qbytearraylist_t *self) {
-    delete L(self);
+void qbytearraylist_delete(QByteArrayList* self) {
+    delete self;
 }
 
 /* --- capacity / basic --- */
-ptrdiff_t qbytearraylist_size(const go_qt6core_qbytearraylist_t *self) {
-    return static_cast<ptrdiff_t>(L(self)->size());
+ptrdiff_t qbytearraylist_size(const QByteArrayList* self) {
+    return static_cast<ptrdiff_t>(self->size());
 }
-bool qbytearraylist_is_empty(const go_qt6core_qbytearraylist_t *self) {
-    return L(self)->isEmpty();
+bool qbytearraylist_is_empty(const QByteArrayList* self) {
+    return self->isEmpty();
 }
-ptrdiff_t qbytearraylist_capacity(const go_qt6core_qbytearraylist_t *self) {
-    return static_cast<ptrdiff_t>(L(self)->capacity());
+ptrdiff_t qbytearraylist_capacity(const QByteArrayList* self) {
+    return static_cast<ptrdiff_t>(self->capacity());
 }
-void qbytearraylist_clear(go_qt6core_qbytearraylist_t *self) {
-    L(self)->clear();
+void qbytearraylist_clear(QByteArrayList* self) {
+    self->clear();
 }
-void qbytearraylist_reserve(go_qt6core_qbytearraylist_t *self, ptrdiff_t n) {
-    L(self)->reserve(static_cast<qsizetype>(n));
+void qbytearraylist_reserve(QByteArrayList* self, ptrdiff_t n) {
+    self->reserve(static_cast<qsizetype>(n));
 }
-void qbytearraylist_squeeze(go_qt6core_qbytearraylist_t *self) {
-    L(self)->squeeze();
+void qbytearraylist_squeeze(QByteArrayList* self) {
+    self->squeeze();
 }
 
 /* --- append / prepend / insert --- */
-void qbytearraylist_append(go_qt6core_qbytearraylist_t *self,
-                           const go_qt6core_qbytearray_t *ba) {
-    L(self)->append(*Q(ba));
+void qbytearraylist_append(QByteArrayList* self, const QByteArray* ba) {
+    self->append(*ba);
 }
-void qbytearraylist_prepend(go_qt6core_qbytearraylist_t *self,
-                            const go_qt6core_qbytearray_t *ba) {
-    L(self)->prepend(*Q(ba));
+void qbytearraylist_prepend(QByteArrayList* self, const QByteArray* ba) {
+    self->prepend(*ba);
 }
-void qbytearraylist_insert(go_qt6core_qbytearraylist_t *self,
-                           ptrdiff_t i,
-                           const go_qt6core_qbytearray_t *ba) {
-    L(self)->insert(static_cast<qsizetype>(i), *Q(ba));
+void qbytearraylist_insert(QByteArrayList* self, ptrdiff_t i, const QByteArray* ba) {
+    self->insert(static_cast<qsizetype>(i), *ba);
 }
 
-/* --- element access --- */
-void qbytearraylist_at_new(const go_qt6core_qbytearraylist_t *self,
-                           ptrdiff_t i,
-                           go_qt6core_qbytearray_t **out) {
-    *out = toHandle(new QByteArray(L(self)->at(static_cast<qsizetype>(i))));
+/* --- element access ---
+ * at() возвращает const T&; создаём копию, чтобы изолировать
+ * Go-пользователя от мутаций списка. out-параметр типизирован
+ * как QByteArray**. */
+void qbytearraylist_at_new(const QByteArrayList* self, ptrdiff_t i, QByteArray** out) {
+    *out = new QByteArray(self->at(static_cast<qsizetype>(i)));
 }
-void qbytearraylist_set(go_qt6core_qbytearraylist_t *self,
-                        ptrdiff_t i,
-                        const go_qt6core_qbytearray_t *ba) {
-    (*L(self))[static_cast<qsizetype>(i)] = *Q(ba);
+void qbytearraylist_set(QByteArrayList* self, ptrdiff_t i, const QByteArray* ba) {
+    (*self)[static_cast<qsizetype>(i)] = *ba;
 }
 
 /* --- remove --- */
-void qbytearraylist_remove_at(go_qt6core_qbytearraylist_t *self, ptrdiff_t i) {
-    L(self)->removeAt(static_cast<qsizetype>(i));
+void qbytearraylist_remove_at(QByteArrayList* self, ptrdiff_t i) {
+    self->removeAt(static_cast<qsizetype>(i));
 }
-void qbytearraylist_remove_first(go_qt6core_qbytearraylist_t *self) {
-    L(self)->removeFirst();
+void qbytearraylist_remove_first(QByteArrayList* self) {
+    self->removeFirst();
 }
-void qbytearraylist_remove_last(go_qt6core_qbytearraylist_t *self) {
-    L(self)->removeLast();
+void qbytearraylist_remove_last(QByteArrayList* self) {
+    self->removeLast();
 }
 
 /* --- search --- */
-ptrdiff_t qbytearraylist_index_of(const go_qt6core_qbytearraylist_t *self,
-                                  const go_qt6core_qbytearray_t *ba) {
-    return static_cast<ptrdiff_t>(L(self)->indexOf(*Q(ba)));
+ptrdiff_t qbytearraylist_index_of(const QByteArrayList* self, const QByteArray* ba) {
+    return static_cast<ptrdiff_t>(self->indexOf(*ba));
 }
-ptrdiff_t qbytearraylist_last_index_of(const go_qt6core_qbytearraylist_t *self,
-                                       const go_qt6core_qbytearray_t *ba) {
-    return static_cast<ptrdiff_t>(L(self)->lastIndexOf(*Q(ba)));
+ptrdiff_t qbytearraylist_last_index_of(const QByteArrayList* self, const QByteArray* ba) {
+    return static_cast<ptrdiff_t>(self->lastIndexOf(*ba));
 }
-bool qbytearraylist_contains(const go_qt6core_qbytearraylist_t *self,
-                             const go_qt6core_qbytearray_t *ba) {
-    return L(self)->contains(*Q(ba));
+bool qbytearraylist_contains(const QByteArrayList* self, const QByteArray* ba) {
+    return self->contains(*ba);
 }
 
 /* --- join (QByteArrayList specialization) --- */
-void qbytearraylist_join(const go_qt6core_qbytearraylist_t *self,
-                         const char *sep, ptrdiff_t sep_len,
-                         go_qt6core_qbytearray_t **out) {
+void qbytearraylist_join(const QByteArrayList* self,
+                         const char* sep, ptrdiff_t sep_len,
+                         QByteArray** out) {
     QByteArrayView v(sep, static_cast<qsizetype>(sep_len));
-    *out = toHandle(new QByteArray(L(self)->join(v)));
+    *out = new QByteArray(self->join(v));
 }
 
 /* --- bulk construction / extraction --- */
-go_qt6core_qbytearraylist_t *qbytearraylist_from_array(
-        const go_qt6core_qbytearray_t *const *bas, ptrdiff_t n) {
-    auto *l = new QByteArrayList();
+QByteArrayList* qbytearraylist_from_array(const QByteArray* const* bas, ptrdiff_t n) {
+    auto* l = new QByteArrayList();
     l->reserve(static_cast<qsizetype>(n));
     for (ptrdiff_t i = 0; i < n; ++i)
-        l->append(*Q(bas[i]));
-    return toHandle(l);
+        l->append(*bas[i]);
+    return l;
 }
 
-void qbytearraylist_to_array_new(const go_qt6core_qbytearraylist_t *self,
-                                 go_qt6core_qbytearray_t ***out_arr,
-                                 ptrdiff_t *out_len) {
-    const qsizetype n = L(self)->size();
+void qbytearraylist_to_array_new(const QByteArrayList* self,
+                                 QByteArray*** out_arr,
+                                 ptrdiff_t* out_len) {
+    const qsizetype n = self->size();
     *out_len = static_cast<ptrdiff_t>(n);
     if (n == 0) {
         *out_arr = nullptr;
         return;
     }
-    auto **arr = static_cast<go_qt6core_qbytearray_t **>(
-        std::malloc(sizeof(go_qt6core_qbytearray_t *) * static_cast<size_t>(n)));
+    QByteArray** arr = static_cast<QByteArray**>(
+        std::malloc(sizeof(QByteArray*) * static_cast<size_t>(n)));
     for (qsizetype i = 0; i < n; ++i)
-        arr[i] = toHandle(new QByteArray(L(self)->at(i)));
+        arr[i] = new QByteArray(self->at(i));
     *out_arr = arr;
 }
-void qbytearraylist_free_array(go_qt6core_qbytearray_t **arr) {
+void qbytearraylist_free_array(QByteArray** arr) {
     std::free(arr);
 }
 

@@ -1,15 +1,27 @@
 package qtext
 
 /*
- Что отсутствует:
- QChar::decomposition(char32_t) → QString	instance + static	Добавить через unsafe.Pointer (Go-цикл qchar ↔ qst*ring нельзя) + удобная обёртка в qstring.
- QChar::compare_helper(QChar, const char*) → int (comparesEqual/compareThreeWay vs const char*)	static	TODO — семантика Qt неочевидна (сравнение с первым UTF-16 code unit строки); требует отдельного решения.
- QChar(uchar row, uchar cell) (двухбайтовый конструктор)	ctor	Покрывается New(uint16(row)<<8 | uint16(cell)) — отдельный хелпер не нужен.
- QChar::fromUcs4 возвращает struct с operator QStringView()	ctor	Go возвращает []QChar. FromUcs4QStringView невозможен (цикл qchar ↔ qstringview).
- QChar::SpecialCharacter::LastValidCodePoint	const	Не влезает в uint16 → const LastValidCodePoint rune = 0x10FFFF.
- std::hash<QChar>, QT_CHAR_FASTCALL, Q_DECL_CONST_FUNCTION, Q_DECLARE_TYPEINFO, QT6_ONLY	impl	Qt-специфика, не для Go.
- QChar(wchar_t) (Windows)	ctor	Go не имеет wchar_t.
- FromRune для non-BMP rune	behavior	Сейчас — truncation (footgun). Добавить FromRuneStrict(rune) (QChar, bool).
+ Что сознательно не вошло:
+
+   - QChar::compare_helper(QChar, const char*) — семантика Qt неочевидна
+     (сравнение с первым UTF-16 code unit строки); требует отдельного решения.
+   - QChar(uchar row, uchar cell) — покрывается NewQChar(uint16(row)<<8 | uint16(cell)).
+   - QChar::fromUcs4 возвращает struct с operator QStringView() —
+     в Go возвращается []QChar; цикл qchar ↔ qstringview не нужен.
+   - QChar::SpecialCharacter::LastValidCodePoint не влезает в uint16 —
+     доступен как rune LastValidCodePoint = 0x10FFFF.
+   - std::hash<QChar>, QT_CHAR_FASTCALL, Q_DECL_CONST_FUNCTION,
+     Q_DECLARE_TYPEINFO, QT6_ONLY — impl-специфика Qt.
+   - QChar(wchar_t) (Windows) — в Go нет wchar_t.
+   - FromRune для non-BMP rune — сейчас truncation (footgun);
+     используйте FromRuneStrict для проверки или FromUcs4 для surrogate pair.
+
+ Особенности дизайна:
+
+   - QChar — value-тип (uint16), сравнивается через ==, хешируется.
+   - qchar_decomposition возвращает *QString (управляет C++ объектом Go-финализатор).
+   - Все статические функции (CategoryOf, ToLowerOf, …) принимают rune (UCS-4)
+     и не создают Go-объектов — только C-вызов.
 */
 
 /*

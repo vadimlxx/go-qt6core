@@ -64,7 +64,7 @@ bool qanystringview_equal  (const void *ldata, ptrdiff_t lsize, int ltag,
                             const void *rdata, ptrdiff_t rsize, int rtag);
 
 /* --- conversion to QString (returns new QString* via out pointer) --- */
-go_qt6core_qstring_t* qanystringview_to_qstring(const void *data, ptrdiff_t size, int kind);
+QString* qanystringview_to_qstring(const void *data, ptrdiff_t size, int kind);
 
 #ifdef __cplusplus
 }

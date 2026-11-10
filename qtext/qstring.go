@@ -1,38 +1,31 @@
 package qtext
 
 /*
- Go-panic на out-of-range для At/First/Last/Sliced/SlicedN/Chopped	Qt в release-сбо*рке отключает Q_ASSERT → UB.
- Left/Right/Mid без panic	Qt-семантика клампинга; соответствует QByteArray-биндингу.
+ Panic vs clamp:
 
- что не вошло:
+   - At / First / Last / Sliced / SlicedN / Chopped — паникуют при выходе
+     за границы (Qt в release-сборке отключает Q_ASSERT → UB).
+   - Left / Right / Mid — клампят значения (семантика Qt), без паники;
+     соответствует QByteArray-биндингу.
 
- arg() — variadic template, требует много перегрузок.
+ Что сознательно не вошло:
 
- split()/splitRef() — возвращают QStringList/QList<QStringView> (нужны специализации контейнеров).
-
- QRegularExpression/QRegularExpressionMatch-методы.
-
- localeAwareCompare() — требует QLocale.
-
- toHtmlEscaped() — cross-cutting escaping.
-
- toPercentEncoding()/fromPercentEncoding() — вместе с qurl или отдельно.
-
- toStdString()/fromStdString(), toStdU16String()/fromStdU16String(), toStdU32String()/fromStdU32String() — std::basic_string interop.
-
- toWCharArray(), toUcs4() — платформо-зависимые / контейнер-зависимые.
-
- vasprintf/asprintf/sprintf методы.
-
- Reverse-iterators (rbegin/rend/crbegin/crend).
-
- QChar*-конструкторы и setRawData/fromRawData.
-
- QLatin1StringView-перегрузки (compare, startsWith, …).
-
- operator+/operator+= — в Go заменяется Clone().Append*().
+   - arg() — variadic template, требует много перегрузок.
+   - split() / splitRef() — возвращают QStringList / QList<QStringView>
+     (нужны специализации контейнеров).
+   - QRegularExpression / QRegularExpressionMatch — отдельный пакет.
+   - localeAwareCompare() — требует QLocale.
+   - toHtmlEscaped() — cross-cutting escaping.
+   - toPercentEncoding() / fromPercentEncoding() — вместе с qurl или отдельно.
+   - toStdString() / toStdU16String() / toStdU32String() — std::basic_string interop.
+   - toWCharArray() / toUcs4() — платформо-зависимые / контейнер-зависимые.
+   - vasprintf / asprintf / sprintf — не идиоматичны в Go.
+   - Reverse-iterators (rbegin/rend/crbegin/crend).
+   - QChar*-конструкторы и setRawData/fromRawData.
+   - QLatin1StringView-перегрузки compare/startsWith/… — добавляются
+     по мере необходимости (импортных циклов больше нет).
+   - operator+ / operator+= — заменяются Clone().Append*().
 */
-
 
 /*
 #cgo pkg-config: Qt6Core
@@ -56,14 +49,14 @@ import (
 // Each *QString owns a heap-allocated C++ QString; the finalizer (and
 // explicit Close) frees it.
 type QString struct {
-	p *C.go_qt6core_qstring_t
+	p *C.QString
 }
 
 func wrapQString(p unsafe.Pointer) *QString {
 	if p == nil {
 		return nil
 	}
-	q := &QString{p: (*C.go_qt6core_qstring_t)(p)}
+	q := &QString{p: (*C.QString)(p)}
 	runtime.SetFinalizer(q, finalizeQString)
 	return q
 }
@@ -171,27 +164,27 @@ func (q *QString) String() string { return q.GoString() }
 
 // Utf8 returns a fresh *QByteArray with UTF-8 encoding.
 func (q *QString) Utf8() *QByteArray {
-	var out unsafe.Pointer
+	var out *C.QByteArray
 	C.qstring_to_utf8_qba(q.p, &out)
 	runtime.KeepAlive(q)
-	return AdoptUnsafePtr(out)
+	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
 }
 
 // Latin1 returns a fresh *QByteArray with Latin-1 encoding
 // (chars outside Latin-1 become '?').
 func (q *QString) Latin1() *QByteArray {
-	var out unsafe.Pointer
+	var out *C.QByteArray
 	C.qstring_to_latin1_qba(q.p, &out)
 	runtime.KeepAlive(q)
-	return AdoptUnsafePtr(out)
+	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
 }
 
 // Local8Bit returns a fresh *QByteArray with local 8-bit encoding.
 func (q *QString) Local8Bit() *QByteArray {
-	var out unsafe.Pointer
+	var out *C.QByteArray
 	C.qstring_to_local8bit_qba(q.p, &out)
 	runtime.KeepAlive(q)
-	return AdoptUnsafePtr(out)
+	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
 }
 
 // At returns the i-th QChar. Panics if i is out of range.
@@ -642,15 +635,4 @@ func QStringFromRepeat(n int, c QChar) *QString {
 	s := NewQString()
 	s.ResizeFill(n, c)
 	return s
-}
-
-// AdoptQStringUnsafePtr takes ownership of a raw go_qt6core_qstring_t*
-// (typically returned by C++ code that allocates a fresh QString) and wraps
-// it as *QString with a finalizer installed.
-//
-// The pointer must be a heap-allocated C++ QString obtained from a function
-// whose contract explicitly transfers ownership. The caller must not free it
-// manually afterwards. Passing nil returns nil.
-func AdoptQStringUnsafePtr(p unsafe.Pointer) *QString {
-	return wrapQString(p)
 }

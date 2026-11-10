@@ -1,13 +1,30 @@
 package qtext
 
 /*
- TODO (не реализовано, сознательно):
-   - fromRawData / setRawData — требует runtime.Pinner + явного владения. Используйте QByteArrayFromBytes.
+ Что сознательно не вошло:
+
+   - fromRawData / setRawData — требуют runtime.Pinner + явного владения.
+     Используйте QByteArrayFromBytes (копирует данные).
    - Итераторы (begin/end/rbegin/rend) — не идиоматичны в Go; используйте Bytes().
    - operator[] — Go не поддерживает перегрузку; используйте At/SetAt.
-   - Неявные конверсии (operator const char*, std::string_view) — используйте Bytes()/String().
-   - fromCFData/toNSData/fromEcmaUint8Array — платформо-специфично (Darwin/WASM).
-   - QByteArrayView как отдельный класс-обёртка — используйте []byte / QByteArrayView-структуру.
+   - Неявные конверсии (operator const char*, std::string_view) —
+     используйте Bytes()/String().
+   - fromCFData / toNSData / fromEcmaUint8Array — платформо-специфично (Darwin/WASM).
+
+ Унификация конструкторов:
+
+   - NewQByteArray(args ...any) — диспетчер поверх именованных:
+       NewQByteArray()               → пустой QByteArray
+       NewQByteArray("hello")        → из строки (UTF-8)
+       NewQByteArray([]byte{...})    → копия среза
+       NewQByteArray(n int, c byte)  → n байт, заполненных c (см. QByteArrayFromFill)
+       NewQByteArray(*QByteArray)    → COW-копия (см. Clone)
+
+ Управление памятью:
+
+   - QByteArray — handle-тип, каждый *QByteArray владеет C++ объектом.
+   - Close() освобождает немедленно; иначе срабатывает finalizer.
+   - COW на стороне Qt (Qt refcount), Clone() дёшев.
 */
 
 /*
@@ -54,26 +71,6 @@ func finalizeQByteArray(q *QByteArray) {
 
 // ---- construction --------------------------------------------------------
 
-// NewQByteArray returns a new empty QByteArray (with optional initial data).
-//
-//	NewQByteArray()              → empty (null) QByteArray
-//	NewQByteArray([]byte{...})   → copy of the byte slice
-//	NewQByteArray("...")         → copy of the string bytes
-func NewQByteArray(args ...any) *QByteArray {
-	switch len(args) {
-	case 0:
-		return wrapQByteArray(unsafe.Pointer(C.qbytearray_new_empty()))
-	case 1:
-		switch v := args[0].(type) {
-		case []byte:
-			return QByteArrayFromBytes(v)
-		case string:
-			return QByteArrayFromBytes([]byte(v))
-		}
-	}
-	panic("QByteArray: NewQByteArray accepts 0 or 1 ([]byte|string) argument")
-}
-
 // QByteArrayFromBytes constructs a QByteArray copying b.
 func QByteArrayFromBytes(b []byte) *QByteArray {
 	var p *C.char
@@ -101,6 +98,24 @@ func QByteArrayFromQCharDecomposition(c QChar) *QByteArray {
 // with Latin-1 encoding.
 func QByteArrayFromQCharDecompositionLatin1(c QChar) *QByteArray {
 	return c.Decompose().Latin1()
+}
+
+func NewQByteArray(args ...any) *QByteArray {
+	switch len(args) {
+	case 0:
+		return wrapQByteArray(unsafe.Pointer(C.qbytearray_new_empty()))
+	case 1:
+		switch v := args[0].(type) {
+		case []byte:
+			return QByteArrayFromBytes(v)
+		case string:
+			return QByteArrayFromBytes([]byte(v))
+		case QChar:
+			return QByteArrayFromQCharDecomposition(v)
+		}
+	}
+
+	panic("QByteArray: NewQByteArray accepts 0 or 1 ([]byte|string) argument")
 }
 
 // ---- lifecycle -----------------------------------------------------------

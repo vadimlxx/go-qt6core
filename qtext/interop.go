@@ -73,6 +73,9 @@ func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
 func QStringFromUnsafePtr(p unsafe.Pointer) *QString {
 	return wrapQString(p)
 }
+func AdoptQStringUnsafePtr(p unsafe.Pointer) *QString {
+	return wrapQString(p)
+}
 
 // UnsafePtr returns the underlying C++ QString* as unsafe.Pointer.
 // Borrowed: the caller does NOT own; qtext remains responsible for freeing.

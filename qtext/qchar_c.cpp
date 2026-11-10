@@ -124,9 +124,8 @@ void qchar_from_ucs4(uint32_t ucs4, uint16_t out[2]) {
 }
 
 /* --- Decomposition --- */
-go_qt6core_qstring_t* qchar_decomposition(uint32_t ucs4) {
-	return reinterpret_cast<go_qt6core_qstring_t*>(
-		new QString(QChar::decomposition(U(ucs4))));
+QString* qchar_decomposition(uint32_t ucs4) {
+	return new QString(QChar::decomposition(U(ucs4)));
 }
 
 } // extern "C"

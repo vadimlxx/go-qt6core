@@ -43,7 +43,7 @@ void qutf8stringview_chopped(const char *data, ptrdiff_t size, ptrdiff_t n,
 int qutf8stringview_compare_view              (const char *data, ptrdiff_t size,
                                                const char *other, ptrdiff_t other_size, int cs);
 int qutf8stringview_compare_qbytearray        (const char *data, ptrdiff_t size,
-                                               const void *qba, int cs);
+                                               const QByteArray *qba, int cs);
 int qutf8stringview_compare_qchar             (const char *data, ptrdiff_t size,
                                                uint16_t c, int cs);
 int qutf8stringview_compare_qstringview       (const char *data, ptrdiff_t size,
@@ -55,7 +55,7 @@ int qutf8stringview_compare_qlatin1stringview (const char *data, ptrdiff_t size,
 bool qutf8stringview_equal_view              (const char *data, ptrdiff_t size,
                                               const char *other, ptrdiff_t other_size);
 bool qutf8stringview_equal_qbytearray        (const char *data, ptrdiff_t size,
-                                              const void *qba);
+                                              const QByteArray *qba);
 bool qutf8stringview_equal_qchar             (const char *data, ptrdiff_t size,
                                               uint16_t c);
 bool qutf8stringview_equal_qstringview       (const char *data, ptrdiff_t size,
@@ -63,8 +63,8 @@ bool qutf8stringview_equal_qstringview       (const char *data, ptrdiff_t size,
 bool qutf8stringview_equal_qlatin1stringview (const char *data, ptrdiff_t size,
                                               const char *l1_data, ptrdiff_t l1_size);
 
-/* --- conversion to owning QString (via void* → qstring.AdoptUnsafePtr) --- */
-go_qt6core_qstring_t* qutf8stringview_to_qstring(const char *data, ptrdiff_t size);
+/* --- conversion to owning QString --- */
+QString* qutf8stringview_to_qstring(const char *data, ptrdiff_t size);
 
 /* --- static --- */
 ptrdiff_t qutf8stringview_max_size(void);

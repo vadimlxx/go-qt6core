@@ -97,8 +97,8 @@ int qutf8stringview_compare_view(const char *data, ptrdiff_t size,
     return V(data, size).compare(V(other, other_size), CS(cs));
 }
 int qutf8stringview_compare_qbytearray(const char *data, ptrdiff_t size,
-                                       const void *qba, int cs) {
-    return V(data, size).compare(*static_cast<const QByteArray *>(qba), CS(cs));
+									   const QByteArray *qba, int cs) {
+	return V(data, size).compare(*qba, CS(cs));
 }
 int qutf8stringview_compare_qchar(const char *data, ptrdiff_t size, uint16_t c, int cs) {
     return V(data, size).compare(QChar(c), CS(cs));
@@ -117,8 +117,8 @@ bool qutf8stringview_equal_view(const char *data, ptrdiff_t size,
                                 const char *other, ptrdiff_t other_size) {
     return V(data, size) == V(other, other_size);
 }
-bool qutf8stringview_equal_qbytearray(const char *data, ptrdiff_t size, const void *qba) {
-    return V(data, size).equal(*static_cast<const QByteArray *>(qba));
+bool qutf8stringview_equal_qbytearray(const char *data, ptrdiff_t size, const QByteArray *qba) {
+	return V(data, size).equal(*qba);
 }
 bool qutf8stringview_equal_qchar(const char *data, ptrdiff_t size, uint16_t c) {
     return V(data, size).equal(QChar(c));
@@ -133,9 +133,8 @@ bool qutf8stringview_equal_qlatin1stringview(const char *data, ptrdiff_t size,
 }
 
 /* --- conversion to owning QString --- */
-go_qt6core_qstring_t* qutf8stringview_to_qstring(const char *data, ptrdiff_t size) {
-	return reinterpret_cast<go_qt6core_qstring_t*>(
-		new QString(V(data, size).toString()));
+QString* qutf8stringview_to_qstring(const char *data, ptrdiff_t size) {
+	return new QString(V(data, size).toString());
 }
 
 /* --- static --- */

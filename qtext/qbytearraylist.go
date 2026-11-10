@@ -1,18 +1,29 @@
 package qtext
 
 /*
- QList::at() возвращает const T&. Копия изолирует Go-пользователя от мутаций списка; поведение совпадает с семантикой Qt (const ref).
+ Соглашения:
 
- Что сознательно не вошло
- Java-style итераторы (QByteArrayListIterator, QMutableByteArrayListIterator) — не идиоматичны в Go; используйте ToSlice() или методы по индексу.
+   - At() возвращает копию элемента (const T& в Qt → копия в Go),
+     пользователь не зависит от мутаций списка.
+   - ToSlice() — замена STL-итераторов QList::begin/end.
+   - Join(sep []byte) — семантика QByteArrayList::join(QByteArrayView).
 
- STL-итераторы QList::begin/end — Go их не поддерживает; ToSlice() — замена.
+ Что сознательно не вошло:
 
- operator<</operator>> (QDataStream) — появятся вместе с пакетом qdatastream.
+   - Java-style итераторы (QByteArrayListIterator, QMutableByteArrayListIterator) —
+     не идиоматичны в Go; используйте ToSlice() или индексы.
+   - STL-итераторы QList::begin/end — ToSlice() — замена.
+   - operator<< / operator>> (QDataStream) — появятся вместе с пакетом qdatastream.
+   - operator+ (конкатенация списков) — реализуется пользователем через
+     ToSlice + NewQByteArrayList([]*QByteArray{...}).
+   - emplaceBack / emplace / assign / replace / swapItemsAt / move и т.п. —
+     покрывают 90% случаев; могут быть добавлены позже без ломки API.
 
- operator+ (конкатенация списков) — не идиоматичен в Go; реализуется пользователем через ToSlice + FromQByteArrays.
+ Унификация конструкторов:
 
- QList-методы, специфичные для Qt6 (emplaceBack, emplace, assign, replace, swapItemsAt, move и т.п.) — покрывают 90% случаев; могут быть добавлены позже без ломки API.
+   - NewQByteArrayList()                            → пустой список
+   - NewQByteArrayList([]string{"a", "b"})          → из []string
+   - NewQByteArrayList([]*QByteArray{ba1, ba2})     → из среза указателей
 */
 
 /*
@@ -34,10 +45,10 @@ import (
 // QByteArrayList wraps a Qt6 QList<QByteArray> (a.k.a. QByteArrayList).
 // The zero value is not usable; use New / FromQByteArrays / FromStrings.
 type QByteArrayList struct {
-	p *C.go_qt6core_qbytearraylist_t
+	p *C.QByteArrayList
 }
 
-func wrapQByteArrayList(p *C.go_qt6core_qbytearraylist_t) *QByteArrayList {
+func wrapQByteArrayList(p *C.QByteArrayList) *QByteArrayList {
 	if p == nil {
 		return nil
 	}
@@ -77,7 +88,7 @@ func NewQByteArrayList(arg ...any) *QByteArrayList {
 	case []string:
 		items := arg[0].([]string)
 		l := NewQByteArrayList()
-		l.Reserve(len(arg))
+		l.Reserve(len(items))
 		for _, s := range items {
 			q := NewQByteArray(s)
 			l.Append(q)
@@ -89,23 +100,22 @@ func NewQByteArrayList(arg ...any) *QByteArrayList {
 		items := arg[0].([]*QByteArray)
 		n := len(items)
 		if n == 0 {
-			wrapQByteArrayList(C.qbytearraylist_new())
+			return wrapQByteArrayList(C.qbytearraylist_new())
 		}
-		ptrs := make([]*C.go_qt6core_qbytearray_t, n)
+		ptrs := make([]*C.QByteArray, n)
 		for i, ba := range items {
 			if ba == nil {
 				panic("qbytearraylist: nil *QByteArray in FromQByteArrays")
 			}
-			ptrs[i] = (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr())
+			ptrs[i] = ba.p
 		}
 		l := wrapQByteArrayList(C.qbytearraylist_from_array(
-			(**C.go_qt6core_qbytearray_t)(unsafe.Pointer(&ptrs[0])), C.ptrdiff_t(n)))
+			(**C.QByteArray)(unsafe.Pointer(&ptrs[0])), C.ptrdiff_t(n)))
 		runtime.KeepAlive(items)
 		return l
 	}
 
 	panic("NewQByteArrayList invalid argumentes")
-	//return wrapQByteArrayList(C.qbytearraylist_new())
 }
 
 // Clone returns a shallow COW copy (Qt refcount++; cheap).
@@ -144,13 +154,13 @@ func (l *QByteArrayList) Squeeze() { C.qbytearraylist_squeeze(l.p); runtime.Keep
 // ---- append / prepend / insert ------------------------------------------
 
 func (l *QByteArrayList) Append(ba *QByteArray) {
-	C.qbytearraylist_append(l.p, (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	C.qbytearraylist_append(l.p, ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
 
 func (l *QByteArrayList) Prepend(ba *QByteArray) {
-	C.qbytearraylist_prepend(l.p, (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	C.qbytearraylist_prepend(l.p, ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -159,7 +169,7 @@ func (l *QByteArrayList) Insert(i int, ba *QByteArray) {
 	if i < 0 || i > l.Size() {
 		panic("qbytearraylist: Insert out of range")
 	}
-	C.qbytearraylist_insert(l.p, C.ptrdiff_t(i), (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	C.qbytearraylist_insert(l.p, C.ptrdiff_t(i), ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -172,17 +182,17 @@ func (l *QByteArrayList) At(i int) *QByteArray {
 	if i < 0 || i >= l.Size() {
 		panic("qbytearraylist: At out of range")
 	}
-	var out *C.go_qt6core_qbytearray_t
+	var out *C.QByteArray
 	C.qbytearraylist_at_new(l.p, C.ptrdiff_t(i), &out)
 	runtime.KeepAlive(l)
-	return AdoptUnsafePtr(unsafe.Pointer(out))
+	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
 }
 
 func (l *QByteArrayList) Set(i int, ba *QByteArray) {
 	if i < 0 || i >= l.Size() {
 		panic("qbytearraylist: Set out of range")
 	}
-	C.qbytearraylist_set(l.p, C.ptrdiff_t(i), (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	C.qbytearraylist_set(l.p, C.ptrdiff_t(i), ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -210,21 +220,21 @@ func (l *QByteArrayList) RemoveLast() {
 // ---- search --------------------------------------------------------------
 
 func (l *QByteArrayList) IndexOf(ba *QByteArray) int {
-	v := C.qbytearraylist_index_of(l.p, (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	v := C.qbytearraylist_index_of(l.p, ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return int(v)
 }
 
 func (l *QByteArrayList) LastIndexOf(ba *QByteArray) int {
-	v := C.qbytearraylist_last_index_of(l.p, (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	v := C.qbytearraylist_last_index_of(l.p, ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return int(v)
 }
 
 func (l *QByteArrayList) Contains(ba *QByteArray) bool {
-	v := C.qbytearraylist_contains(l.p, (*C.go_qt6core_qbytearray_t)(ba.UnsafePtr()))
+	v := C.qbytearraylist_contains(l.p, ba.p)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return bool(v)
@@ -239,11 +249,11 @@ func (l *QByteArrayList) Join(sep []byte) *QByteArray {
 	if len(sep) > 0 {
 		p = (*C.char)(unsafe.Pointer(&sep[0]))
 	}
-	var out *C.go_qt6core_qbytearray_t
+	var out *C.QByteArray
 	C.qbytearraylist_join(l.p, p, C.ptrdiff_t(len(sep)), &out)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(sep)
-	return AdoptUnsafePtr(unsafe.Pointer(out))
+	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
 }
 
 // JoinString is Join with a string separator.
@@ -261,7 +271,7 @@ func (l *QByteArrayList) JoinByte(sep byte) *QByteArray {
 // ToSlice returns all elements as fresh *QByteArray values.
 // Caller owns each returned value (must Close or let finalizer run).
 func (l *QByteArrayList) ToSlice() []*QByteArray {
-	var arr **C.go_qt6core_qbytearray_t
+	var arr **C.QByteArray
 	var n C.ptrdiff_t
 	C.qbytearraylist_to_array_new(l.p, &arr, &n)
 	runtime.KeepAlive(l)
@@ -273,7 +283,7 @@ func (l *QByteArrayList) ToSlice() []*QByteArray {
 	cslice := unsafe.Slice(arr, int(n))
 	out := make([]*QByteArray, int(n))
 	for i, p := range cslice {
-		out[i] = AdoptUnsafePtr(unsafe.Pointer(p))
+		out[i] = QByteArrayFromUnsafePtr(unsafe.Pointer(p))
 	}
 	return out
 }

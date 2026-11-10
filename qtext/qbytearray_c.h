@@ -7,14 +7,7 @@
 #include <stdbool.h>   /* bool */
 
 #ifdef __cplusplus
-/*
- * In C++ we rely on the real class QByteArray from <QByteArray> (must be
- * included before this header in the .cpp). The elaborated-type-specifier
- * struct QByteArray below only *refers* to the existing class, provided
- * QByteArray lives in the global namespace (i.e. QT_NAMESPACE is empty,
- * which is the default). If you build Qt with a non-empty QT_NAMESPACE,
- * switch to `typedef void QByteArray;` and cast in the implementation.
- */
+class QByteArray;
 extern "C" {
 #else
 typedef struct QByteArray QByteArray;

@@ -1,20 +1,33 @@
 package qtext
 
 /*
- В Qt есть first() (синоним front, deprecated) и first(qsizetype n) (subview). В Go перегрузки нет → используем Front()/Back() для байт, First(n)/Last(n) для subviews — как в qbytearray.
+ Соглашения:
 
- Что сознательно не вошло
- STL-итераторы (begin/end/rbegin/rend) — не идиоматичны в Go; Bytes() — замена.
+   - First/Last → сабвью; Front/Back → одиночный байт (как в QByteArray).
+   - Sliced(pos) / SlicedN(pos, n) / Chopped(n) / First(n) / Last(n) —
+     паникуют при выходе за границы (Qt в release-сборке отключает Q_ASSERT).
+   - Left/Right/Mid — клампят значения (семантика Qt), без паники.
+   - Bytes()/String() возвращают копию; DataUnsafe() — заимствованный указатель.
 
- operator std::string_view — не идиоматичен; String()/Bytes().
+ Унификация конструкторов:
 
- Неявные конструкторы (const char*, std::string_view, контейнеры) — Go не поддерживает перегрузки; явные FromBytes/FromString/FromQByteArray покрывают 100% случаев.
+   - NewQByteArrayView(arg ...any) — диспетчер:
+       nil              → пустой view
+       []byte           → view на срез (keepAlive)
+       string           → view на строку (keepAlive)
+       *QByteArray      → view на внутренний буфер (keepAlive)
+       QByteArray       → view на копию значения
 
- Операторы сравнения с QChar (Q_DECLARE_STRONGLY_ORDERED(..., QChar)) — добавятся вместе с пакетом qchar-bridge, если понадобится (сравнение view с одиночным QChar — редкий edge case).
+ Что сознательно не вошло:
 
- qChecksum(QByteArrayView, ...) — свободная функция из qbytearrayalgorithms.h; может быть добавлена отдельно, если понадобится.
-
- QByteArrayView::first() / last() (deprecated aliases) — не включены: их поведение = Front()/Back().
+   - STL-итераторы (begin/end/rbegin/rend) — используйте Bytes().
+   - operator std::string_view — используйте String()/Bytes().
+   - Неявные конструкторы из const char*, std::string_view, контейнеров —
+     явные FromBytes/FromString/FromQByteArray покрывают 100% случаев.
+   - Операторы сравнения с QChar — редкий edge case; появится с qchar-bridge.
+   - QChecksum(QByteArrayView) — может быть добавлен отдельно.
+   - QByteArrayView::first()/last() (deprecated aliases) — не включены,
+     их поведение совпадает с Front()/Back().
 */
 
 /*

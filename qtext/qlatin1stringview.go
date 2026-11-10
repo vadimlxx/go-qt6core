@@ -1,25 +1,23 @@
 package qtext
 
 /*
- QLatin1String — type alias
+ Что сознательно не вошло:
 
- что не вошло:
+   - toString() — реализован через ToUtf8().ConvertToQString() или прямой
+     qstring_from_utf8; появится как .ToQString() после унификации QString.
+   - arg() — variadic template, возвращает QString.
+   - tokenize() — template, возвращает QStringTokenizer.
+   - toWCharArray() — платформо-зависимый wchar_t.
+   - toUcs4() — возвращает QList<uint> (нет generic-контейнера).
+   - QLatin1StringView ↔ QString сравнения — вместе с qstring (циклов больше нет).
+   - QRegularExpression-перегрузки — вместе с qregularexpression.
+   - QUtf8StringView-перегрузка compare — вместе с qutf8stringview.
 
- toString() — требует qstring (не написан).
+ Дизайн:
 
- arg() — varargs template, возвращает QString.
-
- tokenize() — template, возвращает QStringTokenizer.
-
- toWCharArray() — платформо-зависимый wchar_t.
-
- toUcs4() — возвращает QList<uint> (нет generic-контейнера).
-
- QLatin1StringView ↔ QString сравнения (compare(QString) и др.) — вместе с qstring.
-
- QRegularExpression-перегрузки — вместе с qregularexpression.
-
- QUtf8StringView-перегрузка compare — вместе с qutf8stringview.
+   - QLatin1String — алиас для QLatin1StringView (Qt 6.x).
+   - Слайсинг сохраняет owner (keepAlive) — буфер не освободится.
+   - Truncate/Chop/Slice/SliceN мутируют приёмник.
 */
 
 /*
