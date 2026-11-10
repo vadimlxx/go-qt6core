@@ -133,8 +133,9 @@ bool qutf8stringview_equal_qlatin1stringview(const char *data, ptrdiff_t size,
 }
 
 /* --- conversion to owning QString --- */
-void qutf8stringview_to_qstring(const char *data, ptrdiff_t size, void **out_qstring) {
-    *out_qstring = static_cast<void *>(new QString(V(data, size).toString()));
+go_qt6core_qstring_t* qutf8stringview_to_qstring(const char *data, ptrdiff_t size) {
+	return reinterpret_cast<go_qt6core_qstring_t*>(
+		new QString(V(data, size).toString()));
 }
 
 /* --- static --- */

@@ -1,19 +1,19 @@
-package qstringencoder
+package qtext
 
 // Package qstringencoder: QStringEncoder — конкретный энкодер UTF-16 → байты.
 
 /*
  ВАЖНО (Qt 6.11.2):
    - QStringEncoder наследует QStringConverter (тот — QStringConverterBase).
-     В Go структура *QStringEncoder встраивает *qstringconverter.QStringConverter,
-     который встраивает *qstringconverter.QStringConverterBase — точное воспроизведение
+     В Go структура *QStringEncoder встраивает *QStringConverter,
+     который встраивает *QStringConverterBase — точное воспроизведение
      иерархии Qt. Все публичные методы базы доступны через promotion.
    - encode(...) в Qt возвращает DecodedData<T>, лениво конвертируемый в QByteArray.
-     В Go Encode/EncodeView сразу возвращают *qbytearray.QByteArray — семантически
+     В Go Encode/EncodeView сразу возвращают *QByteArray — семантически
      эквивалентно (одна конверсия в C++ с текущим State и последующим truncate).
    - finalize(char*, qsizetype) возвращает FinalizeResultChar<char>; в Go — тройка
      (next int, invalid int16, err FinalizeResultError).
-   - qstringconverter.AdoptUnsafePtr используется для того, чтобы встроенный
+   - AdoptUnsafePtr используется для того, чтобы встроенный
      *QStringConverter не владел C++-объектом: владелец — *QStringEncoder.
 
  не реализовано:
@@ -28,8 +28,7 @@ package qstringencoder
      QStringEncoder; не экспонируется.
    - FinalizeResultChar<Char> — в публичном API только для char; в Go — тройка значений.
    - availableCodecs() (inherited static) — требует qstringlist; TODO в qstringconverter.
-   - encodingForData/encodingForHtml — доступны через qstringconverter.EncodingForData /
-     EncodingForHtml.
+   - encodingForData/encodingForHtml — доступны через EncodingForData / EncodingForHtml.
 */
 
 /*
@@ -47,12 +46,6 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qanystringview"
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringconverter"
-	"github.com/vadimlxx/go-qt6core/qstringview"
 )
 
 // FinalizeResultError mirrors QStringConverter::FinalizeResultError.
@@ -78,15 +71,15 @@ func (e FinalizeResultError) String() string {
 
 // QStringEncoder mirrors Qt 6.11.2 QStringEncoder.
 //
-// It embeds *qstringconverter.QStringConverter (which itself embeds
-// *qstringconverter.QStringConverterBase), reproducing Qt's class hierarchy:
+// It embeds *QStringConverter (which itself embeds
+// *QStringConverterBase), reproducing Qt's class hierarchy:
 //
 //	QStringEncoder → QStringConverter → QStringConverterBase
 //
 // Every public method of the base chain (IsValid, Name, ResetState, HasError, State, SetState,
 // Iface, Swap, Encoding, Flags, …) is available on *QStringEncoder via Go method promotion.
 type QStringEncoder struct {
-	*qstringconverter.QStringConverter
+	*QStringConverter
 	p *C.go_qse_t
 }
 
@@ -96,7 +89,7 @@ func newQStringEncoderFromC(c *C.go_qse_t) *QStringEncoder {
 	}
 	// AdoptUnsafePtr creates a non-owning *QStringConverter alias over the same C++ object.
 	// Ownership stays with the *QStringEncoder wrapper (its finalizer calls qstringencoder_delete).
-	base := qstringconverter.AdoptUnsafePtr(unsafe.Pointer(c))
+	base := QStringConverterAdoptUnsafePtr(unsafe.Pointer(c))
 	enc := &QStringEncoder{
 		QStringConverter: base,
 		p:                c,
@@ -122,14 +115,14 @@ func NewQStringEncoder() *QStringEncoder {
 
 // NewQStringEncoderFromEncoding creates an encoder for the given encoding and flags.
 // Mirrors QStringEncoder(Encoding e, Flags f = Flag::Default).
-func NewQStringEncoderFromEncoding(e qstringconverter.Encoding, f qstringconverter.Flags) *QStringEncoder {
+func NewQStringEncoderFromEncoding(e Encoding, f Flags) *QStringEncoder {
 	return newQStringEncoderFromC(C.qstringencoder_new_from_encoding(C.int(int(e)), C.int(int(f))))
 }
 
 // NewQStringEncoderFromName creates an encoder by encoding name (e.g. "UTF-8", "ISO-8859-1").
 // Mirrors QStringEncoder(QAnyStringView name, Flags f) with a Go string.
 // Returns an invalid encoder if the name is unknown.
-func NewQStringEncoderFromName(name string, f qstringconverter.Flags) *QStringEncoder {
+func NewQStringEncoderFromName(name string, f Flags) *QStringEncoder {
 	var p unsafe.Pointer
 	if len(name) > 0 {
 		p = unsafe.Pointer(unsafe.StringData(name))
@@ -142,7 +135,7 @@ func NewQStringEncoderFromName(name string, f qstringconverter.Flags) *QStringEn
 
 // NewQStringEncoderFromAny creates an encoder from a QAnyStringView name and flags.
 // Mirrors QStringEncoder(QAnyStringView name, Flags f).
-func NewQStringEncoderFromAny(name qanystringview.QAnyStringView, f qstringconverter.Flags) *QStringEncoder {
+func NewQStringEncoderFromAny(name QAnyStringView, f Flags) *QStringEncoder {
 	enc := newQStringEncoderFromC(C.qstringencoder_new_from_any(
 		name.DataUnsafe(), C.ptrdiff_t(name.Size()), C.int(int(name.Kind())), C.int(int(f))))
 	runtime.KeepAlive(name)
@@ -151,7 +144,7 @@ func NewQStringEncoderFromAny(name qanystringview.QAnyStringView, f qstringconve
 
 // NewQStringEncoderFromInterface wraps the protected QStringEncoder(const Interface*) ctor.
 // If iface is nil, the encoder is invalid.
-func NewQStringEncoderFromInterface(i qstringconverter.Interface) *QStringEncoder {
+func NewQStringEncoderFromInterface(i Interface) *QStringEncoder {
 	return newQStringEncoderFromC(C.qstringencoder_new_from_iface(i.UnsafePtr()))
 }
 
@@ -166,40 +159,37 @@ func (e *QStringEncoder) Close() {
 	}
 }
 
-// Encode encodes the contents of q as a fresh *qbytearray.QByteArray.
-// Equivalent to Qt's implicit conversion of QStringEncoder::encode(const QString&) to QByteArray.
-func (e *QStringEncoder) Encode(q *qstring.QString) *qbytearray.QByteArray {
+// Encode encodes the contents of q as a fresh *QByteArray.
+// Equivalent to Qt's implicit conversion of QStringEncoder::encode(const QString&)
+// to QByteArray.
+func (e *QStringEncoder) Encode(q *QString) *QByteArray {
 	if e.p == nil || q == nil {
-		return qbytearray.New()
+		return NewQByteArray()
 	}
 	n := q.Size()
 	var data *C.uint16_t
 	if n > 0 {
 		data = (*C.uint16_t)(q.Utf16Unsafe())
 	}
-	var out unsafe.Pointer
-	var outSize C.ptrdiff_t
-	C.qstringencoder_encode(e.p, data, C.ptrdiff_t(n), &out, &outSize)
+	p := C.qstringencoder_encode(e.p, data, C.ptrdiff_t(n))
 	runtime.KeepAlive(q)
-	return qbytearray.AdoptUnsafePtr(out)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
 
-// EncodeView encodes v as a fresh *qbytearray.QByteArray.
-// Equivalent to Qt's implicit conversion of QStringEncoder::encode(QStringView) to QByteArray.
-func (e *QStringEncoder) EncodeView(v qstringview.QStringView) *qbytearray.QByteArray {
+// Equivalent to Qt's implicit conversion of QStringEncoder::encode(QStringView)
+// to QByteArray.
+func (e *QStringEncoder) EncodeView(v QStringView) *QByteArray {
 	if e.p == nil {
-		return qbytearray.New()
+		return NewQByteArray()
 	}
 	n := v.Size()
 	var data *C.uint16_t
 	if n > 0 {
 		data = (*C.uint16_t)(v.Utf16Unsafe())
 	}
-	var out unsafe.Pointer
-	var outSize C.ptrdiff_t
-	C.qstringencoder_encode(e.p, data, C.ptrdiff_t(n), &out, &outSize)
+	p := C.qstringencoder_encode(e.p, data, C.ptrdiff_t(n))
 	runtime.KeepAlive(v)
-	return qbytearray.AdoptUnsafePtr(out)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
 
 // RequiredSpace returns the maximum number of bytes needed to encode inputLength UTF-16
@@ -215,7 +205,7 @@ func (e *QStringEncoder) RequiredSpace(inputLength int) int {
 // of bytes written. The caller must ensure len(buf) >= RequiredSpace(v.Size()).
 // For an invalid encoder, nothing is written, the encoder's HasError becomes true, and 0
 // is returned. Mirrors QStringEncoder::appendToBuffer.
-func (e *QStringEncoder) AppendToBuffer(buf []byte, v qstringview.QStringView) int {
+func (e *QStringEncoder) AppendToBuffer(buf []byte, v QStringView) int {
 	if e.p == nil {
 		return 0
 	}
@@ -228,8 +218,7 @@ func (e *QStringEncoder) AppendToBuffer(buf []byte, v qstringview.QStringView) i
 	if n > 0 {
 		data = (*C.uint16_t)(v.Utf16Unsafe())
 	}
-	written := C.qstringencoder_append_to_buffer(e.p, bufPtr, C.ptrdiff_t(len(buf)),
-		data, C.ptrdiff_t(n))
+	written := C.qstringencoder_append_to_buffer(e.p, bufPtr, C.ptrdiff_t(len(buf)), data, C.ptrdiff_t(n))
 	runtime.KeepAlive(buf)
 	runtime.KeepAlive(v)
 	return int(written)

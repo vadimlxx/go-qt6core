@@ -582,7 +582,7 @@ func (v QLatin1StringView) ToDouble() (float64, bool) {
 func (v QLatin1StringView) ToUtf8() *QByteArray {
 	p := C.qlatin1stringview_to_utf8((*C.char)(v.data), C.ptrdiff_t(v.size))
 	runtime.KeepAlive(v)
-	return wrapQByteArray(p)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
 
 // MaxSize mirrors QLatin1StringView::maxSize().

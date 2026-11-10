@@ -86,21 +86,6 @@ func QByteArrayViewFromString(s string) QByteArrayView {
 	}
 }
 
-func NewQByteArrayView(arg any) QByteArrayView {
-	if arg == nil {
-		return QByteArrayView{}
-	}
-
-	switch arg.(type) {
-	case string:
-		return QByteArrayViewFromString(arg.(string))
-	case []byte:
-		return QByteArrayViewFromBytes(arg.([]byte))
-	}
-
-	panic("NewQByteArrayView invalid argumentes")
-}
-
 // FromQByteArray returns a zero-copy view into q's internal buffer.
 // The view keeps q alive via its keepAlive field.
 //
@@ -113,7 +98,7 @@ func NewQByteArrayView(arg any) QByteArrayView {
 //     mutate/Close q.
 //
 // For a lifetime-independent snapshot, use q.ToByteArray() instead.
-func FromQByteArray(q *QByteArray) QByteArrayView {
+func QByteArrayViewFromQByteArray(q *QByteArray) QByteArrayView {
 	if q == nil || q.IsNull() {
 		return EmptyQByteArrayView()
 	}
@@ -122,6 +107,26 @@ func FromQByteArray(q *QByteArray) QByteArrayView {
 		size:      q.Size(),
 		keepAlive: q,
 	}
+}
+
+func NewQByteArrayView(arg ...any) QByteArrayView {
+	if len(arg) == 0 || arg[0] == nil {
+		return EmptyQByteArrayView()
+	}
+
+	switch arg[0].(type) {
+		case string:
+			return QByteArrayViewFromString(arg[0].(string))
+		case []byte:
+			return QByteArrayViewFromBytes(arg[0].([]byte))
+		case QByteArray:
+			ba := arg[0].(QByteArray)
+			return QByteArrayViewFromQByteArray(&ba)
+		case *QByteArray:
+			return QByteArrayViewFromQByteArray(arg[0].(*QByteArray))
+	}
+
+	panic("NewQByteArrayView invalid argumentes")
 }
 
 // ---- accessors -----------------------------------------------------------
@@ -324,12 +329,6 @@ func (v QByteArrayView) Compare(other []byte, cs bool) int {
 
 // ---- slicing (return new views sharing the same buffer) -----------------
 
-func viewOut(v QByteArrayView, cdata *C.char, csize C.ptrdiff_t) QByteArrayView {
-	// not used directly; helper for compiler
-	_, _ = cdata, csize
-	return v
-}
-
 func (v QByteArrayView) sliceFromC(
 	call func(data *C.char, size C.ptrdiff_t, outData **C.char, outSize *C.ptrdiff_t),
 ) QByteArrayView {
@@ -486,15 +485,8 @@ func (v QByteArrayView) ToDouble() (float64, bool) {
 func (v QByteArrayView) ToByteArray() *QByteArray {
 	p := C.qbytearrayview_to_bytearray((*C.char)(v.data), C.ptrdiff_t(v.size))
 	runtime.KeepAlive(v)
-	return wrapQByteArray(p)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
-// ToByteArray returns a fresh, owned *qbytearray.QByteArray with a copy
-// of the view's bytes (mirrors QByteArrayView::toByteArray()).
-// func (v *QByteArrayView) ToByteArray() *unsafe.Pointer {
-// 	var out unsafe.Pointer
-// 	C.qbytearrayview_to_bytearray((*C.char)(v.data), C.ptrdiff_t(v.size), &out)
-// 	return &out
-// }
 
 // ---- static --------------------------------------------------------------
 

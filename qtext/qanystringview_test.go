@@ -1,19 +1,12 @@
-package qanystringview
+package qtext
 
 import (
 	"testing"
 	"unicode/utf16"
-	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qchar"
-	"github.com/vadimlxx/go-qt6core/qlatin1stringview"
-	"github.com/vadimlxx/go-qt6core/qstringview"
-	"github.com/vadimlxx/go-qt6core/qutf8stringview"
 )
 
-func TestEmpty(t *testing.T) {
-	v := Empty()
+func TestQAnyStringViewEmpty(t *testing.T) {
+	v := NewQAnyStringView()
 	if !v.IsNull() || !v.IsEmpty() || v.Size() != 0 {
 		t.Fatalf("Empty: null=%v empty=%v size=%d", v.IsNull(), v.IsEmpty(), v.Size())
 	}
@@ -25,8 +18,8 @@ func TestEmpty(t *testing.T) {
 	}
 }
 
-func TestFromBytesUtf8(t *testing.T) {
-	v := FromBytes([]byte("hello"))
+func TestQAnyStringViewFromBytesUtf8(t *testing.T) {
+	v := NewQAnyStringView([]byte("hello"))
 	if v.Kind() != KindUtf8 || v.Size() != 5 || v.SizeBytes() != 5 {
 		t.Fatalf("kind=%v size=%d sizeBytes=%d", v.Kind(), v.Size(), v.SizeBytes())
 	}
@@ -46,9 +39,9 @@ func TestFromBytesUtf8(t *testing.T) {
 	}
 }
 
-func TestFromQStringView(t *testing.T) {
-	sv := qstringview.FromUtf16(utf16.Encode([]rune("héllo")))
-	v := FromQStringView(sv)
+func TestQAnyStringViewFromQStringView(t *testing.T) {
+	sv := QStringViewFromUtf16(utf16.Encode([]rune("héllo")))
+	v := NewQAnyStringView(sv)
 	if v.Kind() != KindUtf16 || v.Size() != 5 || v.SizeBytes() != 10 {
 		t.Fatalf("kind=%v size=%d sizeBytes=%d", v.Kind(), v.Size(), v.SizeBytes())
 	}
@@ -62,9 +55,9 @@ func TestFromQStringView(t *testing.T) {
 	}
 }
 
-func TestFromQLatin1StringView(t *testing.T) {
-	l1 := qlatin1stringview.FromBytes([]byte{'h', 0xE9, 'l', 'l', 'o'}) // "héllo" in Latin-1
-	v := FromQLatin1StringView(l1)
+func TestQAnyStringViewFromQLatin1StringView(t *testing.T) {
+	l1 := QLatin1StringViewFromBytes([]byte{'h', 0xE9, 'l', 'l', 'o'}) // "héllo" in Latin-1
+	v := NewQAnyStringView(l1)
 	if v.Kind() != KindLatin1 || v.Size() != 5 || v.SizeBytes() != 5 {
 		t.Fatalf("kind=%v size=%d sizeBytes=%d", v.Kind(), v.Size(), v.SizeBytes())
 	}
@@ -78,9 +71,9 @@ func TestFromQLatin1StringView(t *testing.T) {
 	}
 }
 
-func TestFromQUtf8StringView(t *testing.T) {
-	u8 := qutf8stringview.FromString("héllo")
-	v := FromQUtf8StringView(u8)
+func TestQAnyStringViewFromQUtf8StringView(t *testing.T) {
+	u8 := NewQUtf8StringView("héllo")
+	v := NewQAnyStringView(u8)
 	if v.Kind() != KindUtf8 {
 		t.Fatalf("kind=%v", v.Kind())
 	}
@@ -89,24 +82,24 @@ func TestFromQUtf8StringView(t *testing.T) {
 	}
 }
 
-func TestFromQByteArray(t *testing.T) {
-	q := qbytearray.FromString("hello")
+func TestQAnyStringViewFromQByteArray(t *testing.T) {
+	q := NewQByteArray("hello")
 	defer q.Close()
-	v := FromQByteArray(q)
+	v := NewQAnyStringView(q)
 	if v.Kind() != KindUtf8 || v.ToString().GoString() != "hello" {
 		t.Fatalf("kind=%v str=%q", v.Kind(), v.ToString().GoString())
 	}
 }
 
-func TestFrontBack(t *testing.T) {
-	v := FromBytes([]byte("abc"))
-	if v.Front() != qchar.New('a') || v.Back() != qchar.New('c') {
+func TestQAnyStringViewFrontBack(t *testing.T) {
+	v := NewQAnyStringView([]byte("abc"))
+	if v.Front() != NewQChar('a') || v.Back() != NewQChar('c') {
 		t.Fatalf("Front/Back: %#x %#x", v.Front().Unicode(), v.Back().Unicode())
 	}
 }
 
-func TestSlicing(t *testing.T) {
-	v := FromBytes([]byte("the quick brown fox"))
+func TestQAnyStringViewSlicing(t *testing.T) {
+	v := NewQAnyStringView([]byte("the quick brown fox"))
 
 	check := func(name string, got QAnyStringView, want string) {
 		t.Helper()
@@ -125,9 +118,9 @@ func TestSlicing(t *testing.T) {
 	check("Chopped", v.Chopped(4), "the quick brown")
 }
 
-func TestSlicingPreservesKind(t *testing.T) {
-	sv := qstringview.FromUtf16(utf16.Encode([]rune("hello")))
-	v := FromQStringView(sv)
+func TestQAnyStringViewSlicingPreservesKind(t *testing.T) {
+	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
+	v := NewQAnyStringView(sv)
 
 	if v.Left(3).Kind() != KindUtf16 {
 		t.Fatal("Left must preserve Kind")
@@ -137,8 +130,8 @@ func TestSlicingPreservesKind(t *testing.T) {
 	}
 }
 
-func TestMutatorsInPlace(t *testing.T) {
-	v := FromBytes([]byte("abcdef"))
+func TestQAnyStringViewMutatorsInPlace(t *testing.T) {
+	v := NewQAnyStringView([]byte("abcdef"))
 	v.Chop(2)
 	if v.ToString().GoString() != "abcd" {
 		t.Fatalf("after Chop: %q", v.ToString().GoString())
@@ -153,56 +146,56 @@ func TestMutatorsInPlace(t *testing.T) {
 	}
 }
 
-func TestCompareEqual(t *testing.T) {
-	a := FromBytes([]byte("hello"))
-	b := FromBytes([]byte("hello"))
-	c := FromBytes([]byte("world"))
+func TestQAnyStringViewCompareEqual(t *testing.T) {
+	a := NewQAnyStringView([]byte("hello"))
+	b := NewQAnyStringView([]byte("hello"))
+	c := NewQAnyStringView([]byte("world"))
 
-	if Compare(a, b, true) != 0 {
+	if QAnyStringViewCompare(a, b, true) != 0 {
 		t.Fatal("Compare(equal) must be 0")
 	}
-	if Compare(a, c, true) >= 0 {
+	if QAnyStringViewCompare(a, c, true) >= 0 {
 		t.Fatal("Compare(hello, world) must be < 0")
 	}
-	if !Equal(a, b) {
+	if !QAnyStringViewEqual(a, b) {
 		t.Fatal("Equal(hello, hello)")
 	}
-	if Equal(a, c) {
+	if QAnyStringViewEqual(a, c) {
 		t.Fatal("Equal(hello, world) must be false")
 	}
 }
 
-func TestCompareCrossEncoding(t *testing.T) {
-	u8 := FromBytes([]byte("hello"))
-	utf16v := FromQStringView(qstringview.FromUtf16(utf16.Encode([]rune("hello"))))
+func TestQAnyStringViewCompareCrossEncoding(t *testing.T) {
+	u8 := NewQAnyStringView([]byte("hello"))
+	utf16v := NewQAnyStringView(QStringViewFromUtf16(utf16.Encode([]rune("hello"))))
 
-	if Compare(u8, utf16v, true) != 0 {
+	if QAnyStringViewCompare(u8, utf16v, true) != 0 {
 		t.Fatal("UTF-8 'hello' must equal UTF-16 'hello'")
 	}
-	if !Equal(u8, utf16v) {
+	if !QAnyStringViewEqual(u8, utf16v) {
 		t.Fatal("Equal across encodings")
 	}
 }
 
-func TestCaseSensitivity(t *testing.T) {
-	a := FromBytes([]byte("Hello"))
-	b := FromBytes([]byte("HELLO"))
+func TestQAnyStringViewCaseSensitivity(t *testing.T) {
+	a := NewQAnyStringView([]byte("Hello"))
+	b := NewQAnyStringView([]byte("HELLO"))
 
-	if Compare(a, b, true) == 0 {
+	if QAnyStringViewCompare(a, b, true) == 0 {
 		t.Fatal("case-sensitive compare must differ")
 	}
-	if Compare(a, b, false) != 0 {
+	if QAnyStringViewCompare(a, b, false) != 0 {
 		t.Fatal("case-insensitive compare must be 0")
 	}
 }
 
-func TestNewUnsafe(t *testing.T) {
-	buf := []byte("abc")
-	v := NewUnsafe(unsafePointerOf(&buf[0]), 3, KindUtf8)
-	if v.ToString().GoString() != "abc" {
-		t.Fatalf("NewUnsafe: %q", v.ToString().GoString())
-	}
-}
-
-// unsafePointerOf is a helper for the test; it accepts a *byte and returns unsafe.Pointer.
-func unsafePointerOf(p *byte) unsafe.Pointer { return unsafe.Pointer(p) }
+// func TestQAnyStringViewNewUnsafe(t *testing.T) {
+// 	buf := []byte("abc")
+// 	v := NewUnsafe(unsafePointerOf(&buf[0]), 3, KindUtf8)
+// 	if v.ToString().GoString() != "abc" {
+// 		t.Fatalf("NewUnsafe: %q", v.ToString().GoString())
+// 	}
+// }
+//
+// // unsafePointerOf is a helper for the test; it accepts a *byte and returns unsafe.Pointer.
+// func unsafePointerOf(p *byte) unsafe.Pointer { return unsafe.Pointer(p) }

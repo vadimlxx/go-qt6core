@@ -230,7 +230,7 @@ func TestQStringViewMutatorsInPlace(t *testing.T) {
 
 func TestQStringViewMaxSize(t *testing.T) {
 	if QStringViewMaxSize() <= 0 {
-		t.Fatalf("MaxSize: %d", MaxSize())
+		t.Fatalf("MaxSize: %d", QStringViewMaxSize())
 	}
 }
 

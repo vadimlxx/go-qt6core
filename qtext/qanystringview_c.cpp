@@ -180,8 +180,9 @@ bool qanystringview_equal(const void *ldata, ptrdiff_t lsize, int ltag,
 }
 
 /* --- conversion to QString --- */
-void qanystringview_to_qstring(const void *data, ptrdiff_t size, int tag, void **out_qstring) {
-    *out_qstring = static_cast<void *>(new QString(makeAny(data, size, tag).toString()));
+go_qt6core_qstring_t* qanystringview_to_qstring(const void *data, ptrdiff_t size, int kind) {
+	return reinterpret_cast<go_qt6core_qstring_t*>(
+		new QString(makeAny(data, size, kind).toString()));
 }
 
 } // extern "C"

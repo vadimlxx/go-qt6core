@@ -80,4 +80,4 @@
 // qstringconverter_c.cpp via internal/qt6core/check_qt_version.h.
 //
 // This package is a subpackage of github.com/vadimlxx/go-qt6core.
-package qstringconverter
+package qtext

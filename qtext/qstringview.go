@@ -413,14 +413,12 @@ func (v QStringView) CompareQChar(c QChar, caseSensitive bool) int {
 	return int(r)
 }
 
-// ---- conversions to owning QByteArray -----------------------------------
-
 // ToUtf8 returns a fresh *QByteArray with UTF-8 encoding
 // (mirrors QStringView::toUtf8()).
 func (v QStringView) ToUtf8() *QByteArray {
 	p := C.qstringview_to_utf8((*C.uint16_t)(v.data), C.ptrdiff_t(v.size))
 	runtime.KeepAlive(v)
-	return wrapQByteArray(p)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
 
 // ToLatin1 returns a fresh *QByteArray with Latin-1 encoding
@@ -428,7 +426,7 @@ func (v QStringView) ToUtf8() *QByteArray {
 func (v QStringView) ToLatin1() *QByteArray {
 	p := C.qstringview_to_latin1((*C.uint16_t)(v.data), C.ptrdiff_t(v.size))
 	runtime.KeepAlive(v)
-	return wrapQByteArray(p)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
 
 // ToLocal8Bit returns a fresh *QByteArray with local 8-bit encoding
@@ -436,7 +434,7 @@ func (v QStringView) ToLatin1() *QByteArray {
 func (v QStringView) ToLocal8Bit() *QByteArray {
 	p := C.qstringview_to_local8bit((*C.uint16_t)(v.data), C.ptrdiff_t(v.size))
 	runtime.KeepAlive(v)
-	return wrapQByteArray(p)
+	return wrapQByteArray(unsafe.Pointer(p))
 }
 
 // ---- numeric conversion --------------------------------------------------

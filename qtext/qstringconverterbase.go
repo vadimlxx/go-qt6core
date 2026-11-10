@@ -1,4 +1,4 @@
-package qstringconverter
+package qtext
 
 // Package qstringconverter: базовые типы (Flag, Flags, State) и QStringConverterBase.
 

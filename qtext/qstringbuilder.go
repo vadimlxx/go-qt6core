@@ -1,4 +1,4 @@
-package qstringbuilder
+package qtext
 
 // Package qstringbuilder предоставляет Go-биндинг для Qt 6.11 QtCore/QStringBuilder.
 
@@ -34,14 +34,6 @@ import (
 	"fmt"
 	"runtime"
 	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qbytearrayview"
-	"github.com/vadimlxx/go-qt6core/qchar"
-	"github.com/vadimlxx/go-qt6core/qlatin1char"
-	"github.com/vadimlxx/go-qt6core/qlatin1stringview"
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringview"
 )
 
 // part is an internal representation of one operand in a QStringBuilder.
@@ -55,8 +47,8 @@ type part struct {
 
 // QStringBuilder is a Go equivalent of Qt's QStringBuilder<A, B> template.
 //
-// It accumulates a sequence of Parts and materializes them into *qstring.QString or
-// *qbytearray.QByteArray on demand. See the package doc for the full semantics.
+// It accumulates a sequence of Parts and materializes them into *QString or
+// *QByteArray on demand. See the package doc for the full semantics.
 //
 // A QStringBuilder is not safe for concurrent mutation. Materialization (ToQString /
 // ToQByteArray / AppendToQString / AppendToQByteArray) is read-only and may be called
@@ -105,7 +97,7 @@ func FromByte(c byte) *QStringBuilder {
 
 // FromQChar returns a QStringBuilder holding one UTF-16 code unit (QString-flavored,
 // mirrors Qt's `QChar` operand).
-func FromQChar(c qchar.QChar) *QStringBuilder {
+func FromQChar(c QChar) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(c)
 	return b
@@ -113,7 +105,7 @@ func FromQChar(c qchar.QChar) *QStringBuilder {
 
 // FromQLatin1Char returns a QStringBuilder holding one Latin-1 character (QString-flavored,
 // mirrors Qt's `QLatin1Char` operand).
-func FromQLatin1Char(c qlatin1char.QLatin1Char) *QStringBuilder {
+func FromQLatin1Char(c QLatin1Char) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(c)
 	return b
@@ -135,38 +127,38 @@ func FromUtf16(units []uint16) *QStringBuilder {
 	return b
 }
 
-// FromQString wraps an existing *qstring.QString (QString-flavored).
+// FromQString wraps an existing *QString (QString-flavored).
 // The view keeps q alive; do not Close q while the builder (or any materialization) is in use.
-func FromQString(q *qstring.QString) *QStringBuilder {
+func FromQString(q *QString) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(q)
 	return b
 }
 
 // FromQStringView wraps a QStringView (QString-flavored).
-func FromQStringView(v qstringview.QStringView) *QStringBuilder {
+func FromQStringView(v QStringView) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(v)
 	return b
 }
 
 // FromQLatin1StringView wraps a QLatin1StringView (QString-flavored).
-func FromQLatin1StringView(v qlatin1stringview.QLatin1StringView) *QStringBuilder {
+func FromQLatin1StringView(v QLatin1StringView) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(v)
 	return b
 }
 
-// FromQByteArray wraps an existing *qbytearray.QByteArray (QByteArray-flavored).
+// FromQByteArray wraps an existing *QByteArray (QByteArray-flavored).
 // The view keeps ba alive; do not Close ba while the builder (or any materialization) is in use.
-func FromQByteArray(ba *qbytearray.QByteArray) *QStringBuilder {
+func FromQByteArray(ba *QByteArray) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(ba)
 	return b
 }
 
 // FromQByteArrayView wraps a QByteArrayView (QByteArray-flavored).
-func FromQByteArrayView(v qbytearrayview.QByteArrayView) *QStringBuilder {
+func FromQByteArrayView(v QByteArrayView) *QStringBuilder {
 	b := &QStringBuilder{}
 	b.addOperand(v)
 	return b
@@ -214,19 +206,19 @@ func (b *QStringBuilder) addOperand(op any) {
 			})
 			b.qsFlavored = true
 		}
-	case qchar.QChar:
+	case QChar:
 		b.parts = append(b.parts, part{
 			kind: C.QSB_KIND_QCHAR,
 			tag:  C.int(uint16(v)),
 		})
 		b.qsFlavored = true
-	case qlatin1char.QLatin1Char:
+	case QLatin1Char:
 		b.parts = append(b.parts, part{
 			kind: C.QSB_KIND_QLATIN1CHAR,
 			tag:  C.int(byte(v)),
 		})
 		b.qsFlavored = true
-	case qlatin1stringview.QLatin1StringView:
+	case QLatin1StringView:
 		if !v.IsNull() && v.Size() > 0 {
 			b.parts = append(b.parts, part{
 				kind: C.QSB_KIND_QLATIN1STRINGVIEW,
@@ -236,7 +228,7 @@ func (b *QStringBuilder) addOperand(op any) {
 			})
 			b.qsFlavored = true
 		}
-	case qstringview.QStringView:
+	case QStringView:
 		if !v.IsNull() && v.Size() > 0 {
 			b.parts = append(b.parts, part{
 				kind: C.QSB_KIND_QSTRINGVIEW,
@@ -246,7 +238,7 @@ func (b *QStringBuilder) addOperand(op any) {
 			})
 			b.qsFlavored = true
 		}
-	case *qstring.QString:
+	case *QString:
 		if v != nil && !v.IsNull() {
 			b.parts = append(b.parts, part{
 				kind: C.QSB_KIND_QSTRING,
@@ -255,7 +247,7 @@ func (b *QStringBuilder) addOperand(op any) {
 			})
 			b.qsFlavored = true
 		}
-	case *qbytearray.QByteArray:
+	case *QByteArray:
 		if v != nil && !v.IsNull() {
 			b.parts = append(b.parts, part{
 				kind: C.QSB_KIND_QBYTEARRAY,
@@ -263,7 +255,7 @@ func (b *QStringBuilder) addOperand(op any) {
 				keep: v,
 			})
 		}
-	case qbytearrayview.QByteArrayView:
+	case QByteArrayView:
 		if !v.IsNull() && v.Size() > 0 {
 			b.parts = append(b.parts, part{
 				kind: C.QSB_KIND_QBYTEARRAYVIEW,
@@ -344,7 +336,7 @@ func (b *QStringBuilder) buildCArray() (*C.qsb_part_t, []any) {
 
 // AppendToQString appends b's parts to q (in place). Equivalent to Qt's `q += builder`.
 // The builder is not consumed; q must not be nil.
-func (b *QStringBuilder) AppendToQString(q *qstring.QString) {
+func (b *QStringBuilder) AppendToQString(q *QString) {
 	if q == nil {
 		panic("qstringbuilder: AppendToQString with nil target")
 	}
@@ -363,7 +355,7 @@ func (b *QStringBuilder) AppendToQString(q *qstring.QString) {
 
 // AppendToQByteArray appends b's parts to ba (in place). Equivalent to Qt's `ba += builder`.
 // The builder is not consumed; ba must not be nil.
-func (b *QStringBuilder) AppendToQByteArray(ba *qbytearray.QByteArray) {
+func (b *QStringBuilder) AppendToQByteArray(ba *QByteArray) {
 	if ba == nil {
 		panic("qstringbuilder: AppendToQByteArray with nil target")
 	}
@@ -380,19 +372,19 @@ func (b *QStringBuilder) AppendToQByteArray(ba *qbytearray.QByteArray) {
 	}
 }
 
-// ToQString materializes b as a fresh *qstring.QString.
+// ToQString materializes b as a fresh *QString.
 // Equivalent to Qt's implicit conversion to QString (works for any flavor).
-func (b *QStringBuilder) ToQString() *qstring.QString {
-	q := qstring.New()
+func (b *QStringBuilder) ToQString() *QString {
+	q := NewQString()
 	b.AppendToQString(q)
 	return q
 }
 
-// ToQByteArray materializes b as a fresh *qbytearray.QByteArray (UTF-8 encoded).
+// ToQByteArray materializes b as a fresh *QByteArray (UTF-8 encoded).
 // For QByteArray-flavored builders this is exact; for QString-flavored builders the contents
 // are UTF-8 encoded (matches Qt's `builder.toUtf8()`).
-func (b *QStringBuilder) ToQByteArray() *qbytearray.QByteArray {
-	ba := qbytearray.New()
+func (b *QStringBuilder) ToQByteArray() *QByteArray {
+	ba := NewQByteArray()
 	b.AppendToQByteArray(ba)
 	return ba
 }
@@ -400,10 +392,10 @@ func (b *QStringBuilder) ToQByteArray() *qbytearray.QByteArray {
 // ToUtf8 is equivalent to ToQString().Utf8().
 // Only meaningful for QString-flavored builders; on QByteArray-flavored builders it returns
 // the UTF-8 encoding of the (already byte-oriented) contents.
-func (b *QStringBuilder) ToUtf8() *qbytearray.QByteArray { return b.ToQString().Utf8() }
+func (b *QStringBuilder) ToUtf8() *QByteArray { return b.ToQString().Utf8() }
 
 // ToLatin1 is equivalent to ToQString().Latin1().
-func (b *QStringBuilder) ToLatin1() *qbytearray.QByteArray { return b.ToQString().Latin1() }
+func (b *QStringBuilder) ToLatin1() *QByteArray { return b.ToQString().Latin1() }
 
 // ToLocal8Bit is equivalent to ToQString().Local8Bit().
-func (b *QStringBuilder) ToLocal8Bit() *qbytearray.QByteArray { return b.ToQString().Local8Bit() }
+func (b *QStringBuilder) ToLocal8Bit() *QByteArray { return b.ToQString().Local8Bit() }

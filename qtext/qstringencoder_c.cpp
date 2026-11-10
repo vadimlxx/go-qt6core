@@ -70,17 +70,9 @@ void qstringencoder_delete(go_qse_t *self) {
 }
 
 /* ---- Encoding ---- */
-void qstringencoder_encode(go_qse_t *self,
-    const uint16_t *in_data, ptrdiff_t in_size,
-    void **out_qba, ptrdiff_t *out_size) {
-    QStringView in(reinterpret_cast<const char16_t *>(in_data),
-                   static_cast<qsizetype>(in_size));
-    /* encode() returns DecodedData<QStringView>; the implicit conversion to QByteArray
-     * calls encodeAsByteArray(), which handles both valid and invalid (iface == nullptr)
-     * encoders — for invalid it increments state.invalidChars and returns an empty QByteArray. */
-    auto *ba = new QByteArray(C(self)->encode(in));
-    *out_qba = static_cast<void *>(ba);
-    *out_size = static_cast<ptrdiff_t>(ba->size());
+QByteArray* qstringencoder_encode(go_qse_t *self, const uint16_t *in_data, ptrdiff_t in_size) {
+	QStringView in(reinterpret_cast<const char16_t *>(in_data), static_cast<qsizetype>(in_size));
+	return new QByteArray(C(self)->encode(in));
 }
 
 /* ---- Required space ---- */

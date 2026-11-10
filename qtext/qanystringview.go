@@ -1,4 +1,4 @@
-package qanystringview
+package qtext
 
 /*
  что не реализовано:
@@ -29,9 +29,6 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qtext"
-	"github.com/vadimlxx/go-qt6core/qutf8stringview"
 )
 
 // Kind identifies the encoding stored in a QAnyStringView.
@@ -73,7 +70,7 @@ type QAnyStringView struct {
 // Empty returns a null QAnyStringView by invoking the C++ default constructor
 // QAnyStringView(). This stays correct even if Qt changes the internal representation
 // of an empty view.
-func Empty() QAnyStringView {
+func EmptyQAnyStringView() QAnyStringView {
 	var data unsafe.Pointer
 	var size C.ptrdiff_t
 	var tag C.int
@@ -82,51 +79,77 @@ func Empty() QAnyStringView {
 }
 
 // FromBytes returns a view over b as UTF-8 (KindUtf8). The Go slice is kept alive.
-func FromBytes(b []byte) QAnyStringView {
+func QAnyStringViewFromBytes(b []byte) QAnyStringView {
 	if len(b) == 0 {
-		return Empty()
+		return EmptyQAnyStringView()
 	}
 	return QAnyStringView{data: unsafe.Pointer(&b[0]), size: len(b), kind: KindUtf8, keepAlive: b}
 }
 
 // FromString returns a view over s as UTF-8 (KindUtf8). Go strings are immutable.
-func FromString(s string) QAnyStringView {
+func QAnyStringViewFromString(s string) QAnyStringView {
 	if len(s) == 0 {
-		return Empty()
+		return EmptyQAnyStringView()
 	}
 	return QAnyStringView{data: unsafe.Pointer(unsafe.StringData(s)), size: len(s), kind: KindUtf8, keepAlive: s}
 }
 
 // FromQByteArray returns a zero-copy UTF-8 view over q's internal buffer. The view keeps q alive.
-func FromQByteArray(q *qtext.QByteArray) QAnyStringView {
+func QAnyStringViewFromQByteArray(q *QByteArray) QAnyStringView {
 	if q == nil || q.IsNull() {
-		return Empty()
+		return EmptyQAnyStringView()
 	}
 	return QAnyStringView{data: q.ConstDataUnsafe(), size: q.Size(), kind: KindUtf8, keepAlive: q}
 }
 
 // FromQUtf8StringView wraps a QUtf8StringView (KindUtf8). The original view is kept alive.
-func FromQUtf8StringView(v qutf8stringview.QUtf8StringView) QAnyStringView {
+func QAnyStringViewFromQUtf8StringView(v QUtf8StringView) QAnyStringView {
 	if v.IsNull() {
-		return Empty()
+		return EmptyQAnyStringView()
 	}
 	return QAnyStringView{data: v.DataUnsafe(), size: v.Size(), kind: KindUtf8, keepAlive: v}
 }
 
 // FromQLatin1StringView wraps a QLatin1StringView (KindLatin1).
-func FromQLatin1StringView(v qtext.QLatin1StringView) QAnyStringView {
+func QAnyStringViewFromQLatin1StringView(v QLatin1StringView) QAnyStringView {
 	if v.IsNull() {
-		return Empty()
+		return EmptyQAnyStringView()
 	}
 	return QAnyStringView{data: v.DataUnsafe(), size: v.Size(), kind: KindLatin1, keepAlive: v}
 }
 
 // FromQStringView wraps a QStringView (KindUtf16).
-func FromQStringView(v qtext.QStringView) QAnyStringView {
+func QAnyStringViewFromQStringView(v QStringView) QAnyStringView {
 	if v.IsNull() {
-		return Empty()
+		return EmptyQAnyStringView()
 	}
 	return QAnyStringView{data: v.Utf16Unsafe(), size: v.Size(), kind: KindUtf16, keepAlive: v}
+}
+
+func NewQAnyStringView(arg ...any) QAnyStringView {
+	if len(arg) == 0 {
+		return EmptyQAnyStringView()
+	}
+
+	switch arg[0].(type) {
+	case []byte:
+		return QAnyStringViewFromBytes(arg[0].([]byte))
+	case string:
+		return QAnyStringViewFromString(arg[0].(string))
+	case QByteArray:
+		ba := arg[0].(QByteArray)
+		return QAnyStringViewFromQByteArray(&ba)
+	case *QByteArray:
+		return QAnyStringViewFromQByteArray(arg[0].(*QByteArray))
+	case QUtf8StringView:
+		return QAnyStringViewFromQUtf8StringView(arg[0].(QUtf8StringView))
+	case QLatin1StringView:
+		return QAnyStringViewFromQLatin1StringView(arg[0].(QLatin1StringView))
+	case QStringView:
+		return QAnyStringViewFromQStringView(arg[0].(QStringView))
+	}
+
+	panic("NewQAnyStringView invalid argumentes")
 }
 
 // NewUnsafe builds a QAnyStringView from raw data + size + kind. Advanced.
@@ -134,18 +157,18 @@ func FromQStringView(v qtext.QStringView) QAnyStringView {
 // Caller is solely responsible for keeping data alive and unmutated.
 // Prefer the typed From* constructors; use NewUnsafe only when you already have
 // a raw pointer whose lifetime you control.
-func NewUnsafe(data unsafe.Pointer, size int, kind Kind) QAnyStringView {
-	if size < 0 {
-		panic("qanystringview: NewUnsafe negative size")
-	}
-	if size > 0 && data == nil {
-		panic("qanystringview: NewUnsafe nil data with non-zero size")
-	}
-	if kind != KindUtf8 && kind != KindLatin1 && kind != KindUtf16 {
-		panic("qanystringview: NewUnsafe invalid kind")
-	}
-	return QAnyStringView{data: data, size: size, kind: kind}
-}
+// func NewUnsafe(data unsafe.Pointer, size int, kind Kind) QAnyStringView {
+// 	if size < 0 {
+// 		panic("qanystringview: NewUnsafe negative size")
+// 	}
+// 	if size > 0 && data == nil {
+// 		panic("qanystringview: NewUnsafe nil data with non-zero size")
+// 	}
+// 	if kind != KindUtf8 && kind != KindLatin1 && kind != KindUtf16 {
+// 		panic("qanystringview: NewUnsafe invalid kind")
+// 	}
+// 	return QAnyStringView{data: data, size: size, kind: kind}
+// }
 
 // ---- introspection -------------------------------------------------------
 
@@ -187,23 +210,23 @@ func (v QAnyStringView) Bytes() []byte {
 // ---- element access ------------------------------------------------------
 
 // Front returns the first character as a QChar. Panics if empty.
-func (v QAnyStringView) Front() qtext.QChar {
+func (v QAnyStringView) Front() QChar {
 	if v.size == 0 {
 		panic("qanystringview: Front on empty view")
 	}
 	r := C.qanystringview_front(v.data, C.ptrdiff_t(v.size), C.int(v.kind))
 	runtime.KeepAlive(v)
-	return qtext.NewQChar(uint16(r))
+	return NewQChar(uint16(r))
 }
 
 // Back returns the last character as a QChar. Panics if empty.
-func (v QAnyStringView) Back() qtext.QChar {
+func (v QAnyStringView) Back() QChar {
 	if v.size == 0 {
 		panic("qanystringview: Back on empty view")
 	}
 	r := C.qanystringview_back(v.data, C.ptrdiff_t(v.size), C.int(v.kind))
 	runtime.KeepAlive(v)
-	return qtext.NewQChar(uint16(r))
+	return NewQChar(uint16(r))
 }
 
 // ---- slicing -------------------------------------------------------------
@@ -330,44 +353,44 @@ func (v *QAnyStringView) SliceN(pos, n int) { *v = v.SlicedN(pos, n) }
 // ---- dispatch to concrete type ------------------------------------------
 
 // AsQStringView returns the underlying QStringView and true if Kind is Utf16,
-// or (qtext.Empty(), false) otherwise.
-func (v QAnyStringView) AsQStringView() (qtext.QStringView, bool) {
+// or (QStringView.Empty(), false) otherwise.
+func (v QAnyStringView) AsQStringView() (QStringView, bool) {
 	if v.kind != KindUtf16 {
-		return qtext.Empty(), false
+		return QStringView{}, false
 	}
 	if v.data == nil {
-		return qtext.Empty(), true
+		return QStringView{}, true
 	}
-	return qtext.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
+	return newQStringViewWithOwner(v.data, v.size, v.keepAlive), true
 }
 
 // AsQLatin1StringView returns the underlying QLatin1StringView and true if Kind is Latin1.
-func (v QAnyStringView) AsQLatin1StringView() (qtext.QLatin1StringView, bool) {
+func (v QAnyStringView) AsQLatin1StringView() (QLatin1StringView, bool) {
 	if v.kind != KindLatin1 {
-		return qtext.Empty(), false
+		return QLatin1StringView{}, false
 	}
 	if v.data == nil {
-		return qtext.Empty(), true
+		return QLatin1StringView{}, true
 	}
-	return qtext.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
+	return NewQLatin1StringViewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
 }
 
 // AsQUtf8StringView returns the underlying QUtf8StringView and true if Kind is Utf8.
-func (v QAnyStringView) AsQUtf8StringView() (qutf8stringview.QUtf8StringView, bool) {
+func (v QAnyStringView) AsQUtf8StringView() (QUtf8StringView, bool) {
 	if v.kind != KindUtf8 {
-		return qutf8stringview.Empty(), false
+		return NewQUtf8StringView(), false
 	}
 	if v.data == nil {
-		return qutf8stringview.Empty(), true
+		return NewQUtf8StringView(), true
 	}
-	return qutf8stringview.NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
+	return NewUnsafeWithOwner(v.data, v.size, v.keepAlive), true
 }
 
 // ---- comparison ----------------------------------------------------------
 
 // Compare returns Qt's int comparison result (negative/zero/positive).
 // Equivalent to the static QAnyStringView::compare(lhs, rhs, cs).
-func Compare(lhs, rhs QAnyStringView, caseSensitive bool) int {
+func QAnyStringViewCompare(lhs, rhs QAnyStringView, caseSensitive bool) int {
 	csInt := C.int(0)
 	if !caseSensitive {
 		csInt = 1
@@ -381,7 +404,7 @@ func Compare(lhs, rhs QAnyStringView, caseSensitive bool) int {
 
 // Equal returns true if lhs == rhs (case-sensitive).
 // Equivalent to the static QAnyStringView::equal(lhs, rhs).
-func Equal(lhs, rhs QAnyStringView) bool {
+func QAnyStringViewEqual(lhs, rhs QAnyStringView) bool {
 	r := C.qanystringview_equal(lhs.data, C.ptrdiff_t(lhs.size), C.int(lhs.kind),
 		rhs.data, C.ptrdiff_t(rhs.size), C.int(rhs.kind))
 	runtime.KeepAlive(lhs)
@@ -391,11 +414,11 @@ func Equal(lhs, rhs QAnyStringView) bool {
 
 // ---- conversion ----------------------------------------------------------
 
-// ToString returns a fresh *qtext.QString by decoding the contents according to Kind.
-// Equivalent to QAnyStringView::toString() (dispatches to QString::fromUtf8/fromLatin1/fromUtf16).
-func (v QAnyStringView) ToString() *qtext.QString {
-	var out unsafe.Pointer
-	C.qanystringview_to_qstring(v.data, C.ptrdiff_t(v.size), C.int(v.kind), &out)
+// ToString returns a fresh *QString by decoding the contents according to Kind.
+// Equivalent to QAnyStringView::toString() in Qt
+// (dispatches to QString::fromUtf8 / QString::fromLatin1 / QString::fromUtf16).
+func (v QAnyStringView) ToString() *QString {
+	p := C.qanystringview_to_qstring(v.data, C.ptrdiff_t(v.size), C.int(v.kind))
 	runtime.KeepAlive(v)
-	return qtext.AdoptUnsafePtr(out)
+	return wrapQString(unsafe.Pointer(p))
 }

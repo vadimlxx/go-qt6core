@@ -260,6 +260,6 @@ func TestQLatin1StringViewBytesCopyIndependent(t *testing.T) {
 
 func TestQLatin1StringViewMaxSize(t *testing.T) {
 	if QLatin1StringViewMaxSize() <= 0 {
-		t.Fatalf("MaxSize: %d", MaxSize())
+		t.Fatalf("MaxSize: %d", QLatin1StringViewMaxSize())
 	}
 }

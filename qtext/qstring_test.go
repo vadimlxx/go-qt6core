@@ -241,7 +241,7 @@ func TestQStringUtf8Latin1(t *testing.T) {
 
 func TestQStringMaxSize(t *testing.T) {
 	if QStringMaxSize() <= 0 {
-		t.Fatalf("MaxSize: %d", MaxSize())
+		t.Fatalf("MaxSize: %d", QStringMaxSize())
 	}
 }
 

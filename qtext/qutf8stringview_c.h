@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "qstring_c.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,7 +64,7 @@ bool qutf8stringview_equal_qlatin1stringview (const char *data, ptrdiff_t size,
                                               const char *l1_data, ptrdiff_t l1_size);
 
 /* --- conversion to owning QString (via void* → qstring.AdoptUnsafePtr) --- */
-void qutf8stringview_to_qstring(const char *data, ptrdiff_t size, void **out_qstring);
+go_qt6core_qstring_t* qutf8stringview_to_qstring(const char *data, ptrdiff_t size);
 
 /* --- static --- */
 ptrdiff_t qutf8stringview_max_size(void);

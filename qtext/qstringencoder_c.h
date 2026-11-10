@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "qbytearray_c.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,9 +32,7 @@ void qstringencoder_delete(go_qse_t *self);
  * If the encoder is invalid, the encoder's state.invalidChars is incremented and
  * *out_qba points to an empty QByteArray (never NULL).
  */
-void qstringencoder_encode(go_qse_t *self,
-    const uint16_t *in_data, ptrdiff_t in_size,
-    void **out_qba, ptrdiff_t *out_size);
+QByteArray* qstringencoder_encode(go_qse_t *self, const uint16_t *in_data, ptrdiff_t in_size);
 
 /* ---- Required space ---- */
 ptrdiff_t qstringencoder_required_space(const go_qse_t *self, ptrdiff_t input_length);

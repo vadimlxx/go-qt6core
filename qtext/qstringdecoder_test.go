@@ -1,4 +1,4 @@
-package qstringdecoder
+package qtext
 
 import (
 	"bytes"

@@ -1,13 +1,10 @@
-package qstringconverter
+package qtext
 
 import (
 	"testing"
-
-	"github.com/vadimlxx/go-qt6core/qanystringview"
-	"github.com/vadimlxx/go-qt6core/qbytearrayview"
 )
 
-func TestDefaultInvalid(t *testing.T) {
+func TestQStringConverterDefaultInvalid(t *testing.T) {
 	q := NewQStringConverter()
 	defer q.Close()
 
@@ -30,7 +27,7 @@ func TestDefaultInvalid(t *testing.T) {
 	}
 }
 
-func TestFromEncoding(t *testing.T) {
+func TestQStringConverterFromEncoding(t *testing.T) {
 	cases := []struct {
 		e    Encoding
 		name string
@@ -62,7 +59,7 @@ func TestFromEncoding(t *testing.T) {
 	}
 }
 
-func TestFromName(t *testing.T) {
+func TestQStringConverterFromName(t *testing.T) {
 	q := NewQStringConverterFromName("UTF-16", FlagDefault)
 	defer q.Close()
 	if !q.IsValid() || q.Encoding() != Utf16 {
@@ -76,8 +73,8 @@ func TestFromName(t *testing.T) {
 	}
 }
 
-func TestFromAny(t *testing.T) {
-	any := qanystringview.FromString("UTF-16")
+func TestQStringConverterFromAny(t *testing.T) {
+	any := NewQAnyStringView("UTF-16")
 	q := NewQStringConverterFromAny(any, FlagDefault)
 	defer q.Close()
 	if !q.IsValid() || q.Encoding() != Utf16 {
@@ -85,7 +82,7 @@ func TestFromAny(t *testing.T) {
 	}
 
 	// Latin1 view (byte-level same as UTF-8 for ASCII)
-	l1 := qanystringview.FromBytes([]byte("UTF-8")) // simplest cross-kind case
+	l1 := NewQAnyStringView([]byte("UTF-8")) // simplest cross-kind case
 	q2 := NewQStringConverterFromAny(l1, FlagDefault)
 	defer q2.Close()
 	if !q2.IsValid() || q2.Encoding() != Utf8 {
@@ -93,7 +90,7 @@ func TestFromAny(t *testing.T) {
 	}
 }
 
-func TestFromIface(t *testing.T) {
+func TestQStringConverterFromIface(t *testing.T) {
 	src := NewQStringConverterFromEncoding(Utf16, FlagDefault)
 	defer src.Close()
 
@@ -116,7 +113,7 @@ func TestFromIface(t *testing.T) {
 	}
 }
 
-func TestNameForEncoding(t *testing.T) {
+func TestQStringConverterNameForEncoding(t *testing.T) {
 	if got := NameForEncoding(Utf16); got != "UTF-16" {
 		t.Fatalf("NameForEncoding(Utf16): %q", got)
 	}
@@ -125,7 +122,7 @@ func TestNameForEncoding(t *testing.T) {
 	}
 }
 
-func TestEncodingForName(t *testing.T) {
+func TestQStringConverterEncodingForName(t *testing.T) {
 	if e, ok := EncodingForName("UTF-16"); !ok || e != Utf16 {
 		t.Fatalf("EncodingForName(UTF-16): %v, %v", e, ok)
 	}
@@ -137,45 +134,45 @@ func TestEncodingForName(t *testing.T) {
 	}
 }
 
-func TestEncodingForNameAny(t *testing.T) {
-	any := qanystringview.FromString("UTF-16")
+func TestQStringConverterEncodingForNameAny(t *testing.T) {
+	any := NewQAnyStringView("UTF-16")
 	if e, ok := EncodingForNameAny(any); !ok || e != Utf16 {
 		t.Fatalf("EncodingForNameAny(UTF-16): %v, %v", e, ok)
 	}
 }
 
-func TestEncodingForData(t *testing.T) {
+func TestQStringConverterEncodingForData(t *testing.T) {
 	// UTF-16LE BOM: FF FE
-	bv := qbytearrayview.FromBytes([]byte{0xFF, 0xFE, 0x41, 0x00, 0x42, 0x00})
+	bv := NewQByteArrayView([]byte{0xFF, 0xFE, 0x41, 0x00, 0x42, 0x00})
 	e, ok := EncodingForData(bv, 0)
 	if !ok || e != Utf16LE {
 		t.Fatalf("EncodingForData(UTF-16LE BOM): %v, %v", e, ok)
 	}
 
 	// UTF-8 BOM: EF BB BF
-	bv2 := qbytearrayview.FromBytes([]byte{0xEF, 0xBB, 0xBF, 0x41})
+	bv2 := NewQByteArrayView([]byte{0xEF, 0xBB, 0xBF, 0x41})
 	e2, ok2 := EncodingForData(bv2, 0)
 	if !ok2 || e2 != Utf8 {
 		t.Fatalf("EncodingForData(UTF-8 BOM): %v, %v", e2, ok2)
 	}
 
 	// No BOM, no detection
-	bv3 := qbytearrayview.FromBytes([]byte("plain ASCII"))
+	bv3 := NewQByteArrayView([]byte("plain ASCII"))
 	if _, ok := EncodingForData(bv3, 0); ok {
 		// plain ASCII typically returns false (no BOM, no plausible heuristic)
 		t.Log("EncodingForData(plain ASCII) detected something — that's fine")
 	}
 }
 
-func TestEncodingForHtml(t *testing.T) {
+func TestQStringConverterEncodingForHtml(t *testing.T) {
 	html := "<html><head><meta charset=\"UTF-8\"><title>x</title></head></html>"
-	bv := qbytearrayview.FromString(html)
+	bv := NewQByteArrayView(html)
 	e, ok := EncodingForHtml(bv)
 	t.Logf("EncodingForHtml: %v, %v", e, ok)
 	// Not asserting — HTML detection is heuristic.
 }
 
-func TestState(t *testing.T) {
+func TestQStringConverterState(t *testing.T) {
 	q := NewQStringConverterFromEncoding(Utf16, FlagDefault)
 	defer q.Close()
 
@@ -209,7 +206,7 @@ func TestState(t *testing.T) {
 		}
 }
 
-func TestSwap(t *testing.T) {
+func TestQStringConverterSwap(t *testing.T) {
 	a := NewQStringConverterFromEncoding(Utf16, FlagDefault)
 	defer a.Close()
 	b := NewQStringConverterFromEncoding(Latin1, FlagDefault)
@@ -221,7 +218,7 @@ func TestSwap(t *testing.T) {
 	}
 }
 
-func TestIface(t *testing.T) {
+func TestQStringConverterIface(t *testing.T) {
 	q := NewQStringConverterFromEncoding(Utf16, FlagDefault)
 	defer q.Close()
 
@@ -246,7 +243,7 @@ func TestIface(t *testing.T) {
 	}
 }
 
-func TestIfaceNull(t *testing.T) {
+func TestQStringConverterIfaceNull(t *testing.T) {
 	q := NewQStringConverter()
 	defer q.Close()
 	if !q.Iface().IsNil() {
@@ -254,7 +251,7 @@ func TestIfaceNull(t *testing.T) {
 	}
 }
 
-func TestFlagHas(t *testing.T) {
+func TestQStringConverterFlagHas(t *testing.T) {
 	f := Flags(FlagDefault)
 	if f.Has(FlagStateless) {
 		t.Fatal("Default must not have Stateless")

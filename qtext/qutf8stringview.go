@@ -1,4 +1,4 @@
-package qutf8stringview
+package qtext
 
 /*
  At/Front/Back → byte	В Qt storage_type = char; Go byte = uint8. Байтовая семантика корректна — это UTF-8 view, не QChar
@@ -36,12 +36,6 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qchar"
-	"github.com/vadimlxx/go-qt6core/qlatin1stringview"
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringview"
 )
 
 // QUtf8StringView is a read-only, non-owning view over a UTF-8 buffer.
@@ -56,28 +50,25 @@ type QUtf8StringView struct {
 
 // ---- construction --------------------------------------------------------
 
-// Empty returns a null QUtf8StringView.
-func Empty() QUtf8StringView { return QUtf8StringView{} }
-
 // NewUnsafe builds a view directly from a raw UTF-8 byte pointer and size.
 // Caller is solely responsible for keeping the underlying data alive and
 // unmutated for as long as the view (or any of its slices) is used.
-func NewUnsafe(data unsafe.Pointer, size int) QUtf8StringView {
-	if size < 0 {
-		panic("qutf8stringview: NewUnsafe negative size")
-	}
-	if size > 0 && data == nil {
-		panic("qutf8stringview: NewUnsafe nil data with non-zero size")
-	}
-	return QUtf8StringView{data: data, size: size}
-}
+// func NewUnsafe(data unsafe.Pointer, size int) QUtf8StringView {
+// 	if size < 0 {
+// 		panic("qutf8stringview: NewUnsafe negative size")
+// 	}
+// 	if size > 0 && data == nil {
+// 		panic("qutf8stringview: NewUnsafe nil data with non-zero size")
+// 	}
+// 	return QUtf8StringView{data: data, size: size}
+// }
 
 // FromBytes returns a zero-copy view over b, interpreted as UTF-8.
 // The Go slice b is kept alive by the view.
 // Use IsValidUtf8() to verify the buffer contains valid UTF-8.
-func FromBytes(b []byte) QUtf8StringView {
+func QUtf8StringViewFromBytes(b []byte) QUtf8StringView {
 	if len(b) == 0 {
-		return Empty()
+		return QUtf8StringView{}
 	}
 	return QUtf8StringView{
 		data:      unsafe.Pointer(&b[0]),
@@ -89,9 +80,9 @@ func FromBytes(b []byte) QUtf8StringView {
 // FromString returns a zero-copy view over s interpreted as UTF-8.
 // Go strings are immutable, so the view is effectively read-only.
 // Use IsValidUtf8() to verify the buffer contains valid UTF-8.
-func FromString(s string) QUtf8StringView {
+func QUtf8StringViewFromString(s string) QUtf8StringView {
 	if len(s) == 0 {
-		return Empty()
+		return QUtf8StringView{}
 	}
 	return QUtf8StringView{
 		data:      unsafe.Pointer(unsafe.StringData(s)),
@@ -103,9 +94,9 @@ func FromString(s string) QUtf8StringView {
 // FromQByteArray returns a zero-copy view over q's internal buffer,
 // interpreting the bytes as UTF-8. The view keeps q alive.
 // Do NOT mutate or Close q while the view exists.
-func FromQByteArray(q *qbytearray.QByteArray) QUtf8StringView {
+func QUtf8StringViewFromQByteArray(q *QByteArray) QUtf8StringView {
 	if q == nil || q.IsNull() {
-		return Empty()
+		return QUtf8StringView{}
 	}
 	return QUtf8StringView{
 		data:      q.ConstDataUnsafe(),
@@ -118,9 +109,9 @@ func FromQByteArray(q *qbytearray.QByteArray) QUtf8StringView {
 //
 // This allocates a temporary UTF-8 QByteArray internally and keeps it alive
 // via the view. Use q.ToQStringView() for zero-copy UTF-16 access instead.
-func FromQString(q *qstring.QString) QUtf8StringView {
+func QUtf8StringViewFromQString(q *QString) QUtf8StringView {
 	if q == nil || q.IsNull() {
-		return Empty()
+		return QUtf8StringView{}
 	}
 	ba := q.Utf8()
 	return QUtf8StringView{
@@ -128,6 +119,31 @@ func FromQString(q *qstring.QString) QUtf8StringView {
 		size:      ba.Size(),
 		keepAlive: ba,
 	}
+}
+
+func NewQUtf8StringView(arg ...any) QUtf8StringView {
+	if len(arg) == 0 || arg[0] == nil {
+		return QUtf8StringView{}
+	}
+
+	switch arg[0].(type) {
+	case []byte:
+		return QUtf8StringViewFromBytes(arg[0].([]byte))
+	case string:
+		return QUtf8StringViewFromString(arg[0].(string))
+	case QByteArray:
+		ba := arg[0].(QByteArray)
+		return QUtf8StringViewFromQByteArray(&ba)
+	case *QByteArray:
+		return QUtf8StringViewFromQByteArray(arg[0].(*QByteArray))
+	case QString:
+		s := arg[0].(QString)
+		return QUtf8StringViewFromQString(&s)
+	case *QString:
+		return QUtf8StringViewFromQString(arg[0].(*QString))
+	}
+
+	panic("NewQUtf8StringView invalid argumentes")
 }
 
 // ---- accessors -----------------------------------------------------------
@@ -303,15 +319,6 @@ func (v *QUtf8StringView) Slice(pos int) { *v = v.Sliced(pos) }
 // SliceN replaces the receiver with SlicedN(pos, n).
 func (v *QUtf8StringView) SliceN(pos, n int) { *v = v.SlicedN(pos, n) }
 
-// ---- helpers -------------------------------------------------------------
-
-func csInt(cs bool) C.int {
-	if cs {
-		return 0 // Qt::CaseSensitive
-	}
-	return 1 // Qt::CaseInsensitive
-}
-
 // ---- compare (cs = true → CaseSensitive, false → CaseInsensitive) --------
 
 func (v QUtf8StringView) Compare(other QUtf8StringView, caseSensitive bool) int {
@@ -324,7 +331,7 @@ func (v QUtf8StringView) Compare(other QUtf8StringView, caseSensitive bool) int 
 	return int(r)
 }
 
-func (v QUtf8StringView) CompareQByteArray(other *qbytearray.QByteArray, caseSensitive bool) int {
+func (v QUtf8StringView) CompareQByteArray(other *QByteArray, caseSensitive bool) int {
 	r := C.qutf8stringview_compare_qbytearray(
 		(*C.char)(v.data), C.ptrdiff_t(v.size), other.UnsafePtr(), csInt(caseSensitive))
 	runtime.KeepAlive(v)
@@ -332,14 +339,14 @@ func (v QUtf8StringView) CompareQByteArray(other *qbytearray.QByteArray, caseSen
 	return int(r)
 }
 
-func (v QUtf8StringView) CompareQChar(c qchar.QChar, caseSensitive bool) int {
+func (v QUtf8StringView) CompareQChar(c QChar, caseSensitive bool) int {
 	r := C.qutf8stringview_compare_qchar(
 		(*C.char)(v.data), C.ptrdiff_t(v.size), C.uint16_t(c.Unicode()), csInt(caseSensitive))
 	runtime.KeepAlive(v)
 	return int(r)
 }
 
-func (v QUtf8StringView) CompareQStringView(other qstringview.QStringView, caseSensitive bool) int {
+func (v QUtf8StringView) CompareQStringView(other QStringView, caseSensitive bool) int {
 	r := C.qutf8stringview_compare_qstringview(
 		(*C.char)(v.data), C.ptrdiff_t(v.size),
 		(*C.uint16_t)(other.Utf16Unsafe()), C.ptrdiff_t(other.Size()),
@@ -349,7 +356,7 @@ func (v QUtf8StringView) CompareQStringView(other qstringview.QStringView, caseS
 	return int(r)
 }
 
-func (v QUtf8StringView) CompareQLatin1StringView(other qlatin1stringview.QLatin1StringView, caseSensitive bool) int {
+func (v QUtf8StringView) CompareQLatin1StringView(other QLatin1StringView, caseSensitive bool) int {
 	r := C.qutf8stringview_compare_qlatin1stringview(
 		(*C.char)(v.data), C.ptrdiff_t(v.size),
 		(*C.char)(other.DataUnsafe()), C.ptrdiff_t(other.Size()),
@@ -370,7 +377,7 @@ func (v QUtf8StringView) Equal(other QUtf8StringView) bool {
 	return bool(r)
 }
 
-func (v QUtf8StringView) EqualQByteArray(other *qbytearray.QByteArray) bool {
+func (v QUtf8StringView) EqualQByteArray(other *QByteArray) bool {
 	r := C.qutf8stringview_equal_qbytearray(
 		(*C.char)(v.data), C.ptrdiff_t(v.size), other.UnsafePtr())
 	runtime.KeepAlive(v)
@@ -378,14 +385,14 @@ func (v QUtf8StringView) EqualQByteArray(other *qbytearray.QByteArray) bool {
 	return bool(r)
 }
 
-func (v QUtf8StringView) EqualQChar(c qchar.QChar) bool {
+func (v QUtf8StringView) EqualQChar(c QChar) bool {
 	r := C.qutf8stringview_equal_qchar(
 		(*C.char)(v.data), C.ptrdiff_t(v.size), C.uint16_t(c.Unicode()))
 	runtime.KeepAlive(v)
 	return bool(r)
 }
 
-func (v QUtf8StringView) EqualQStringView(other qstringview.QStringView) bool {
+func (v QUtf8StringView) EqualQStringView(other QStringView) bool {
 	r := C.qutf8stringview_equal_qstringview(
 		(*C.char)(v.data), C.ptrdiff_t(v.size),
 		(*C.uint16_t)(other.Utf16Unsafe()), C.ptrdiff_t(other.Size()))
@@ -394,7 +401,7 @@ func (v QUtf8StringView) EqualQStringView(other qstringview.QStringView) bool {
 	return bool(r)
 }
 
-func (v QUtf8StringView) EqualQLatin1StringView(other qlatin1stringview.QLatin1StringView) bool {
+func (v QUtf8StringView) EqualQLatin1StringView(other QLatin1StringView) bool {
 	r := C.qutf8stringview_equal_qlatin1stringview(
 		(*C.char)(v.data), C.ptrdiff_t(v.size),
 		(*C.char)(other.DataUnsafe()), C.ptrdiff_t(other.Size()))
@@ -405,17 +412,16 @@ func (v QUtf8StringView) EqualQLatin1StringView(other qlatin1stringview.QLatin1S
 
 // ---- conversion to owning QString ---------------------------------------
 
-// ToString returns a fresh *qstring.QString by decoding the view's bytes
+// ToString returns a fresh *QString by decoding the view's bytes
 // as UTF-8 (mirrors QUtf8StringView::toString()).
-func (v QUtf8StringView) ToString() *qstring.QString {
-	var out unsafe.Pointer
-	C.qutf8stringview_to_qstring((*C.char)(v.data), C.ptrdiff_t(v.size), &out)
+func (v QUtf8StringView) ToString() *QString {
+	qs := wrapQString(unsafe.Pointer(C.qutf8stringview_to_qstring((*C.char)(v.data), C.ptrdiff_t(v.size))))
 	runtime.KeepAlive(v)
-	return qstring.AdoptUnsafePtr(out)
+	return qs
 }
 
 // MaxSize mirrors QUtf8StringView::maxSize().
-func MaxSize() int { return int(C.qutf8stringview_max_size()) }
+func QUtf8StringViewMaxSize() int { return int(C.qutf8stringview_max_size()) }
 
 // NewUnsafeWithOwner builds a view over raw UTF-8 data and attaches an owner reference
 // keeping the underlying buffer alive for as long as the view (or its slices) is referenced.

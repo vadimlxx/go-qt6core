@@ -1,22 +1,13 @@
 package qtext
 
 /*
- Не предоставлен FromRawData -- Требует пиннинга Go-памяти (runtime.Pinner) и явного владения; добавим отдельно, когда появится необходимость. Используйте FromBytes.
- Split возвращает []*QByteArray -- Каждый элемент — отдельный владеемый handle; массив освобождается в C сразу после переноса владения.
- nullptr-строки -- В Qt 6.11 data() для null-QByteArray возвращает указатель на статическую пустую строку; C.GoStringN с n=0 даёт "". Ок.
-
- Что не вошло (сознательно)
- Итераторы (begin/end/rbegin/rend, std::reverse_iterator) — не идиоматичны в Go; используйте Bytes().
-
- operator[] через синтаксис — Go не поддерживает перегрузку операторов; используйте At/SetAt.
-
- Неявные конверсии (operator const char*, operator std::string_view) — Go не поддерживает; используйте Bytes()/String().
-
- fromRawData, setRawData — нужны runtime.Pinner + явное владение. TODO.
-
- fromCFData/toNSData/fromEcmaUint8Array — платформо-специфично (Darwin/WASM).
-
- QByteArrayView как отдельный тип — используем []byte на границе.
+ TODO (не реализовано, сознательно):
+   - fromRawData / setRawData — требует runtime.Pinner + явного владения. Используйте QByteArrayFromBytes.
+   - Итераторы (begin/end/rbegin/rend) — не идиоматичны в Go; используйте Bytes().
+   - operator[] — Go не поддерживает перегрузку; используйте At/SetAt.
+   - Неявные конверсии (operator const char*, std::string_view) — используйте Bytes()/String().
+   - fromCFData/toNSData/fromEcmaUint8Array — платформо-специфично (Darwin/WASM).
+   - QByteArrayView как отдельный класс-обёртка — используйте []byte / QByteArrayView-структуру.
 */
 
 /*
@@ -35,68 +26,21 @@ import (
 	"unsafe"
 )
 
-// QByteArray wraps a Qt6 QByteArray. Zero value is not usable;
-// use New / FromBytes / FromString / FromFill / FromQStringUnsafePtr.
+// QByteArray wraps a Qt6 QByteArray.
+// Zero value is not usable; use NewQByteArray / QByteArrayFromBytes / etc.
 type QByteArray struct {
 	p *C.QByteArray
 }
 
-// ---- construction --------------------------------------------------------
-
-// New returns a new empty (null) QByteArray.
-// func NewQByteArray() *QByteArray { return wrap(C.qbytearray_new_empty()) }
-//
-// FromBytes constructs a QByteArray copying b.
-func QByteArrayFromBytes(b []byte) *QByteArray {
-	var p *C.char
-	if len(b) > 0 {
-		p = (*C.char)(unsafe.Pointer(&b[0]))
-	}
-	q := wrapQByteArray(C.qbytearray_new_from_data(p, C.ptrdiff_t(len(b))))
-	runtime.KeepAlive(b)
-	return q
-}
-
-// FromFill returns a QByteArray of size n filled with c.
-func QByteArrayFromFill(n int, c byte) *QByteArray {
-	return wrapQByteArray(C.qbytearray_new_fill(C.ptrdiff_t(n), C.char(c)))
-}
-
-// // NewQByteArray constructs a QByteArray copying s.
-// func NewQByteArray(s string) *QByteArray { return QByteArrayFromBytes([]byte(s)) }
-
-func NewQByteArray(args ...any) *QByteArray {
-	switch len(args) {
-	case 0:
-		return wrapQByteArray(C.qbytearray_new_empty())
-	case 1:
-		switch args[0].(type) {
-			case []byte:
-				return QByteArrayFromBytes(args[0].([]byte))
-			case string:
-				return QByteArrayFromBytes([]byte(args[0].(string)))
-		}
-	}
-
-	panic("QByteArray invalid argumentes")
-}
-
-// FromQCharDecomposition returns the Unicode decomposition of c as UTF-8 bytes.
-// Equivalent to QChar::decomposition().toUtf8() in Qt.
-func QByteArrayFromQCharDecomposition(c QChar) *QByteArray {
-	return c.Decompose().Utf8()
-}
-
-// FromQCharDecompositionLatin1 is FromQCharDecomposition with Latin-1 encoding.
-func QByteArrayFromQCharDecompositionLatin1(c QChar) *QByteArray {
-	return c.Decompose().Latin1()
-}
-
-func wrapQByteArray(p *C.QByteArray) *QByteArray {
+// wrapQByteArray wraps an opaque C++ QByteArray* into *QByteArray.
+// Accepts unsafe.Pointer for symmetry with wrapQString and to allow the
+// C-ABI to return either *C.QByteArray or go_qt6core_qbytearray_t*.
+// Takes ownership: the finalizer frees the C++ object.
+func wrapQByteArray(p unsafe.Pointer) *QByteArray {
 	if p == nil {
 		return nil
 	}
-	q := &QByteArray{p: p}
+	q := &QByteArray{p: (*C.QByteArray)(p)}
 	runtime.SetFinalizer(q, finalizeQByteArray)
 	return q
 }
@@ -108,7 +52,60 @@ func finalizeQByteArray(q *QByteArray) {
 	}
 }
 
-// Close releases the underlying C++ object immediately and disables finalizer.
+// ---- construction --------------------------------------------------------
+
+// NewQByteArray returns a new empty QByteArray (with optional initial data).
+//
+//	NewQByteArray()              → empty (null) QByteArray
+//	NewQByteArray([]byte{...})   → copy of the byte slice
+//	NewQByteArray("...")         → copy of the string bytes
+func NewQByteArray(args ...any) *QByteArray {
+	switch len(args) {
+	case 0:
+		return wrapQByteArray(unsafe.Pointer(C.qbytearray_new_empty()))
+	case 1:
+		switch v := args[0].(type) {
+		case []byte:
+			return QByteArrayFromBytes(v)
+		case string:
+			return QByteArrayFromBytes([]byte(v))
+		}
+	}
+	panic("QByteArray: NewQByteArray accepts 0 or 1 ([]byte|string) argument")
+}
+
+// QByteArrayFromBytes constructs a QByteArray copying b.
+func QByteArrayFromBytes(b []byte) *QByteArray {
+	var p *C.char
+	if len(b) > 0 {
+		p = (*C.char)(unsafe.Pointer(&b[0]))
+	}
+	q := wrapQByteArray(unsafe.Pointer(C.qbytearray_new_from_data(p, C.ptrdiff_t(len(b)))))
+	runtime.KeepAlive(b)
+	return q
+}
+
+// QByteArrayFromFill returns a QByteArray of size n filled with c.
+func QByteArrayFromFill(n int, c byte) *QByteArray {
+	return wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_new_fill(C.ptrdiff_t(n), C.char(c))))
+}
+
+// QByteArrayFromQCharDecomposition returns the Unicode decomposition of c
+// as UTF-8 bytes (QChar::decomposition().toUtf8()).
+func QByteArrayFromQCharDecomposition(c QChar) *QByteArray {
+	return c.Decompose().Utf8()
+}
+
+// QByteArrayFromQCharDecompositionLatin1 is QByteArrayFromQCharDecomposition
+// with Latin-1 encoding.
+func QByteArrayFromQCharDecompositionLatin1(c QChar) *QByteArray {
+	return c.Decompose().Latin1()
+}
+
+// ---- lifecycle -----------------------------------------------------------
+
+// Close releases the underlying C++ object immediately and disables the finalizer.
 // Do not call Close concurrently with other methods.
 func (q *QByteArray) Close() {
 	if q.p != nil {
@@ -120,7 +117,7 @@ func (q *QByteArray) Close() {
 
 // Clone returns a shallow COW copy (refcount++; cheap).
 func (q *QByteArray) Clone() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_new_copy(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_new_copy(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -159,8 +156,7 @@ func (q *QByteArray) Detach() {
 	runtime.KeepAlive(q)
 }
 
-// IsSharedWith reports whether q and other share the same internal buffer
-// (same data pointer and size). Mirrors QByteArray::isSharedWith.
+// IsSharedWith reports whether q and other share the same internal buffer.
 func (q *QByteArray) IsSharedWith(other *QByteArray) bool {
 	v := C.qbytearray_is_shared_with(q.p, other.p)
 	runtime.KeepAlive(q)
@@ -168,8 +164,8 @@ func (q *QByteArray) IsSharedWith(other *QByteArray) bool {
 	return bool(v)
 }
 
-// MaxSize mirrors QByteArray::maxSize().
-func MaxSize() int { return int(C.qbytearray_max_size()) }
+// QByteArrayMaxSize mirrors QByteArray::maxSize().
+func QByteArrayMaxSize() int { return int(C.qbytearray_max_size()) }
 
 // Bytes returns a copy of q's bytes.
 func (q *QByteArray) Bytes() []byte {
@@ -242,9 +238,9 @@ func (q *QByteArray) NullTerminate() {
 	runtime.KeepAlive(q)
 }
 
-// NullTerminated returns a new QByteArray with a trailing '\0' appended (if not already present).
+// NullTerminated returns a new QByteArray with a trailing '\0' appended.
 func (q *QByteArray) NullTerminated() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_null_terminated(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_null_terminated(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -358,8 +354,7 @@ func (q *QByteArray) ContainsBytes(sub []byte) bool {
 	return bool(v)
 }
 
-// Compare returns Qt's compare() result (negative, zero, positive).
-// When cs == true, comparison is case-sensitive.
+// Compare returns Qt's compare() result. cs == true → case-sensitive.
 func (q *QByteArray) Compare(other []byte, cs bool) int {
 	var p *C.char
 	if len(other) > 0 {
@@ -378,19 +373,19 @@ func (q *QByteArray) Compare(other []byte, cs bool) int {
 // ---- slicing -------------------------------------------------------------
 
 func (q *QByteArray) Left(n int) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_left(q.p, C.ptrdiff_t(n)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_left(q.p, C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	return r
 }
 
 func (q *QByteArray) Right(n int) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_right(q.p, C.ptrdiff_t(n)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_right(q.p, C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	return r
 }
 
 func (q *QByteArray) Mid(i, len int) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_mid(q.p, C.ptrdiff_t(i), C.ptrdiff_t(len)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_mid(q.p, C.ptrdiff_t(i), C.ptrdiff_t(len))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -399,7 +394,7 @@ func (q *QByteArray) First(n int) *QByteArray {
 	if n < 0 || n > q.Size() {
 		panic("qbytearray: First out of range")
 	}
-	r := wrapQByteArray(C.qbytearray_first(q.p, C.ptrdiff_t(n)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_first(q.p, C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -408,7 +403,7 @@ func (q *QByteArray) Last(n int) *QByteArray {
 	if n < 0 || n > q.Size() {
 		panic("qbytearray: Last out of range")
 	}
-	r := wrapQByteArray(C.qbytearray_last(q.p, C.ptrdiff_t(n)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_last(q.p, C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -417,7 +412,7 @@ func (q *QByteArray) Sliced(pos int) *QByteArray {
 	if pos < 0 || pos > q.Size() {
 		panic("qbytearray: Sliced out of range")
 	}
-	r := wrapQByteArray(C.qbytearray_sliced(q.p, C.ptrdiff_t(pos)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_sliced(q.p, C.ptrdiff_t(pos))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -427,7 +422,8 @@ func (q *QByteArray) SlicedN(pos, n int) *QByteArray {
 	if pos < 0 || n < 0 || pos+n > sz {
 		panic("qbytearray: SlicedN out of range")
 	}
-	r := wrapQByteArray(C.qbytearray_sliced_n(q.p, C.ptrdiff_t(pos), C.ptrdiff_t(n)))
+	r := wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_sliced_n(q.p, C.ptrdiff_t(pos), C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -436,7 +432,7 @@ func (q *QByteArray) Chopped(n int) *QByteArray {
 	if n < 0 || n > q.Size() {
 		panic("qbytearray: Chopped out of range")
 	}
-	r := wrapQByteArray(C.qbytearray_chopped(q.p, C.ptrdiff_t(n)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_chopped(q.p, C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -496,37 +492,39 @@ func (q *QByteArray) IsValidUtf8() bool {
 // ---- transforms ----------------------------------------------------------
 
 func (q *QByteArray) ToLower() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_to_lower(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_to_lower(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
 func (q *QByteArray) ToUpper() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_to_upper(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_to_upper(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
 func (q *QByteArray) Trimmed() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_trimmed(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_trimmed(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
 func (q *QByteArray) Simplified() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_simplified(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_simplified(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
 func (q *QByteArray) LeftJustified(width int, fill byte, truncate bool) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_left_justified(q.p, C.ptrdiff_t(width), C.char(fill), C.bool(truncate)))
+	r := wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_left_justified(q.p, C.ptrdiff_t(width), C.char(fill), C.bool(truncate))))
 	runtime.KeepAlive(q)
 	return r
 }
 func (q *QByteArray) RightJustified(width int, fill byte, truncate bool) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_right_justified(q.p, C.ptrdiff_t(width), C.char(fill), C.bool(truncate)))
+	r := wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_right_justified(q.p, C.ptrdiff_t(width), C.char(fill), C.bool(truncate))))
 	runtime.KeepAlive(q)
 	return r
 }
 func (q *QByteArray) Repeated(times int) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_repeated(q.p, C.ptrdiff_t(times)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_repeated(q.p, C.ptrdiff_t(times))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -729,13 +727,14 @@ func (q *QByteArray) ToDouble() (float64, bool) {
 }
 
 func NumberLL(n int64, base int) *QByteArray {
-	return wrapQByteArray(C.qbytearray_number_ll(C.int64_t(n), C.int(base)))
+	return wrapQByteArray(unsafe.Pointer(C.qbytearray_number_ll(C.int64_t(n), C.int(base))))
 }
-func NumberULL(n uint64, base int) *QByteArray {
-	return wrapQByteArray(C.qbytearray_number_ull(C.uint64_t(n), C.int(base)))
+func ULL(n uint64, base int) *QByteArray {
+	return wrapQByteArray(unsafe.Pointer(C.qbytearray_number_ull(C.uint64_t(n), C.int(base))))
 }
-func NumberDouble(v float64, format byte, precision int) *QByteArray {
-	return wrapQByteArray(C.qbytearray_number_double(C.double(v), C.char(format), C.int(precision)))
+func QByteArrayFromNumberDouble(v float64, format byte, precision int) *QByteArray {
+	return wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_number_double(C.double(v), C.char(format), C.int(precision))))
 }
 
 func (q *QByteArray) SetNumLL(n int64, base int) {
@@ -754,7 +753,7 @@ func (q *QByteArray) SetNumDouble(v float64, format byte, precision int) {
 // ---- encoding ------------------------------------------------------------
 
 func (q *QByteArray) ToBase64(options Base64Options) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_to_base64(q.p, C.int(options)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_to_base64(q.p, C.int(options))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -762,24 +761,25 @@ func (q *QByteArray) ToBase64(options Base64Options) *QByteArray {
 func FromBase64(b []byte, options Base64Options) *QByteArray {
 	src := QByteArrayFromBytes(b)
 	defer src.Close()
-	r := wrapQByteArray(C.qbytearray_from_base64(src.p, C.int(options)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_from_base64(src.p, C.int(options))))
 	return r
 }
 
-// FromBase64Encoding mirrors QByteArray::fromBase64Encoding.
+// QByteArrayFromBase64Encoding mirrors QByteArray::fromBase64Encoding.
 func FromBase64Encoding(b []byte, options Base64Options) (*QByteArray, Base64DecodingStatus) {
 	var p *C.char
 	if len(b) > 0 {
 		p = (*C.char)(unsafe.Pointer(&b[0]))
 	}
 	var status C.int
-	r := wrapQByteArray(C.qbytearray_from_base64_encoding(p, C.ptrdiff_t(len(b)), C.int(options), &status))
+	r := wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_from_base64_encoding(p, C.ptrdiff_t(len(b)), C.int(options), &status)))
 	runtime.KeepAlive(b)
 	return r, Base64DecodingStatus(status)
 }
 
 func (q *QByteArray) ToHex(separator byte) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_to_hex(q.p, C.char(separator)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_to_hex(q.p, C.char(separator))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -787,7 +787,7 @@ func (q *QByteArray) ToHex(separator byte) *QByteArray {
 func FromHex(b []byte) *QByteArray {
 	src := QByteArrayFromBytes(b)
 	defer src.Close()
-	return wrapQByteArray(C.qbytearray_from_hex(src.p))
+	return wrapQByteArray(unsafe.Pointer(C.qbytearray_from_hex(src.p)))
 }
 
 func (q *QByteArray) ToPercentEncoding(exclude, include []byte, percent byte) *QByteArray {
@@ -795,7 +795,8 @@ func (q *QByteArray) ToPercentEncoding(exclude, include []byte, percent byte) *Q
 	inc := QByteArrayFromBytes(include)
 	defer exc.Close()
 	defer inc.Close()
-	r := wrapQByteArray(C.qbytearray_to_percent(q.p, exc.p, inc.p, C.char(percent)))
+	r := wrapQByteArray(unsafe.Pointer(
+		C.qbytearray_to_percent(q.p, exc.p, inc.p, C.char(percent))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -803,19 +804,19 @@ func (q *QByteArray) ToPercentEncoding(exclude, include []byte, percent byte) *Q
 func FromPercentEncoding(b []byte, percent byte) *QByteArray {
 	src := QByteArrayFromBytes(b)
 	defer src.Close()
-	return wrapQByteArray(C.qbytearray_from_percent(src.p, C.char(percent)))
+	return wrapQByteArray(unsafe.Pointer(C.qbytearray_from_percent(src.p, C.char(percent))))
 }
 
 // ---- compression ---------------------------------------------------------
 
 func (q *QByteArray) Compress(level int) *QByteArray {
-	r := wrapQByteArray(C.qbytearray_compress(q.p, C.int(level)))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_compress(q.p, C.int(level))))
 	runtime.KeepAlive(q)
 	return r
 }
 
 func (q *QByteArray) Uncompress() *QByteArray {
-	r := wrapQByteArray(C.qbytearray_uncompress(q.p))
+	r := wrapQByteArray(unsafe.Pointer(C.qbytearray_uncompress(q.p)))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -823,6 +824,7 @@ func (q *QByteArray) Uncompress() *QByteArray {
 // ---- split ---------------------------------------------------------------
 
 // Split mirrors QByteArray::split, returning []*QByteArray.
+// Each element is a separately owned handle.
 func (q *QByteArray) Split(sep byte) []*QByteArray {
 	var n C.ptrdiff_t
 	arr := C.qbytearray_split(q.p, C.char(sep), &n)
@@ -835,7 +837,7 @@ func (q *QByteArray) Split(sep byte) []*QByteArray {
 	cSlice := unsafe.Slice(arr, int(n))
 	out := make([]*QByteArray, int(n))
 	for i, p := range cSlice {
-		out[i] = wrapQByteArray(p)
+		out[i] = wrapQByteArray(unsafe.Pointer(p))
 	}
 	return out
 }

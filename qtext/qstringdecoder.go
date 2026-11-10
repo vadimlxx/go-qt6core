@@ -1,4 +1,4 @@
-package qstringdecoder
+package qtext
 
 // Package qstringdecoder: QStringDecoder — конкретный декодер байты → UTF-16.
 
@@ -50,7 +50,6 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/vadimlxx/go-qt6core/qanystringview"
 	"github.com/vadimlxx/go-qt6core/qbytearray"
 	"github.com/vadimlxx/go-qt6core/qbytearrayview"
 	"github.com/vadimlxx/go-qt6core/qstring"
@@ -144,7 +143,7 @@ func NewQStringDecoderFromName(name string, f qstringconverter.Flags) *QStringDe
 
 // NewQStringDecoderFromAny creates a decoder from a QAnyStringView name and flags.
 // Mirrors QStringDecoder(QAnyStringView name, Flags f).
-func NewQStringDecoderFromAny(name qanystringview.QAnyStringView, f qstringconverter.Flags) *QStringDecoder {
+func NewQStringDecoderFromAny(name QAnyStringView, f Flags) *QStringDecoder {
 	dec := newQStringDecoderFromC(C.qstringdecoder_new_from_any(
 		name.DataUnsafe(), C.ptrdiff_t(name.Size()), C.int(int(name.Kind())), C.int(int(f))))
 	runtime.KeepAlive(name)
@@ -170,7 +169,7 @@ func (d *QStringDecoder) Close() {
 
 // Decode decodes the contents of ba as a fresh *qstring.QString.
 // Equivalent to Qt's implicit conversion of QStringDecoder::decode(const QByteArray&) to QString.
-func (d *QStringDecoder) Decode(ba *qbytearray.QByteArray) *qstring.QString {
+func (d *QStringDecoder) Decode(ba *QByteArray) *qstring.QString {
 	if d.p == nil || ba == nil {
 		return qstring.New()
 	}
@@ -187,7 +186,7 @@ func (d *QStringDecoder) Decode(ba *qbytearray.QByteArray) *qstring.QString {
 
 // DecodeView decodes v as a fresh *qstring.QString.
 // Equivalent to Qt's implicit conversion of QStringDecoder::decode(QByteArrayView) to QString.
-func (d *QStringDecoder) DecodeView(v qbytearrayview.QByteArrayView) *qstring.QString {
+func (d *QStringDecoder) DecodeView(v QByteArrayView) *qstring.QString {
 	if d.p == nil {
 		return qstring.New()
 	}

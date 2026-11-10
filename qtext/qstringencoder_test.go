@@ -1,17 +1,12 @@
-package qstringencoder
+package qtext
 
 import (
 	"bytes"
 	"testing"
 	"unicode/utf16"
-
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringconverter"
-	"github.com/vadimlxx/go-qt6core/qstringview"
 )
 
-func TestDefaultInvalid(t *testing.T) {
+func TestQStringEncoderDefaultInvalid(t *testing.T) {
 	e := NewQStringEncoder()
 	defer e.Close()
 
@@ -23,7 +18,7 @@ func TestDefaultInvalid(t *testing.T) {
 	}
 
 	// Encoding on an invalid encoder must return empty and set HasError.
-	q := qstring.FromString("hello")
+	q := QStringFromString("hello")
 	defer q.Close()
 	out := e.Encode(q)
 	defer out.Close()
@@ -35,8 +30,8 @@ func TestDefaultInvalid(t *testing.T) {
 	}
 }
 
-func TestFromEncodingUtf8(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderFromEncodingUtf8(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
 	if !e.IsValid() {
@@ -46,7 +41,7 @@ func TestFromEncodingUtf8(t *testing.T) {
 		t.Fatalf("Name: %q", e.Name())
 	}
 
-	q := qstring.FromString("héllo")
+	q := QStringFromString("héllo")
 	defer q.Close()
 	out := e.Encode(q)
 	defer out.Close()
@@ -56,25 +51,25 @@ func TestFromEncodingUtf8(t *testing.T) {
 	}
 }
 
-func TestFromNameUtf8(t *testing.T) {
-	e := NewQStringEncoderFromName("UTF-8", qstringconverter.FlagDefault)
+func TestQStringEncoderFromNameUtf8(t *testing.T) {
+	e := NewQStringEncoderFromName("UTF-8", FlagDefault)
 	defer e.Close()
 	if !e.IsValid() || e.Name() != "UTF-8" {
 		t.Fatalf("valid=%v name=%q", e.IsValid(), e.Name())
 	}
 
-	bad := NewQStringEncoderFromName("nonexistent", qstringconverter.FlagDefault)
+	bad := NewQStringEncoderFromName("nonexistent", FlagDefault)
 	defer bad.Close()
 	if bad.IsValid() {
 		t.Fatal("nonexistent name must be invalid")
 	}
 }
 
-func TestEncodeView(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderEncodeView(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
-	sv := qstringview.FromUtf16(utf16.Encode([]rune("日本")))
+	sv := QStringViewFromUtf16(utf16.Encode([]rune("日本")))
 	out := e.EncodeView(sv)
 	defer out.Close()
 
@@ -83,12 +78,12 @@ func TestEncodeView(t *testing.T) {
 	}
 }
 
-func TestEncodeLatin1(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Latin1, qstringconverter.FlagDefault)
+func TestQStringEncoderEncodeLatin1(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Latin1, FlagDefault)
 	defer e.Close()
 
 	// "héllo" — Latin1 encodes é as single byte 0xE9.
-	q := qstring.FromString("héllo")
+	q := QStringFromString("héllo")
 	defer q.Close()
 	out := e.Encode(q)
 	defer out.Close()
@@ -99,8 +94,8 @@ func TestEncodeLatin1(t *testing.T) {
 	}
 }
 
-func TestRequiredSpace(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderRequiredSpace(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
 	// requiredSpace must be an upper bound; for UTF-8 it's typically 4*len for non-ASCII.
@@ -110,11 +105,11 @@ func TestRequiredSpace(t *testing.T) {
 	}
 }
 
-func TestAppendToBuffer(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderAppendToBuffer(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
-	sv := qstringview.FromUtf16(utf16.Encode([]rune("hello")))
+	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	buf := make([]byte, e.RequiredSpace(sv.Size()))
 	n := e.AppendToBuffer(buf, sv)
 	if n != 5 || string(buf[:n]) != "hello" {
@@ -122,8 +117,8 @@ func TestAppendToBuffer(t *testing.T) {
 	}
 }
 
-func TestFinalizeEmpty(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderFinalizeEmpty(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
 	// Fresh UTF-8 encoder has no pending state; Finalize should report NoError.
@@ -136,8 +131,8 @@ func TestFinalizeEmpty(t *testing.T) {
 	}
 }
 
-func TestFinalizeBufferEmpty(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderFinalizeBufferEmpty(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
 	next, invalid, errCode := e.FinalizeBuffer(make([]byte, 16))
@@ -146,8 +141,8 @@ func TestFinalizeBufferEmpty(t *testing.T) {
 	}
 }
 
-func TestEmbeddedBase(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderEmbeddedBase(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
 	// The embedded *QStringConverter must not be nil and must reflect the same C++ state.
@@ -170,9 +165,9 @@ func TestEmbeddedBase(t *testing.T) {
 	}
 }
 
-func TestFromInterface(t *testing.T) {
+func TestQStringEncoderFromInterface(t *testing.T) {
 	// Build a valid converter to get its Interface, then construct an encoder from it.
-	src := qstringconverter.NewQStringConverterFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+	src := NewQStringConverterFromEncoding(Utf8, FlagDefault)
 	defer src.Close()
 
 	iface := src.Iface()
@@ -187,18 +182,18 @@ func TestFromInterface(t *testing.T) {
 	}
 
 	// Null interface → invalid encoder.
-	nullEnc := NewQStringEncoderFromInterface(qstringconverter.Interface{})
+	nullEnc := NewQStringEncoderFromInterface(Interface{})
 	defer nullEnc.Close()
 	if nullEnc.IsValid() {
 		t.Fatal("FromInterface(null) must be invalid")
 	}
 }
 
-func TestEncodeMultipleChars(t *testing.T) {
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringEncoderEncodeMultipleChars(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
-	q := qstring.FromString("a😀b") // 😀 = U+1F600 = 2 UTF-16 units, 4 UTF-8 bytes
+	q := QStringFromString("a😀b") // 😀 = U+1F600 = 2 UTF-16 units, 4 UTF-8 bytes
 	defer q.Close()
 
 	out := e.Encode(q)
@@ -209,13 +204,13 @@ func TestEncodeMultipleChars(t *testing.T) {
 	}
 }
 
-func TestEncodeThenEncodeAgain(t *testing.T) {
+func TestQStringEncoderEncodeThenEncodeAgain(t *testing.T) {
 	// Multiple encode calls reuse the same encoder instance and its state.
-	e := NewQStringEncoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
 	for _, s := range []string{"hello", "world", "!"} {
-		q := qstring.FromString(s)
+		q := QStringFromString(s)
 		out := e.Encode(q)
 		q.Close()
 		if !bytes.Equal(out.Bytes(), []byte(s)) {
@@ -224,6 +219,3 @@ func TestEncodeThenEncodeAgain(t *testing.T) {
 		out.Close()
 	}
 }
-
-// helper alias to avoid unused import warnings in trimmed builds.
-var _ = qbytearray.AdoptUnsafePtr

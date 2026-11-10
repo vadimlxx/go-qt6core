@@ -149,7 +149,7 @@ func TestFromQByteArray(t *testing.T) {
 	q := NewQByteArray("hello world")
 	defer q.Close()
 
-	v := FromQByteArray(q)
+	v := NewQByteArrayView(q)
 	if v.String() != "hello world" {
 		t.Fatalf("FromQByteArray: %q", v.String())
 	}
@@ -162,7 +162,7 @@ func TestFromQByteArray(t *testing.T) {
 	// Null QByteArray -> null view.
 	qnull := NewQByteArray()
 	defer qnull.Close()
-	if !FromQByteArray(qnull).IsNull() {
+	if !NewQByteArrayView(qnull).IsNull() {
 		t.Fatal("FromQByteArray(null) must be null view")
 	}
 }
@@ -200,6 +200,6 @@ func TestBytesCopyIndependent(t *testing.T) {
 
 func TestQByteArrayViewMaxSize(t *testing.T) {
 	if QByteArrayViewMaxSize() <= 0 {
-		t.Fatalf("MaxSize: %d", MaxSize())
+		t.Fatalf("MaxSize: %d", QByteArrayViewMaxSize())
 	}
 }

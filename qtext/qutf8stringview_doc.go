@@ -33,4 +33,4 @@
 //
 // This package is a subpackage of github.com/vadimlxx/go-qt6core.
 // Requires Qt >= 6.11 and a C++17 compiler; links via pkg-config Qt6Core.
-package qutf8stringview
+package qtext

@@ -1,20 +1,12 @@
-package qstringbuilder
+package qtext
 
 import (
 	"bytes"
 	"testing"
 	"unicode/utf16"
-
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qbytearrayview"
-	"github.com/vadimlxx/go-qt6core/qchar"
-	"github.com/vadimlxx/go-qt6core/qlatin1char"
-	"github.com/vadimlxx/go-qt6core/qlatin1stringview"
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringview"
 )
 
-func TestEmpty(t *testing.T) {
+func TestQStringBuilderEmpty(t *testing.T) {
 	b := Concat()
 	if b.Len() != 0 {
 		t.Fatalf("Len: %d", b.Len())
@@ -34,7 +26,7 @@ func TestEmpty(t *testing.T) {
 	}
 }
 
-func TestConcatStrings(t *testing.T) {
+func TestQStringBuilderConcatStrings(t *testing.T) {
 	b := Concat("hello", ", ", "world")
 	if b.IsQStringFlavored() {
 		t.Fatal("string-only builder must not be QString-flavored")
@@ -51,9 +43,9 @@ func TestConcatStrings(t *testing.T) {
 	}
 }
 
-func TestConcatMixedFlavors(t *testing.T) {
+func TestQStringBuilderConcatMixedFlavors(t *testing.T) {
 	// char is QByteArray-flavored, QString is QString-flavored → result QString.
-	qs := qstring.FromString("world")
+	qs := QStringFromString("world")
 	defer qs.Close()
 	b := Concat(byte('A'), "hello, ", qs)
 	if !b.IsQStringFlavored() {
@@ -66,9 +58,9 @@ func TestConcatMixedFlavors(t *testing.T) {
 	}
 }
 
-func TestConcatQChar(t *testing.T) {
+func TestQStringBuilderConcatQChar(t *testing.T) {
 	// QChar is QString-flavored.
-	b := Concat(qchar.New('H'), "i")
+	b := Concat(NewQChar('H'), "i")
 	if !b.IsQStringFlavored() {
 		t.Fatal("QChar + string must be QString-flavored")
 	}
@@ -79,8 +71,8 @@ func TestConcatQChar(t *testing.T) {
 	}
 }
 
-func TestConcatQLatin1Char(t *testing.T) {
-	b := Concat(qlatin1char.New(0xE9), "tude") // "étude"
+func TestQStringBuilderConcatQLatin1Char(t *testing.T) {
+	b := Concat(NewQLatin1Char(0xE9), "tude") // "étude"
 	if !b.IsQStringFlavored() {
 		t.Fatal("QLatin1Char must be QString-flavored")
 	}
@@ -91,8 +83,8 @@ func TestConcatQLatin1Char(t *testing.T) {
 	}
 }
 
-func TestConcatQStringView(t *testing.T) {
-	sv := qstringview.FromUtf16(utf16.Encode([]rune("hello")))
+func TestQStringBuilderConcatQStringView(t *testing.T) {
+	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	b := Concat(sv, ", ", "world")
 	if !b.IsQStringFlavored() {
 		t.Fatal("QStringView must be QString-flavored")
@@ -104,8 +96,8 @@ func TestConcatQStringView(t *testing.T) {
 	}
 }
 
-func TestConcatQLatin1StringView(t *testing.T) {
-	l1 := qlatin1stringview.FromBytes([]byte{0xE9}) // "é"
+func TestQStringBuilderConcatQLatin1StringView(t *testing.T) {
+	l1 := QLatin1StringViewFromBytes([]byte{0xE9}) // "é"
 	b := Concat("caf", l1)
 	if !b.IsQStringFlavored() {
 		t.Fatal("QLatin1StringView must be QString-flavored")
@@ -117,8 +109,8 @@ func TestConcatQLatin1StringView(t *testing.T) {
 	}
 }
 
-func TestConcatQByteArray(t *testing.T) {
-	ba := qbytearray.FromString("world")
+func TestQStringBuilderConcatQByteArray(t *testing.T) {
+	ba := NewQByteArray("world")
 	defer ba.Close()
 	b := Concat("hello, ", ba)
 	if b.IsQStringFlavored() {
@@ -131,8 +123,8 @@ func TestConcatQByteArray(t *testing.T) {
 	}
 }
 
-func TestConcatQByteArrayView(t *testing.T) {
-	bv := qbytearrayview.FromString("world")
+func TestQStringBuilderConcatQByteArrayView(t *testing.T) {
+	bv := NewQByteArrayView("world")
 	b := Concat("hello, ", bv)
 	if b.IsQStringFlavored() {
 		t.Fatal("string + QByteArrayView must NOT be QString-flavored")
@@ -144,7 +136,7 @@ func TestConcatQByteArrayView(t *testing.T) {
 	}
 }
 
-func TestConcatUtf16(t *testing.T) {
+func TestQStringBuilderConcatUtf16(t *testing.T) {
 	units := utf16.Encode([]rune("héllo"))
 	b := Concat(units, "!")
 	if !b.IsQStringFlavored() {
@@ -157,7 +149,7 @@ func TestConcatUtf16(t *testing.T) {
 	}
 }
 
-func TestNestedBuilders(t *testing.T) {
+func TestQStringBuilderNestedBuilders(t *testing.T) {
 	inner := Concat("a", "b")
 	outer := Concat(inner, "c")
 	if outer.Len() != 3 {
@@ -170,7 +162,7 @@ func TestNestedBuilders(t *testing.T) {
 	}
 }
 
-func TestAppend(t *testing.T) {
+func TestQStringBuilderAppend(t *testing.T) {
 	b := Concat("a")
 	b.Append(Concat("b", "c"))
 	out := b.ToQByteArray()
@@ -180,7 +172,7 @@ func TestAppend(t *testing.T) {
 	}
 }
 
-func TestAppendPart(t *testing.T) {
+func TestQStringBuilderAppendPart(t *testing.T) {
 	b := FromString("a").AppendPart("b").AppendPart("c")
 	out := b.ToQByteArray()
 	defer out.Close()
@@ -189,8 +181,8 @@ func TestAppendPart(t *testing.T) {
 	}
 }
 
-func TestAppendToQString(t *testing.T) {
-	q := qstring.FromString("prefix: ")
+func TestQStringBuilderAppendToQString(t *testing.T) {
+	q := QStringFromString("prefix: ")
 	defer q.Close()
 	b := Concat("a", "b", "c")
 	b.AppendToQString(q)
@@ -199,8 +191,8 @@ func TestAppendToQString(t *testing.T) {
 	}
 }
 
-func TestAppendToQByteArray(t *testing.T) {
-	ba := qbytearray.FromString("prefix: ")
+func TestQStringBuilderAppendToQByteArray(t *testing.T) {
+	ba := NewQByteArray("prefix: ")
 	defer ba.Close()
 	b := Concat("a", "b", "c")
 	b.AppendToQByteArray(ba)
@@ -209,8 +201,8 @@ func TestAppendToQByteArray(t *testing.T) {
 	}
 }
 
-func TestToUtf8Latin1Local8Bit(t *testing.T) {
-	b := Concat("h", qlatin1char.New(0xE9), "llo") // "héllo" (QString-flavored)
+func TestQStringBuilderToUtf8Latin1Local8Bit(t *testing.T) {
+	b := Concat("h", NewQLatin1Char(0xE9), "llo") // "héllo" (QString-flavored)
 	u := b.ToUtf8()
 	defer u.Close()
 	if !bytes.Equal(u.Bytes(), []byte("héllo")) {
@@ -224,7 +216,7 @@ func TestToUtf8Latin1Local8Bit(t *testing.T) {
 	}
 }
 
-func TestUnsupportedType(t *testing.T) {
+func TestQStringBuilderUnsupportedType(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatal("expected panic for unsupported type")

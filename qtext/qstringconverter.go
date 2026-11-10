@@ -1,4 +1,4 @@
-package qstringconverter
+package qtext
 
 // Package qstringconverter: QStringConverter — конкретный класс.
 
@@ -41,9 +41,6 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qanystringview"
-	"github.com/vadimlxx/go-qt6core/qbytearrayview"
 )
 
 // Encoding mirrors QStringConverter::Encoding.
@@ -190,7 +187,7 @@ func NewQStringConverterFromName(name string, f Flags) *QStringConverter {
 
 // NewQStringConverterFromAny creates a converter from a QAnyStringView name and flags.
 // Mirrors QStringConverter(QAnyStringView name, Flags f).
-func NewQStringConverterFromAny(name qanystringview.QAnyStringView, f Flags) *QStringConverter {
+func NewQStringConverterFromAny(name QAnyStringView, f Flags) *QStringConverter {
 	qsc := newQStringConverterFromC(C.qstringconverter_new_from_any(
 		name.DataUnsafe(), C.ptrdiff_t(name.Size()), C.int(int(name.Kind())), C.int(int(f))))
 	runtime.KeepAlive(name)
@@ -352,8 +349,8 @@ func EncodingForName(name string) (Encoding, bool) {
 	return Encoding(v), true
 }
 
-// EncodingForNameAny is EncodingForName accepting a qanystringview.QAnyStringView directly.
-func EncodingForNameAny(name qanystringview.QAnyStringView) (Encoding, bool) {
+// EncodingForNameAny is EncodingForName accepting a QAnyStringView directly.
+func EncodingForNameAny(name QAnyStringView) (Encoding, bool) {
 	v := int(C.qstringconverter_encoding_for_name(
 		name.DataUnsafe(), C.ptrdiff_t(name.Size()), C.int(int(name.Kind()))))
 	runtime.KeepAlive(name)
@@ -367,7 +364,7 @@ func EncodingForNameAny(name qanystringview.QAnyStringView) (Encoding, bool) {
 // recognized; otherwise (Utf8, false). If expectedFirstChar != 0, the detected encoding
 // is accepted only when the decoded data starts with that code unit.
 // Mirrors static QStringConverter::encodingForData.
-func EncodingForData(data qbytearrayview.QByteArrayView, expectedFirstChar uint16) (Encoding, bool) {
+func EncodingForData(data QByteArrayView, expectedFirstChar uint16) (Encoding, bool) {
 	bs := data.Bytes()
 	var p unsafe.Pointer
 	if len(bs) > 0 {
@@ -385,7 +382,7 @@ func EncodingForData(data qbytearrayview.QByteArrayView, expectedFirstChar uint1
 // EncodingForHtml returns the Encoding detected from the HTML <meta> charset declaration
 // in the given byte data, and true if recognized; otherwise (Utf8, false).
 // Mirrors static QStringConverter::encodingForHtml.
-func EncodingForHtml(data qbytearrayview.QByteArrayView) (Encoding, bool) {
+func EncodingForHtml(data QByteArrayView) (Encoding, bool) {
 	bs := data.Bytes()
 	var p unsafe.Pointer
 	if len(bs) > 0 {
@@ -423,7 +420,7 @@ func (q *QStringConverter) UnsafePtr() unsafe.Pointer {
 // parity with Qt's class hierarchy).
 //
 // Intended for sibling subpackages (qstringencoder, qstringdecoder), not for end users.
-func AdoptUnsafePtr(p unsafe.Pointer) *QStringConverter {
+func QStringConverterAdoptUnsafePtr(p unsafe.Pointer) *QStringConverter {
 	if p == nil {
 		return nil
 	}
