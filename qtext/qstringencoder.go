@@ -48,26 +48,6 @@ import (
 	"unsafe"
 )
 
-// FinalizeResultError mirrors QStringConverter::FinalizeResultError.
-type FinalizeResultError int
-
-const (
-	FinalizeNoError FinalizeResultError = iota
-	FinalizeInvalidCharacters
-	FinalizeNotEnoughSpace
-)
-
-func (e FinalizeResultError) String() string {
-	switch e {
-	case FinalizeNoError:
-		return "NoError"
-	case FinalizeInvalidCharacters:
-		return "InvalidCharacters"
-	case FinalizeNotEnoughSpace:
-		return "NotEnoughSpace"
-	}
-	return "FinalizeResultError(?)"
-}
 
 // QStringEncoder mirrors Qt 6.11.2 QStringEncoder.
 //

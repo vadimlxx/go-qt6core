@@ -1,16 +1,10 @@
 package qtext
 
 import (
-	"bytes"
 	"testing"
-
-	"github.com/vadimlxx/go-qt6core/qbytearray"
-	"github.com/vadimlxx/go-qt6core/qbytearrayview"
-	// "github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringconverter"
 )
 
-func TestDefaultInvalid(t *testing.T) {
+func TestQStringDecoderDefaultInvalid(t *testing.T) {
 	d := NewQStringDecoder()
 	defer d.Close()
 
@@ -22,7 +16,7 @@ func TestDefaultInvalid(t *testing.T) {
 	}
 
 	// Decoding on an invalid decoder must return empty and set HasError.
-	ba := qbytearray.FromString("hello")
+	ba := NewQByteArray("hello")
 	defer ba.Close()
 	out := d.Decode(ba)
 	defer out.Close()
@@ -34,8 +28,8 @@ func TestDefaultInvalid(t *testing.T) {
 	}
 }
 
-func TestFromEncodingUtf8(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderFromEncodingUtf8(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	if !d.IsValid() {
@@ -45,7 +39,7 @@ func TestFromEncodingUtf8(t *testing.T) {
 		t.Fatalf("Name: %q", d.Name())
 	}
 
-	ba := qbytearray.FromString("héllo")
+	ba := NewQByteArray("héllo")
 	defer ba.Close()
 	out := d.Decode(ba)
 	defer out.Close()
@@ -55,25 +49,25 @@ func TestFromEncodingUtf8(t *testing.T) {
 	}
 }
 
-func TestFromNameUtf8(t *testing.T) {
-	d := NewQStringDecoderFromName("UTF-8", qstringconverter.FlagDefault)
+func TestQStringDecoderFromNameUtf8(t *testing.T) {
+	d := NewQStringDecoderFromName("UTF-8", FlagDefault)
 	defer d.Close()
 	if !d.IsValid() || d.Name() != "UTF-8" {
 		t.Fatalf("valid=%v name=%q", d.IsValid(), d.Name())
 	}
 
-	bad := NewQStringDecoderFromName("nonexistent", qstringconverter.FlagDefault)
+	bad := NewQStringDecoderFromName("nonexistent", FlagDefault)
 	defer bad.Close()
 	if bad.IsValid() {
 		t.Fatal("nonexistent name must be invalid")
 	}
 }
 
-func TestDecodeView(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderDecodeView(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
-	bv := qbytearrayview.FromString("日本")
+	bv := NewQByteArrayView("日本")
 	out := d.DecodeView(bv)
 	defer out.Close()
 
@@ -82,12 +76,12 @@ func TestDecodeView(t *testing.T) {
 	}
 }
 
-func TestDecodeLatin1(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Latin1, qstringconverter.FlagDefault)
+func TestQStringDecoderDecodeLatin1(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Latin1, FlagDefault)
 	defer d.Close()
 
 	// "héllo" as Latin-1 bytes: h=0x68, é=0xE9, l, l, o
-	ba := qbytearray.FromBytes([]byte{'h', 0xE9, 'l', 'l', 'o'})
+	ba := NewQByteArray([]byte{'h', 0xE9, 'l', 'l', 'o'})
 	defer ba.Close()
 	out := d.Decode(ba)
 	defer out.Close()
@@ -97,12 +91,12 @@ func TestDecodeLatin1(t *testing.T) {
 	}
 }
 
-func TestDecodeUtf16LE(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf16LE, qstringconverter.FlagDefault)
+func TestQStringDecoderDecodeUtf16LE(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf16LE, FlagDefault)
 	defer d.Close()
 
 	// "hi" in UTF-16LE: 68 00 69 00
-	ba := qbytearray.FromBytes([]byte{0x68, 0x00, 0x69, 0x00})
+	ba := NewQByteArray([]byte{0x68, 0x00, 0x69, 0x00})
 	defer ba.Close()
 	out := d.Decode(ba)
 	defer out.Close()
@@ -112,8 +106,8 @@ func TestDecodeUtf16LE(t *testing.T) {
 	}
 }
 
-func TestRequiredSpace(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderRequiredSpace(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	// RequiredSpace must be >= input length for any encoding.
@@ -123,11 +117,11 @@ func TestRequiredSpace(t *testing.T) {
 	}
 }
 
-func TestAppendToBuffer(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderAppendToBuffer(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
-	bv := qbytearrayview.FromString("hello")
+	bv := NewQByteArrayView("hello")
 	buf := make([]uint16, d.RequiredSpace(bv.Size()))
 	n := d.AppendToBuffer(buf, bv)
 	if n != 5 {
@@ -156,8 +150,8 @@ func rune16ToRunes(u []uint16) []rune {
 	return out
 }
 
-func TestFinalizeEmpty(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderFinalizeEmpty(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	// Fresh UTF-8 decoder has no pending state; Finalize should report NoError.
@@ -170,8 +164,8 @@ func TestFinalizeEmpty(t *testing.T) {
 	}
 }
 
-func TestFinalizeBufferEmpty(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderFinalizeBufferEmpty(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	next, invalid, errCode := d.FinalizeBuffer(make([]uint16, 16))
@@ -180,8 +174,8 @@ func TestFinalizeBufferEmpty(t *testing.T) {
 	}
 }
 
-func TestEmbeddedBase(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderEmbeddedBase(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	// The embedded *QStringConverter must not be nil and must reflect the same C++ state.
@@ -204,9 +198,9 @@ func TestEmbeddedBase(t *testing.T) {
 	}
 }
 
-func TestFromInterface(t *testing.T) {
+func TestQStringDecoderFromInterface(t *testing.T) {
 	// Build a valid converter to get its Interface, then construct a decoder from it.
-	src := qstringconverter.NewQStringConverterFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+	src := NewQStringConverterFromEncoding(Utf8, FlagDefault)
 	defer src.Close()
 
 	iface := src.Iface()
@@ -221,19 +215,19 @@ func TestFromInterface(t *testing.T) {
 	}
 
 	// Null interface → invalid decoder.
-	nullDec := NewQStringDecoderFromInterface(qstringconverter.Interface{})
+	nullDec := NewQStringDecoderFromInterface(Interface{})
 	defer nullDec.Close()
 	if nullDec.IsValid() {
 		t.Fatal("FromInterface(null) must be invalid")
 	}
 }
 
-func TestDecodeMultiByte(t *testing.T) {
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+func TestQStringDecoderDecodeMultiByte(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	// "a😀b" — 😀 = U+1F600 = 4 UTF-8 bytes, 2 UTF-16 code units
-	ba := qbytearray.FromString("a😀b")
+	ba := NewQByteArray("a😀b")
 	defer ba.Close()
 
 	out := d.Decode(ba)
@@ -244,13 +238,13 @@ func TestDecodeMultiByte(t *testing.T) {
 	}
 }
 
-func TestDecodeReusesState(t *testing.T) {
+func TestQStringDecoderDecodeReusesState(t *testing.T) {
 	// Multiple decode calls reuse the same decoder instance and its state.
-	d := NewQStringDecoderFromEncoding(qstringconverter.Utf8, qstringconverter.FlagDefault)
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
 	defer d.Close()
 
 	for _, s := range []string{"hello", "world", "!"} {
-		ba := qbytearray.FromString(s)
+		ba := NewQByteArray(s)
 		out := d.Decode(ba)
 		ba.Close()
 		if out.GoString() != s {
@@ -260,9 +254,9 @@ func TestDecodeReusesState(t *testing.T) {
 	}
 }
 
-func TestDecoderForHtml(t *testing.T) {
+func TestQStringDecoderDecoderForHtml(t *testing.T) {
 	html := "<html><head><meta charset=\"UTF-8\"><title>x</title></head></html>"
-	bv := qbytearrayview.FromString(html)
+	bv := NewQByteArrayView(html)
 	d := DecoderForHtml(bv)
 	defer d.Close()
 	if !d.IsValid() {
@@ -270,7 +264,7 @@ func TestDecoderForHtml(t *testing.T) {
 	}
 
 	// Sanity: the returned decoder is usable.
-	ba := qbytearray.FromString("hello")
+	ba := NewQByteArray("hello")
 	defer ba.Close()
 	out := d.Decode(ba)
 	defer out.Close()
@@ -278,6 +272,3 @@ func TestDecoderForHtml(t *testing.T) {
 		t.Fatalf("Decode via DecoderForHtml: %q", out.GoString())
 	}
 }
-
-// sanity check that bytes.Equal is used (avoid unused import in future edits).
-var _ = bytes.Equal

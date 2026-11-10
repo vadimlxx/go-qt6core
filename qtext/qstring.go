@@ -643,3 +643,14 @@ func QStringFromRepeat(n int, c QChar) *QString {
 	s.ResizeFill(n, c)
 	return s
 }
+
+// AdoptQStringUnsafePtr takes ownership of a raw go_qt6core_qstring_t*
+// (typically returned by C++ code that allocates a fresh QString) and wraps
+// it as *QString with a finalizer installed.
+//
+// The pointer must be a heap-allocated C++ QString obtained from a function
+// whose contract explicitly transfers ownership. The caller must not free it
+// manually afterwards. Passing nil returns nil.
+func AdoptQStringUnsafePtr(p unsafe.Pointer) *QString {
+	return wrapQString(p)
+}

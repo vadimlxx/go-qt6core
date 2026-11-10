@@ -1,4 +1,4 @@
-package qstringmatcher
+package qtext
 
 // Package qstringmatcher: QStringMatcher — эффективный поиск подстроки с предвычислением.
 
@@ -35,9 +35,6 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
-
-	"github.com/vadimlxx/go-qt6core/qstring"
-	"github.com/vadimlxx/go-qt6core/qstringview"
 )
 
 // QStringMatcher mirrors Qt 6.11.2 QStringMatcher.
@@ -64,13 +61,6 @@ func finalize(m *QStringMatcher) {
 	}
 }
 
-func csInt(caseSensitive bool) C.int {
-	if caseSensitive {
-		return 1 // Qt::CaseSensitive
-	}
-	return 0 // Qt::CaseInsensitive
-}
-
 // ---- constructors --------------------------------------------------------
 
 // New creates an empty QStringMatcher (empty pattern, Qt::CaseSensitive).
@@ -81,8 +71,8 @@ func New() *QStringMatcher {
 
 // FromQString creates a QStringMatcher from a QString pattern.
 // Mirrors QStringMatcher(const QString &pattern, Qt::CaseSensitivity cs = CaseSensitive).
-// Passing a nil *qstring.QString is equivalent to an empty QString pattern.
-func FromQString(pattern *qstring.QString, caseSensitive bool) *QStringMatcher {
+// Passing a nil *QString is equivalent to an empty QString pattern.
+func QStringMatcherFromQString(pattern *QString, caseSensitive bool) *QStringMatcher {
 	var p unsafe.Pointer
 	if pattern != nil {
 		p = pattern.UnsafePtr()
@@ -96,7 +86,7 @@ func FromQString(pattern *qstring.QString, caseSensitive bool) *QStringMatcher {
 // Mirrors QStringMatcher(QStringView pattern, Qt::CaseSensitivity cs = CaseSensitive).
 // The data is copied (QStringMatcher stores its own QString q_pattern), so the view does
 // not need to outlive the matcher.
-func FromQStringView(pattern qstringview.QStringView, caseSensitive bool) *QStringMatcher {
+func QStringMatcherFromQStringView(pattern QStringView, caseSensitive bool) *QStringMatcher {
 	n := pattern.Size()
 	var p *C.uint16_t
 	if n > 0 {
@@ -110,7 +100,7 @@ func FromQStringView(pattern qstringview.QStringView, caseSensitive bool) *QStri
 // FromUtf16 creates a QStringMatcher from raw UTF-16 code units (QChar*).
 // Mirrors QStringMatcher(const QChar *uc, qsizetype len, Qt::CaseSensitivity cs).
 // The data is copied into an internal QString.
-func FromUtf16(units []uint16, caseSensitive bool) *QStringMatcher {
+func QStringMatcherFromUtf16(units []uint16, caseSensitive bool) *QStringMatcher {
 	var p *C.uint16_t
 	if len(units) > 0 {
 		p = (*C.uint16_t)(unsafe.Pointer(&units[0]))
@@ -155,7 +145,7 @@ func (m *QStringMatcher) Assign(other *QStringMatcher) {
 // SetPattern replaces m's pattern with q (copies q via QString COW).
 // Passing nil is equivalent to an empty QString pattern.
 // Invalidates any QStringView previously returned by PatternView.
-func (m *QStringMatcher) SetPattern(q *qstring.QString) {
+func (m *QStringMatcher) SetPattern(q *QString) {
 	var p unsafe.Pointer
 	if q != nil {
 		p = q.UnsafePtr()
@@ -180,13 +170,13 @@ func (m *QStringMatcher) CaseSensitivity() bool {
 	return r != 0
 }
 
-// Pattern returns a fresh owned copy of the matcher's pattern as *qstring.QString.
+// Pattern returns a fresh owned copy of the matcher's pattern as *QString.
 // Mirrors QString::pattern().
-func (m *QStringMatcher) Pattern() *qstring.QString {
+func (m *QStringMatcher) Pattern() *QString {
 	var out unsafe.Pointer
 	C.qstringmatcher_pattern(m.p, &out)
 	runtime.KeepAlive(m)
-	return qstring.AdoptUnsafePtr(out)
+	return wrapQString(out)
 }
 
 // PatternView returns a zero-copy view into the matcher's internal pattern buffer.
@@ -195,15 +185,15 @@ func (m *QStringMatcher) Pattern() *qstring.QString {
 // IMPORTANT: the view is invalidated by SetPattern, Assign, Close, or any other operation
 // that modifies the matcher's q_pattern. If you need a stable snapshot, use Pattern().
 // Mirrors patternView().
-func (m *QStringMatcher) PatternView() qstringview.QStringView {
+func (m *QStringMatcher) PatternView() QStringView {
 	var data *C.uint16_t
 	var size C.ptrdiff_t
 	C.qstringmatcher_pattern_view(m.p, &data, &size)
 	runtime.KeepAlive(m)
 	if data == nil || size == 0 {
-		return qstringview.Empty()
+		return EmptyQStringView()
 	}
-	return qstringview.NewUnsafeWithOwner(unsafe.Pointer(data), int(size), m)
+	return newQStringViewWithOwner(unsafe.Pointer(data), int(size), m)
 }
 
 // ---- search --------------------------------------------------------------
@@ -211,7 +201,7 @@ func (m *QStringMatcher) PatternView() qstringview.QStringView {
 // IndexIn searches for the pattern in str starting at position from.
 // Returns the position of the first match, or -1 if not found.
 // Mirrors indexIn(const QString &str, qsizetype from = 0).
-func (m *QStringMatcher) IndexIn(str *qstring.QString, from int) int {
+func (m *QStringMatcher) IndexIn(str *QString, from int) int {
 	if str == nil {
 		return -1
 	}
@@ -227,7 +217,7 @@ func (m *QStringMatcher) IndexIn(str *qstring.QString, from int) int {
 // IndexInView searches for the pattern in str starting at position from.
 // Returns the position of the first match, or -1 if not found.
 // Mirrors indexIn(QStringView str, qsizetype from = 0).
-func (m *QStringMatcher) IndexInView(str qstringview.QStringView, from int) int {
+func (m *QStringMatcher) IndexInView(str QStringView, from int) int {
 	n := str.Size()
 	var p *C.uint16_t
 	if n > 0 {
