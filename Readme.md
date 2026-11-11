@@ -95,6 +95,15 @@ QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size()
 
 Because Go has no operator overloading, Qt operators map to methods -- see margins_doc
 
+- QSize & QSizeF
+
+```
+Qt-constructor QSize() returns QSize(-1, -1), NOT (0, 0).
+   - NewQSizeDefault()  → (-1, -1)  — default QSize()
+   - NewQSizeZero()     → ( 0,  0)  — «zero» QSize
+   - NewQSize(w, h)     → ( w,  h)  — manual
+```
+
 All details see in doc.go files
 
 ### License
