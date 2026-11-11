@@ -25,9 +25,19 @@ QString* qstring_new_empty() {
 QString* qstring_new_copy(const QString* other) {
     return new QString(*other);
 }
-QString* qstring_new_from_qstringview(const uint16_t* data, ptrdiff_t size) {
+QString* qstring_new_from_utf8(const char* data, ptrdiff_t size) {
+    return new QString(U8(data, size));
+}
+QString* qstring_new_from_utf16(const uint16_t* data, ptrdiff_t size) {
     return new QString(QString::fromUtf16(reinterpret_cast<const char16_t*>(data),
                                           static_cast<qsizetype>(size)));
+}
+QString* qstring_new_from_latin1(const char* data, ptrdiff_t size) {
+    return new QString(QString::fromLatin1(data, static_cast<qsizetype>(size)));
+}
+QString* qstring_new_from_qbytearray(const QByteArray* other) {
+    if (!other) return new QString();
+    return new QString(QString::fromUtf8(*other));
 }
 void qstring_delete(QString* self) {
     delete self;
@@ -132,9 +142,7 @@ void qstring_replace_range_utf8(QString* self, ptrdiff_t i, ptrdiff_t n, const c
     self->replace(static_cast<qsizetype>(i), static_cast<qsizetype>(n), U8(after, after_size));
 }
 
-/* --- slicing ---
- * Каждая функция возвращает новый QString* (владелец — Go finalizer). */
-
+/* --- slicing --- */
 QString* qstring_left(const QString* self, ptrdiff_t n) {
     return new QString(self->left(static_cast<qsizetype>(n)));
 }
@@ -310,11 +318,7 @@ ptrdiff_t qstring_max_size(void) {
 bool qstring_is_right_to_left(const QString* self) { return self->isRightToLeft(); }
 bool qstring_is_valid_utf16(const QString* self)   { return self->isValidUtf16(); }
 
-/* --- conversion to QByteArray ---
- * out-параметр типизирован как QByteArray** (раньше был void**).
- * QByteArray forward-декларирован в qstring_c.h; полное определение
- * подтянуто через #include <QByteArray> выше. */
-
+/* --- conversion to QByteArray --- */
 void qstring_to_utf8_qba(const QString* self, QByteArray** out) {
     *out = new QByteArray(self->toUtf8());
 }

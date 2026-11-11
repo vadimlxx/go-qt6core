@@ -29,11 +29,6 @@
 //   - qbytearray:       for the result of Encode / EncodeView.
 //   - qanystringview:   for NewQStringEncoderFromAny.
 //
-// No import cycle: qstringconverter imports none of {qstring, qbytearray, qstringview,
-// qanystringview}, so depending on it is safe. The unsafe.Pointer bridge
-// qstringconverter.AdoptUnsafePtr() lets this package share the same C++ QStringEncoder*
-// between the *QStringEncoder owner and its embedded *QStringConverter alias.
-//
 // # Protected members exposed
 //
 // The following protected Qt members are exposed (as requested):

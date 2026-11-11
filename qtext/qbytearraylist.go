@@ -185,7 +185,7 @@ func (l *QByteArrayList) At(i int) *QByteArray {
 	var out *C.QByteArray
 	C.qbytearraylist_at_new(l.p, C.ptrdiff_t(i), &out)
 	runtime.KeepAlive(l)
-	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
+	return wrapQByteArray(unsafe.Pointer(out))
 }
 
 func (l *QByteArrayList) Set(i int, ba *QByteArray) {
@@ -253,7 +253,7 @@ func (l *QByteArrayList) Join(sep []byte) *QByteArray {
 	C.qbytearraylist_join(l.p, p, C.ptrdiff_t(len(sep)), &out)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(sep)
-	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
+	return wrapQByteArray(unsafe.Pointer(out))
 }
 
 // JoinString is Join with a string separator.
@@ -283,7 +283,7 @@ func (l *QByteArrayList) ToSlice() []*QByteArray {
 	cslice := unsafe.Slice(arr, int(n))
 	out := make([]*QByteArray, int(n))
 	for i, p := range cslice {
-		out[i] = QByteArrayFromUnsafePtr(unsafe.Pointer(p))
+		out[i] = wrapQByteArray(unsafe.Pointer(p))
 	}
 	return out
 }

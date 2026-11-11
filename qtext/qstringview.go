@@ -321,13 +321,6 @@ func (v *QStringView) SliceN(pos, n int) { *v = v.SlicedN(pos, n) }
 
 // ---- search --------------------------------------------------------------
 
-func csInt(cs bool) C.int {
-	if cs {
-		return 0
-	}
-	return 1
-}
-
 func (v QStringView) IndexOf(c QChar, from int, caseSensitive bool) int {
 	r := C.qstringview_index_of_qchar((*C.uint16_t)(v.data), C.ptrdiff_t(v.size),
 		C.uint16_t(c.Unicode()), C.ptrdiff_t(from), csInt(caseSensitive))

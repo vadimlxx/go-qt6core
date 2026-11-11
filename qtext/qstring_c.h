@@ -19,7 +19,10 @@ typedef struct QByteArray QByteArray;
 /* --- lifecycle --- */
 QString* qstring_new_empty(void);
 QString* qstring_new_copy(const QString* other);
-QString* qstring_new_from_qstringview(const uint16_t* data, ptrdiff_t size);
+QString* qstring_new_from_utf8(const char* data, ptrdiff_t size);
+QString* qstring_new_from_utf16(const uint16_t* data, ptrdiff_t size);
+QString* qstring_new_from_latin1(const char* data, ptrdiff_t size);
+QString* qstring_new_from_qbytearray(const QByteArray* other);
 void     qstring_delete(QString* self);
 
 /* --- basic accessors --- */

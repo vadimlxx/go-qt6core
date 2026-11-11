@@ -33,24 +33,6 @@
 //   - live on the OTHER side (qstring.FromQByteArray, qstringview.FromQByteArray, …), or
 //   - live here as unsafe.Pointer <-> *QByteArray adapters (ToQString, FromQStringUnsafePtr).
 //
-// # QString interop (unsafe.Pointer as wire type)
-//
-//	q := qbytearray.FromString("hello")
-//	s := qstring.AdoptUnsafePtr(q.ToQString())       // decode UTF-8 → QString
-//	defer s.Close()
-//
-// and in the other direction:
-//
-//	s := qstring.FromString("hello")
-//	defer s.Close()
-//	q := qbytearray.FromQStringUnsafePtr(s.UnsafePtr()) // QString → UTF-8
-//	defer q.Close()
-//
-// or, more idiomatically:
-//
-//	q := s.Utf8()                                     // QString → QByteArray
-//	s := qstring.FromQByteArray(q)                    // QByteArray → QString
-//
 // Latin-1 and Local8Bit variants follow the same pattern: ToQStringLatin1 /
 // FromQStringLatin1UnsafePtr / ToQStringLocal8Bit / FromQStringLocal8BitUnsafePtr.
 //

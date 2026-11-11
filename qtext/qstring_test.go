@@ -20,7 +20,7 @@ func TestEmptyQString(t *testing.T) {
 func TestQStringFromString(t *testing.T) {
 	cases := []string{"", "hello", "héllo", "Привет", "日本語", "a😀b"}
 	for _, in := range cases {
-		s := QStringFromString(in)
+		s := NewQString(in)
 		if s.GoString() != in {
 			t.Fatalf("in=%q out=%q", in, s.GoString())
 		}
@@ -30,7 +30,7 @@ func TestQStringFromString(t *testing.T) {
 
 func TestQStringFromUtf16(t *testing.T) {
 	units := utf16.Encode([]rune("a😀b"))
-	s := QStringFromUtf16(units)
+	s := NewQString(units)
 	defer s.Close()
 	if s.GoString() != "a😀b" {
 		t.Fatalf("GoString: %q", s.GoString())
@@ -52,7 +52,7 @@ func TestQStringFromLatin1(t *testing.T) {
 func TestQStringFromQByteArray(t *testing.T) {
 	ba := NewQByteArray("héllo")
 	defer ba.Close()
-	s := QStringFromQByteArray(ba)
+	s := NewQString(ba)
 	defer s.Close()
 	if s.GoString() != "héllo" {
 		t.Fatalf("GoString: %q", s.GoString())
@@ -61,7 +61,7 @@ func TestQStringFromQByteArray(t *testing.T) {
 
 func TestQStringFromQStringView(t *testing.T) {
 	v := QStringViewFromString("héllo")
-	s := QStringFromQStringView(v)
+	s := NewQString(v)
 	defer s.Close()
 	if s.GoString() != "héllo" {
 		t.Fatalf("GoString: %q", s.GoString())
@@ -78,7 +78,7 @@ func TestQStringToQStringView(t *testing.T) {
 }
 
 func TestQStringAtFrontBack(t *testing.T) {
-	s := QStringFromString("abc")
+	s := NewQString("abc")
 	defer s.Close()
 
 	if s.At(0) != NewQChar('a') {

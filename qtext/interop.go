@@ -31,21 +31,6 @@ import "unsafe"
 
 // ---- QByteArray ----------------------------------------------------------
 
-// QByteArrayFromUnsafePtr wraps a heap-allocated C++ QByteArray* into *QByteArray.
-// Takes ownership: the returned wrapper's finalizer (or explicit Close()) frees
-// the C++ object.
-func QByteArrayFromUnsafePtr(p unsafe.Pointer) *QByteArray {
-	return wrapQByteArray(p)
-}
-
-// AdoptUnsafePtr is a deprecated alias for QByteArrayFromUnsafePtr.
-//
-// Deprecated: use QByteArrayFromUnsafePtr for consistency with
-// QStringFromUnsafePtr.
-func AdoptUnsafePtr(p unsafe.Pointer) *QByteArray {
-	return QByteArrayFromUnsafePtr(p)
-}
-
 // UnsafePtr returns the underlying C++ QByteArray* as unsafe.Pointer.
 // Borrowed: the caller does NOT own; qtext remains responsible for freeing.
 // The C++ object is valid until this wrapper is Close()d.
@@ -66,16 +51,6 @@ func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
 }
 
 // ---- QString -------------------------------------------------------------
-
-// QStringFromUnsafePtr wraps a heap-allocated C++ QString* into *QString.
-// Takes ownership: the returned wrapper's finalizer (or explicit Close()) frees
-// the C++ object.
-func QStringFromUnsafePtr(p unsafe.Pointer) *QString {
-	return wrapQString(p)
-}
-func AdoptQStringUnsafePtr(p unsafe.Pointer) *QString {
-	return wrapQString(p)
-}
 
 // UnsafePtr returns the underlying C++ QString* as unsafe.Pointer.
 // Borrowed: the caller does NOT own; qtext remains responsible for freeing.

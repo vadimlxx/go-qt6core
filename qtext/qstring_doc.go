@@ -8,17 +8,19 @@
 // release.
 //
 // Construction interop:
-//   - FromString / FromUtf8 / FromUtf16 / FromLatin1 use
-//     internal/qt6core (one-copy UTF-8→UTF-16 conversion).
-//   - FromQByteArray uses internal/qt6core (UTF-8 decoding).
-//   - FromQStringView uses package qstring's own C++ (QString::fromUtf16).
+//   - FromString / FromUtf8       → qstring_new_from_utf8     (QString::fromUtf8)
+//   - FromUtf16 / FromQStringView → qstring_new_from_utf16    (QString::fromUtf16)
+//   - FromLatin1                  → qstring_new_from_latin1   (QString::fromLatin1)
+//   - FromQByteArray              → qstring_new_from_qbytearray (QString::fromUtf8(ba))
 //
-// Sibling interop:
-//   - At / Front / Back return qchar.QChar.
-//   - Utf8 / Latin1 / Local8Bit return *qbytearray.QByteArray (via
-//     qbytearray.AdoptUnsafePtr).
-//   - ToQStringView returns a zero-copy qstringview.QStringView that keeps
-//     the *QString alive (requires qstringview.NewUnsafeWithOwner).
+// All constructors and methods use direct C++ bindings from qstring_c.cpp;
+// this package no longer imports internal/qt6core.
+//
+// Sibling interop (all in package qtext):
+//   - At / Front / Back return QChar.
+//   - Utf8 / Latin1 / Local8Bit return *QByteArray (via QByteArrayFromUnsafePtr).
+//   - ToQStringView returns a zero-copy QStringView that keeps the *QString
+//     alive via the owner field.
 //
 // TODO (not yet bound):
 //   - arg()                       — variadic template.

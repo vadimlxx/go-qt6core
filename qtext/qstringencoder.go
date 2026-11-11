@@ -13,8 +13,6 @@ package qtext
      эквивалентно (одна конверсия в C++ с текущим State и последующим truncate).
    - finalize(char*, qsizetype) возвращает FinalizeResultChar<char>; в Go — тройка
      (next int, invalid int16, err FinalizeResultError).
-   - AdoptUnsafePtr используется для того, чтобы встроенный
-     *QStringConverter не владел C++-объектом: владелец — *QStringEncoder.
 
  не реализовано:
    - operator() / encode(const QString&) vs encode(QStringView) — в Go разные методы

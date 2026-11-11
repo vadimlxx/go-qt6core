@@ -41,8 +41,6 @@ import "C"
 import (
 	"runtime"
 	"unsafe"
-
-	qt6core "github.com/vadimlxx/go-qt6core/internal/qt6core"
 )
 
 // QString wraps a Qt6 QString (UTF-16 COW string).
@@ -80,43 +78,97 @@ func (q *QString) Close() {
 // ---- construction --------------------------------------------------------
 
 // New returns an empty QString.
-func NewQString() *QString {
+func NewEmptyQString() *QString {
 	return wrapQString(unsafe.Pointer(C.qstring_new_empty()))
 }
 
 // FromString constructs a QString by decoding s as UTF-8.
 func QStringFromString(s string) *QString {
-	return wrapQString(qt6core.QStringFromUtf8(s))
+	var p *C.char
+	if len(s) > 0 {
+		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
+	}
+	q := wrapQString(unsafe.Pointer(C.qstring_new_from_utf8(p, C.ptrdiff_t(len(s)))))
+	runtime.KeepAlive(s)
+	return q
 }
 
 // FromUtf8 constructs a QString by decoding b as UTF-8.
 func QStringFromUtf8(b []byte) *QString {
-	return wrapQString(qt6core.QStringFromUtf8Bytes(b))
+	var p *C.char
+	if len(b) > 0 {
+		p = (*C.char)(unsafe.Pointer(&b[0]))
+	}
+	q := wrapQString(unsafe.Pointer(C.qstring_new_from_utf8(p, C.ptrdiff_t(len(b)))))
+	runtime.KeepAlive(b)
+	return q
 }
 
 // FromUtf16 constructs a QString from UTF-16 code units.
 func QStringFromUtf16(units []uint16) *QString {
-	return wrapQString(qt6core.QStringFromUtf16(units))
+	var p *C.uint16_t
+	if len(units) > 0 {
+		p = (*C.uint16_t)(unsafe.Pointer(&units[0]))
+	}
+	q := wrapQString(unsafe.Pointer(C.qstring_new_from_utf16(p, C.ptrdiff_t(len(units)))))
+	runtime.KeepAlive(units)
+	return q
 }
 
 // FromLatin1 constructs a QString by decoding b as Latin-1.
 func QStringFromLatin1(b []byte) *QString {
-	return wrapQString(qt6core.QStringFromLatin1(b))
+	var p *C.char
+	if len(b) > 0 {
+		p = (*C.char)(unsafe.Pointer(&b[0]))
+	}
+	q := wrapQString(unsafe.Pointer(C.qstring_new_from_latin1(p, C.ptrdiff_t(len(b)))))
+	runtime.KeepAlive(b)
+	return q
 }
 
 // FromQByteArray constructs a QString by decoding ba as UTF-8
 // (mirrors QString::fromUtf8(const QByteArray&)).
 func QStringFromQByteArray(ba *QByteArray) *QString {
-	return wrapQString(qt6core.QStringFromQByteArray(ba.UnsafePtr()))
+	if ba == nil || ba.p == nil {
+		return NewQString()
+	}
+	q := wrapQString(unsafe.Pointer(C.qstring_new_from_qbytearray(ba.p)))
+	runtime.KeepAlive(ba)
+	return q
 }
 
 // FromQStringView constructs a QString by copying the view's contents.
 func QStringFromQStringView(v QStringView) *QString {
 	if v.IsNull() {
+		return NewQString()
+	}
+	q := wrapQString(unsafe.Pointer(C.qstring_new_from_utf16(
+		(*C.uint16_t)(v.Utf16Unsafe()), C.ptrdiff_t(v.Size()))))
+	runtime.KeepAlive(v)
+	return q
+}
+
+func NewQString(arg ...any) *QString {
+	if len(arg) == 0 || arg[0] == nil {
 		return wrapQString(unsafe.Pointer(C.qstring_new_empty()))
 	}
-	return wrapQString(unsafe.Pointer(C.qstring_new_from_qstringview(
-		(*C.uint16_t)(v.Utf16Unsafe()), C.ptrdiff_t(v.Size()))))
+
+	switch v := arg[0].(type) {
+	case string:
+		return QStringFromString(v)
+	case []byte:
+		return QStringFromUtf8(v)
+	case []uint16:
+		return QStringFromUtf16(v)
+	case QByteArray:
+		return QStringFromQByteArray(&v)
+	case *QByteArray:
+		return QStringFromQByteArray(v)
+	case QStringView:
+		return QStringFromQStringView(v)
+	}
+
+	panic("NewQString invalid argumentes")
 }
 
 // Clone returns a shallow COW copy (Qt refcount++; cheap).
@@ -153,10 +205,14 @@ func (q *QString) Utf16() []uint16 {
 }
 
 // GoString decodes the contents as UTF-8 into a Go string.
+//
+// Реализовано через Utf8() → QByteArray.String(): Qt делает одну копию
+// (UTF-16 → UTF-8 в QByteArray), C.GoStringN — вторую (C → Go). Итого 2
+// копии; раньше через internal/qt6core было 3 (плюс временный C malloc).
 func (q *QString) GoString() string {
-	s := qt6core.QStringToUtf8String(unsafe.Pointer(q.p))
-	runtime.KeepAlive(q)
-	return s
+	ba := q.Utf8()
+	defer ba.Close()
+	return ba.String()
 }
 
 // String implements fmt.Stringer.
@@ -167,7 +223,7 @@ func (q *QString) Utf8() *QByteArray {
 	var out *C.QByteArray
 	C.qstring_to_utf8_qba(q.p, &out)
 	runtime.KeepAlive(q)
-	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
+	return wrapQByteArray(unsafe.Pointer(out))
 }
 
 // Latin1 returns a fresh *QByteArray with Latin-1 encoding
@@ -176,7 +232,7 @@ func (q *QString) Latin1() *QByteArray {
 	var out *C.QByteArray
 	C.qstring_to_latin1_qba(q.p, &out)
 	runtime.KeepAlive(q)
-	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
+	return wrapQByteArray(unsafe.Pointer(out))
 }
 
 // Local8Bit returns a fresh *QByteArray with local 8-bit encoding.
@@ -184,7 +240,7 @@ func (q *QString) Local8Bit() *QByteArray {
 	var out *C.QByteArray
 	C.qstring_to_local8bit_qba(q.p, &out)
 	runtime.KeepAlive(q)
-	return QByteArrayFromUnsafePtr(unsafe.Pointer(out))
+	return wrapQByteArray(unsafe.Pointer(out))
 }
 
 // At returns the i-th QChar. Panics if i is out of range.

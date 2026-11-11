@@ -1,20 +1,19 @@
-// Package qt6core provides internal, cross-package C++ bridge helpers
-// for the go-qt6core library.
+// Package qt6core is an internal helper package for the go-qt6core library.
 //
-// It is NOT part of the public API. It exists solely so that sibling
-// packages (qstring, qstringlist, qbytearray, qjson, qsettings, ...)
-// can share one implementation of QString ↔ UTF-8/UTF-16/Latin-1 and
-// QByteArray ↔ QString conversions, without a circular dependency
-// between qstring and qstringlist.
+// It provides exactly two things:
 //
-// All exported functions exchange objects via unsafe.Pointer:
-//   - Functions named QStringFrom*/QByteArrayFrom* return a newly
-//     allocated C++ object; the caller owns it and must free it via
-//     the corresponding *Delete function (typically from a finalizer
-//     in the owning public package).
-//   - Functions named QStringTo* return freshly allocated Go copies;
-//     no ownership transfer of C++ objects takes place.
+//   - check_qt_version.h — compile-time minimum Qt version check
+//     (#included by every *_c.cpp in package qtext).
+//   - Version() — the runtime Qt version query, for diagnostics.
 //
-// Requirements: Qt >= 6.11 (checked at compile time via
-// check_qt_version.h), C++17 compiler, pkg-config Qt6Core.
+// Before the qtext unification, this package also hosted the cross-package
+// QString/QByteArray bridge (UTF-8/UTF-16/Latin-1 conversions). After QString
+// and QByteArray became part of package qtext, that bridge is no longer
+// needed: qtext has its own direct C bindings (qstring_c.*, qbytearray_c.*),
+// and no package cycles exist to work around.
+//
+// NOT part of the public API. External packages should use qtext directly.
+//
+// Requirements: Qt >= 6.11 (checked at compile time), C++17 compiler,
+// pkg-config Qt6Core.
 package qt6core

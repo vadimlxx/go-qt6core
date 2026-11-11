@@ -66,25 +66,6 @@
 //	qlatin1stringview → imports qchar (Compare/StartsWith/… with QChar)
 //	qutf8stringview   → imports qchar (CompareQChar/EqualQChar)
 //
-// Because qstring imports qchar (not the reverse), qchar cannot return
-// *qstring.QString without an import cycle. For the one Qt API that
-// produces a QString (QChar::decomposition), qchar returns an
-// unsafe.Pointer to a freshly allocated C++ QString*, and users wrap it
-// via qstring.AdoptUnsafePtr. A convenience wrapper lives in qstring:
-//
-//	import (
-//	    "github.com/vadimlxx/go-qt6core/qchar"
-//	    "github.com/vadimlxx/go-qt6core/qstring"
-//	)
-//
-//	s := qstring.FromDecomposition(qchar.New(0x00E9)) // é
-//	defer s.Close()
-//
-// If you call qchar.Decomposition directly, you must wrap it yourself:
-//
-//	s := qstring.AdoptUnsafePtr(qchar.Decomposition(c))
-//	defer s.Close()
-//
 // # Not yet bound / API differences vs Qt 6.11
 //
 // The following Qt API is either not exposed or exposed differently:
