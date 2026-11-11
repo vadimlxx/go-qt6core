@@ -118,25 +118,6 @@ func NewQByteArray(args ...any) *QByteArray {
 	panic("QByteArray: NewQByteArray accepts 0 or 1 ([]byte|string) argument")
 }
 
-// UnsafePtr returns the underlying C++ QByteArray* as unsafe.Pointer.
-// Borrowed: the caller does NOT own; qtext remains responsible for freeing.
-// The C++ object is valid until this wrapper is Close()d.
-func (q *QByteArray) UnsafePtr() unsafe.Pointer {
-	if q == nil || q.p == nil {
-		return nil
-	}
-	return unsafe.Pointer(q.p)
-}
-
-// ConstDataUnsafe returns a borrowed pointer to q's internal buffer.
-// The pointer is valid until q is mutated, resized, or Close()d.
-//
-// Intended for zero-copy QByteArrayView construction. The caller must keep q
-// alive and unmutated for as long as the pointer is used.
-func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
-	return unsafe.Pointer(C.qbytearray_data(q.p))
-}
-
 // ---- lifecycle -----------------------------------------------------------
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
