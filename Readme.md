@@ -91,7 +91,9 @@ QBitRef::operator bool() / operator!() / operator=(bool) / operator=(const QBitR
 
 QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size().
 
+- QMargins & QMarginsF
 
+Because Go has no operator overloading, Qt operators map to methods -- see margins_doc
 
 All details see in doc.go files
 
