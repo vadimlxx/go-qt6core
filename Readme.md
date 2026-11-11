@@ -104,6 +104,18 @@ Qt-constructor QSize() returns QSize(-1, -1), NOT (0, 0).
    - NewQSize(w, h)     → ( w,  h)  — manual
 ```
 
+- QPoint & QPointF
+
+Operator mapping (QPoint / QPointF) -- see qpoint_doc
+
+qHash(QPointF) is deleted in Qt itself.
+
+rx() / ry() — covered by SetX / SetY.
+
+std::tuple protocol / structured bindings — no Go equivalent; use X()/Y().
+
+get<I>(QPoint) / get<I>(QPointF) — same; use X()/Y().
+
 All details see in doc.go files
 
 ### License
