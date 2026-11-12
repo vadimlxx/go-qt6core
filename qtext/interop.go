@@ -41,6 +41,10 @@ func (q *QByteArray) UnsafePtr() unsafe.Pointer {
 	return unsafe.Pointer(q.p)
 }
 
+func QByteArrayFromUnsafePtr(p unsafe.Pointer) *QByteArray {
+	return wrapQByteArray(p)
+}
+
 // ConstDataUnsafe returns a borrowed pointer to q's internal buffer.
 // The pointer is valid until q is mutated, resized, or Close()d.
 //
@@ -60,4 +64,8 @@ func (q *QString) UnsafePtr() unsafe.Pointer {
 		return nil
 	}
 	return unsafe.Pointer(q.p)
+}
+
+func QStringFromUnsafePtr(p unsafe.Pointer) *QString {
+	return wrapQString(p)
 }

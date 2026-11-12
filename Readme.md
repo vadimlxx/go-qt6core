@@ -91,6 +91,8 @@ QBitRef::operator bool() / operator!() / operator=(bool) / operator=(const QBitR
 
 QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size().
 
+#### All geometry classes are assigned to qgeometry:
+
 - QMargins & QMarginsF
 
 Because Go has no operator overloading, Qt operators map to methods -- see margins_doc
@@ -127,6 +129,17 @@ std::tuple protocol / structured bindings — no Go equivalent; use Left()/Top()
 Free operator+(QRect, QMargins) / operator+(QMargins, QRect) — covered by MarginsAdded (commutative in effect).
 
 Free operator-(QRect, QMargins) — covered by MarginsRemoved.
+
+#### All date, time & locate classes are assigned to qdatetime:
+
+- QLocate
+
+see qlocate_doc
+
+
+
+#### All classes that store and process various data without dependencies are located in qdata.
+
 
 
 All details see in doc.go files
