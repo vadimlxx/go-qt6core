@@ -55,9 +55,12 @@ package qgeometry
 */
 import "C"
 
+import "structs"
+
 // QPointF wraps Qt6 QPointF (Q_PRIMITIVE_TYPE, 2×qreal value).
 // Fields are unexported; use X()/Y() to read, SetX()/SetY() to mutate.
 type QPointF struct {
+	_ structs.HostLayout
 	x float64
 	y float64
 }

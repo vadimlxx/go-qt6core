@@ -49,10 +49,13 @@ package qgeometry
 */
 import "C"
 
+import "structs"
+
 // QMarginsF wraps Qt6 QMarginsF (Q_RELOCATABLE_TYPE, 4×qreal value).
 // Fields are unexported; use Left()/Top()/Right()/Bottom() to read,
 // SetLeft()/… to mutate.
 type QMarginsF struct {
+	_      structs.HostLayout
 	left   float64
 	top    float64
 	right  float64

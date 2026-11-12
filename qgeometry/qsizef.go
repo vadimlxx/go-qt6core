@@ -54,9 +54,12 @@ package qgeometry
 */
 import "C"
 
+import "structs"
+
 // QSizeF wraps Qt6 QSizeF (Q_RELOCATABLE_TYPE, 2×qreal value).
 // Fields are unexported; use Width()/Height() to read, SetWidth()/SetHeight() to mutate.
 type QSizeF struct {
+	_      structs.HostLayout
 	width  float64
 	height float64
 }

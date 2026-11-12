@@ -65,8 +65,11 @@ package qgeometry
 */
 import "C"
 
+import "structs"
+
 // QRectF wraps Qt6 QRectF (Q_RELOCATABLE_TYPE, (xp,yp,w,h) float64).
 type QRectF struct {
+	_      structs.HostLayout
 	xp, yp, w, h float64
 }
 

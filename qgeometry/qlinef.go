@@ -55,6 +55,8 @@ package qgeometry
 */
 import "C"
 
+import "structs"
+
 // IntersectionType mirrors Qt's QLineF::IntersectionType.
 type IntersectionType int
 
@@ -67,6 +69,7 @@ const (
 // QLineF wraps Qt6 QLineF (Q_PRIMITIVE_TYPE, 2×QPointF value).
 // Fields are unexported; use X1()/Y1()/X2()/Y2() or P1()/P2() to read.
 type QLineF struct {
+	_      structs.HostLayout
 	x1, y1, x2, y2 float64
 }
 
