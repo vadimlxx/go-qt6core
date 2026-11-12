@@ -90,11 +90,6 @@
 //     P2 is not modified (matching Qt).
 //   - SetAngle preserves P1 and recomputes P2 from length + angle (angle in degrees).
 //
-// # Protected access
-//
-// QLine and QLineF have no protected members — only public API and private implementation.
-// Nothing needs to be exposed via a helper subclass.
-//
 // # Not yet implemented
 //
 //   - QDataStream operator<< / operator>>  — will appear with package qdatastream.

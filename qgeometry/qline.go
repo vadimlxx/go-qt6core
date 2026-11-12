@@ -31,7 +31,6 @@ package qgeometry
    - IsNull() — точное сравнение p1 == p2 (в отличие от QLineF, где fuzzy).
    - Center() — QPoint((x1+x2)/2, (y1+y2)/2) с промежуточным 64-битным сложением.
    - Dx()/Dy() — x2-x1, y2-y1 (int, wraps на overflow как Qt release).
-   - Protected-секций у QLine нет — открывать нечего.
 
  Что не реализовано (см. qline_doc.go):
 

@@ -118,7 +118,15 @@ get<I>(QPoint) / get<I>(QPointF) — same; use X()/Y().
 
 - QLine & QLineF
 
+operator== / operator!= — use Equal / NotEqual.
+
 - QRect & QRectF
+
+std::tuple protocol / structured bindings — no Go equivalent; use Left()/Top()/Width()/Height().
+
+Free operator+(QRect, QMargins) / operator+(QMargins, QRect) — covered by MarginsAdded (commutative in effect).
+
+Free operator-(QRect, QMargins) — covered by MarginsRemoved.
 
 
 All details see in doc.go files
