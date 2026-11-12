@@ -4,19 +4,6 @@
 //
 //   - QLocale (handle-based; COW via QSharedDataPointer)
 //
-// # Planned additions (same package)
-//
-//   - QDate
-//   - QTime
-//   - QDateTime
-//   - QCalendar
-//
-// Because QDate, QTime, QDateTime and QCalendar will live in this same package, the QLocale
-// methods that take or return those types — toString(QDate), toDate(), toTime(),
-// toDateTime(), and the QCalendar-aware overloads — can be added directly without import
-// cycles and without unsafe.Pointer bridges. This is the primary reason QLocale lives in
-// package qdatetime rather than a standalone qlocale package.
-//
 // # QLocale: handle semantics
 //
 // QLocale is a value type in Qt that uses Copy-on-Write (COW) via

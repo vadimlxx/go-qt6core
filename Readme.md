@@ -136,7 +136,12 @@ Free operator-(QRect, QMargins) — covered by MarginsRemoved.
 
 see qlocate_doc
 
+- QCalendar
 
+The Go zero value QCalendar{} is NOT a valid calendar:
+
+QCalendar{}       → d_ptr == nil → IsValid() == false
+NewQCalendar()    → Qt's QCalendar() → valid, Gregorian
 
 #### All classes that store and process various data without dependencies are located in qdata.
 
