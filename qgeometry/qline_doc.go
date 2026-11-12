@@ -1,37 +1,36 @@
 // Package qgeometry — QLine and QLineF bindings for Qt 6.11 QtCore.
 //
-// # Currently supported in these files
+// # Value semantics
 //
-//   - QLine  — 2×QPoint line (p1, p2). Integer geometry.
-//   - QLineF — 2×QPointF line (p1, p2). Floating-point geometry.
+// Both QLine and QLineF are Q_PRIMITIVE_TYPE value types in Qt. In Go they are plain structs
+// with unexported fields (x1, y1, x2, y2) holding a full copy of the data. Assignment and
+// function-passing copy the value; mutating one copy does not affect another. There are no
+// pointers, no finalizers and no Close().
 //
-// Both are Q_PRIMITIVE_TYPE value types in Qt. In Go they are structs with unexported fields (p1, p2)
-// and Qt-style accessor methods (P1(), P2(), X1(), Y1(), X2(), Y2(), Dx(), Dy(), Length(), Angle(),
-// etc.). Construction goes through NewQLine / NewQLineF and their variants; mutation through
-// Translate / SetP1 / SetP2 / SetLength / SetAngle / … ; transforms return new values via
-// Translated / UnitVector / NormalVector. Passing through the C ABI uses flat 2-field structs
-// (go_qline_t, go_qlinef_t) built from go_qpoint_t/go_qpointf_t in C mode, typedef'd to real
-// QLine / QLineF in C++ mode — layout stays ABI-compatible with Qt.
+// This matches the current state of QPoint / QPointF / QSize / QSizeF / QMargins / QMarginsF,
+// which are also value types in this package.
 //
-// # Default constructors
-//
-// Qt's default constructors are zero-valued:
+// # Construction
 //
 //	QLine()  → QLine((0,0), (0,0))   // isNull() == true (exact)
 //	QLineF() → QLineF((0,0), (0,0))  // isNull() == true (fuzzy)
 //
-// Therefore the Go zero value QLine{} / QLineF{} is already a valid default, and
-// NewQLineZero() / NewQLineFZero() are convenience aliases. There are no NewQLineDefault /
-// NewQLineFDefault functions.
+// The Go zero value QLine{} / QLineF{} is therefore already a valid default. Use
+// NewQLineZero() / NewQLineFZero() as explicit aliases.
 //
 // # Operator mapping (QLine / QLineF)
 //
-// Both types have NO arithmetic operators (+, -, *, /) in Qt — only translation and geometric
-// transforms. The mapping for what Qt does expose:
+// Both types have NO arithmetic operators (+, -, *, /) in Qt — only translation and
+// geometric transforms. The mapping for what Qt does expose:
 //
 //	l == l2      → l.Equal(l2)  /  l.NotEqual(l2)    (QLine: exact; QLineF: fuzzy)
-//	translate    → l.Translate(p) / l.TranslateXY(dx, dy)      (in place)
-//	translated   → l.Translated(p) / l.TranslatedXY(dx, dy)    (returns new)
+//	translate    → l.Translate(p) / l.TranslateXY(dx, dy)      (returns updated value)
+//	translated   → l.Translated(p) / l.TranslatedXY(dx, dy)    (returns new value)
+//
+// Note: in Go, because QLine / QLineF are value types, methods like Translate return a new
+// value rather than mutating in place. Assign back to update:
+//
+//	l = l.Translate(p)
 //
 // # QLine ↔ QLineF
 //
@@ -50,6 +49,22 @@
 //   - PointAt(t)                 — interpolation point (t=0 → P1, t=1 → P2).
 //   - fromPolar(length, angle)   — QLineFFromPolar(len, deg) static constructor.
 //
+// # Angle convention (Qt screen coordinates — y grows downward)
+//
+// Qt uses screen coordinates where +y points DOWN. Angles are counter-clockwise from +x,
+// normalised to [0, 360):
+//
+//	0°   → right (+x)
+//	90°  → up on screen (-y)     ← negative y!
+//	180° → left (-x)
+//	270° → down on screen (+y)
+//
+// This is NOT the math-textbook convention (y-up). Users coming from math backgrounds
+// commonly expect 90° to point toward +y — in Qt it points toward −y.
+//
+// angleTo(other) = (other.angle() - this.angle() + 360) mod 360. So a rightward line
+// to a downward line is 270°, not 90°.
+//
 // # Intersection (QLineF only)
 //
 // IntersectionType is exposed as the IntersectionType type with three constants:
@@ -61,10 +76,10 @@
 // Two methods:
 //
 //	l.Intersects(other)                      → IntersectionType
-//	l.IntersectsWithPoint(other)             → (IntersectionType, QPointF)
+//	l.IntersectsWithPoint(other)             → (IntersectionType, QPointF, bool)
 //
-// When there is no intersection, IntersectsWithPoint returns (0, 0) as the point — Qt does not
-// write to the out-parameter in that case, so Go's zero-initialised value is used.
+// When there is no intersection, IntersectsWithPoint returns (NoIntersection, QPointF{}, false).
+// Check the bool before using the point.
 //
 // # Semantic deviations from Qt
 //
@@ -84,12 +99,11 @@
 //
 //   - QDataStream operator<< / operator>>  — will appear with package qdatastream.
 //   - QDebug operator<<                    — will appear with package qdebug.
-//   - operator== / operator!= as overloaded operators
-//                                          — Go has no operator overloading; use Equal / NotEqual.
+//   - operator== / operator!=              — use Equal / NotEqual.
 //   - Free functions qFuzzyCompare(QLineF, QLineF) and qFuzzyIsNull(QLineF)
 //                                          — covered indirectly by Equal() / IsNull().
-//   - Direct field access (l.P1, l.P2)     — Go does not allow a field and a method with the same
-//                                            name; use the accessor methods instead.
+//   - Direct field access (l.x1, l.y1, …)  — Go does not allow a field and a method with the
+//                                            same name; use the accessor methods instead.
 //   - std::tuple protocol                  — no equivalent in Go.
 //
 // # Future work
@@ -101,28 +115,5 @@
 //   - QDataStream serialization once qdatastream exists.
 //   - QDebug formatting once qdebug exists.
 //
-// # Handle semantics (matching QPoint / QPointF)
-//
-// QLine and QLineF are exposed as HANDLES (Go structs holding a C++ pointer). Accessors and
-// mutators go directly to the heap-allocated C++ object. Mutations through one Go variable are
-// visible through all variables pointing to the same C++ object. Clone() produces an independent
-// copy.
-//
-// Memory management:
-//
-//   - NewQLine / NewQLineF / arithmetic / Clone / P1() / P2() / Center() / PointAt() /
-//     UnitVector() / NormalVector() allocate a new heap C++ object.
-//   - The finalizer frees it; Close() frees immediately and disables the finalizer.
-//   - Do not copy *QLine by value expecting independent copies — copy the pointer; use Clone()
-//     for a truly independent copy.
-//
-// # Fundamental limitation with embedded QLine / QLineF
-//
-// Qt stores QLine / QLineF **by value** inside other classes. A Go *QLine handle CANNOT
-// reference such internal storage; it always owns a separate heap copy. If C++ code later
-// mutates an embedded QLine, the previously-obtained *QLine will NOT see the change. Use the
-// containing class's fresh accessors (e.g. QPainterPath element getters) to read the current
-// state. This is a limitation of Qt's public API, not of the binding.
 // Requires Qt >= 6.11, C++17, pkg-config Qt6Core.
-
 package qgeometry
