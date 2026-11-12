@@ -1,39 +1,29 @@
 package qgeometry
 
 /*
- QSize — биндинг Qt 6.11 QtCore/QSize как HANDLE.
+ QSize — биндинг Qt 6.11 QtCore/QSize.
 
- QSize — value-тип в Qt (Q_RELOCATABLE_TYPE, 2×int). В Go хранится handle на heap-размещённый
- C++ QSize. Все геттеры/сеттеры идут напрямую в C++.
-
- ВАЖНОЕ ОГРАНИЧЕНИЕ:
-   Qt хранит QSize внутри других классов ПО ЗНАЧЕНИЮ. Handle на QSize не видит изменений,
-   сделанных C++ во встроенном QSize другого класса. Это ограничение API Qt, а не биндинга.
+ QSize — value-тип (Q_RELOCATABLE_TYPE): 2 int-поля (width, height). В Go поля неэкспортируемые,
+ доступ через геттеры Width()/Height(). Через C ABI передаётся плоской структурой go_qsize_t
+ (2×int, 8 байт).
 
  ВАЖНО: Qt-конструктор QSize() возвращает QSize(-1, -1), НЕ (0, 0).
    - NewQSizeDefault()  → (-1, -1)  — соответствует QSize()
    - NewQSizeZero()     → ( 0,  0)  — «нулевой» QSize
    - NewQSize(w, h)     → ( w,  h)  — явный
 
- Семантика значений vs ссылок:
-   - QSize — ссылочный тип (handle). Мутации через один handle видны через все handle'ы на
-     тот же объект. Для независимой копии — Clone().
-   - Go-нулевое значение QSize{} невалидно. Используйте NewQSize / NewQSizeZero / NewQSizeDefault.
-
- Управление памятью:
-   - NewQSize/NewQSizeZero/NewQSizeDefault/арифметика/Clone/ToSizeF/Transposed/Scaled/… —
-     создают НОВЫЙ heap-объект. Close() освобождает немедленно; иначе срабатывает finalizer.
-
  Соглашения:
+
    - Геттеры: Width(), Height(), IsNull(), IsEmpty(), IsValid().
-   - Мутирующие (in place, void): SetWidth, SetHeight, Transpose, Scale, ScaleSize.
-   - Трансформации (новый handle): Transposed, Scaled, ScaledSize, ExpandedTo, BoundedTo,
-     GrownBy(*QMargins), ShrunkBy(*QMargins).
-   - Арифметика (новый handle): Add, Sub, MulFloat, DivFloat.
-   - Присваивающие формы (in place): AddAssign, SubAssign, MulFloatAssign, DivFloatAssign.
-   - Сравнение: Equal(other *QSize), NotEqual(other).
-   - Конвертация: ToSizeF() → *QSizeF.
-   - Клонирование: Clone() → *QSize.
+   - Мутирующие сеттеры: SetWidth(w), SetHeight(h), Transpose(), Scale(w, h, mode),
+     ScaleSize(sz, mode).
+   - Трансформации (возвращают новый QSize): Transposed(), Scaled(w, h, mode), ScaledSize(sz, mode),
+     ExpandedTo(other), BoundedTo(other), GrownBy(QMargins), ShrunkBy(QMargins).
+   - Арифметика: Add(other), Sub(other), MulFloat(c), DivFloat(c).
+     В Qt операторы *= и /= принимают только qreal — поэтому MulInt/DivInt отсутствуют.
+   - Присваивающие формы: AddAssign, SubAssign, MulFloatAssign, DivFloatAssign.
+   - Сравнение: Equal(other), NotEqual(other) — точное (comparesEqual).
+   - Конвертация: ToSizeF() → QSizeF.
 
  AspectRatioMode (Qt::AspectRatioMode) определён в этом файле и используется QSize/QSizeF:
 
@@ -42,9 +32,11 @@ package qgeometry
    - KeepAspectRatioByExpanding  — покрыть запрошенный, сохраняя аспект
 
  Особенности:
+
    - MulFloat/DivFloat используют Qt's qSaturateRound — идентично operator*(QSize, qreal).
-   - DivFloat(0): в release — saturate(inf); в debug — Q_ASSERT. Go — как release.
-   - Protected-секций у QSize нет.
+   - DivFloat(0): в release — saturate(inf) = INT_MAX/INT_MIN; в debug — Q_ASSERT. Go — как release.
+   - Scale(w,h,mode) и Scaled(w,h,mode) различаются только мутацией/возвратом — оба делегируют Qt.
+   - Protected-секций у QSize нет — открывать нечего.
 
  Что не реализовано (см. qsize_doc.go):
 
@@ -64,8 +56,6 @@ package qgeometry
 */
 import "C"
 
-import "runtime"
-
 // AspectRatioMode mirrors Qt::AspectRatioMode.
 type AspectRatioMode int
 
@@ -78,131 +68,135 @@ const (
 	KeepAspectRatioByExpanding AspectRatioMode = 2
 )
 
-// QSize wraps a heap-allocated Qt6 QSize.
+// QSize wraps Qt6 QSize (Q_RELOCATABLE_TYPE, 2×int value).
+// Fields are unexported; use Width()/Height() to read, SetWidth()/SetHeight() to mutate.
 type QSize struct {
-	p C.go_qsize_t
-}
-
-func wrapQSize(p C.go_qsize_t) *QSize {
-	if p == nil {
-		return nil
-	}
-	s := &QSize{p: p}
-	runtime.SetFinalizer(s, finalizeQSize)
-	return s
-}
-
-func finalizeQSize(s *QSize) {
-	if s.p != nil {
-		C.qsize_delete(s.p)
-		s.p = nil
-	}
-}
-
-// Close releases the underlying C++ object immediately and disables the finalizer.
-func (s *QSize) Close() {
-	if s.p != nil {
-		C.qsize_delete(s.p)
-		s.p = nil
-		runtime.SetFinalizer(s, nil)
-	}
+	width  int
+	height int
 }
 
 // ---- construction --------------------------------------------------------
 
-// NewQSize returns a handle to QSize(w, h).
-func NewQSize(w, h int) *QSize {
-	return wrapQSize(C.qsize_new(C.int(w), C.int(h)))
+// NewQSize returns QSize(w, h).
+func NewQSize(w, h int) QSize {
+	return qsizeFromC(C.qsize_new(C.int(w), C.int(h)))
 }
 
-// NewQSizeZero returns a handle to QSize(0, 0).
-func NewQSizeZero() *QSize { return NewQSize(0, 0) }
+// NewQSizeZero returns QSize(0, 0).
+func NewQSizeZero() QSize { return NewQSize(0, 0) }
 
-// NewQSizeDefault returns a handle to QSize(-1, -1), matching Qt's default constructor QSize().
-func NewQSizeDefault() *QSize { return wrapQSize(C.qsize_new_default()) }
-
-// Clone returns a heap copy of s (independent C++ object).
-func (s *QSize) Clone() *QSize { return wrapQSize(C.qsize_clone(s.p)) }
+// NewQSizeDefault returns QSize(-1, -1), matching Qt's default constructor QSize().
+func NewQSizeDefault() QSize { return qsizeFromC(C.qsize_default()) }
 
 // ---- accessors -----------------------------------------------------------
 
-func (s *QSize) IsNull() bool  { return bool(C.qsize_is_null(s.p)) }
-func (s *QSize) IsEmpty() bool { return bool(C.qsize_is_empty(s.p)) }
-func (s *QSize) IsValid() bool { return bool(C.qsize_is_valid(s.p)) }
-func (s *QSize) Width() int    { return int(C.qsize_width(s.p)) }
-func (s *QSize) Height() int   { return int(C.qsize_height(s.p)) }
+func (s QSize) IsNull() bool  { return bool(C.qsize_is_null(qsizeToC(s))) }
+func (s QSize) IsEmpty() bool { return bool(C.qsize_is_empty(qsizeToC(s))) }
+func (s QSize) IsValid() bool { return bool(C.qsize_is_valid(qsizeToC(s))) }
+func (s QSize) Width() int    { return int(C.qsize_width(qsizeToC(s))) }
+func (s QSize) Height() int   { return int(C.qsize_height(qsizeToC(s))) }
 
-// ---- mutating setters (in place) ----------------------------------------
+// ---- modifiers -----------------------------------------------------------
 
-func (s *QSize) SetWidth(w int)  { C.qsize_set_width(s.p, C.int(w)) }
-func (s *QSize) SetHeight(h int) { C.qsize_set_height(s.p, C.int(h)) }
+func (s *QSize) SetWidth(w int)  { *s = qsizeFromC(C.qsize_set_width(qsizeToC(*s), C.int(w))) }
+func (s *QSize) SetHeight(h int) { *s = qsizeFromC(C.qsize_set_height(qsizeToC(*s), C.int(h))) }
 
 // Transpose swaps width and height in place (mirrors QSize::transpose()).
-func (s *QSize) Transpose() { C.qsize_transpose(s.p) }
+func (s *QSize) Transpose() { *s = s.Transposed() }
 
-// Scale scales s in place to fit (w, h) with the given aspect ratio mode.
-func (s *QSize) Scale(w, h int, mode AspectRatioMode) {
-	C.qsize_scale(s.p, C.int(w), C.int(h), C.int(mode))
+// Scale scales s in place to fit (w, h) with the given aspect ratio mode
+// (mirrors QSize::scale(int, int, Qt::AspectRatioMode)).
+func (s *QSize) Scale(w, h int, mode AspectRatioMode) { *s = s.Scaled(w, h, mode) }
+
+// ScaleSize scales s in place to fit other with the given aspect ratio mode
+// (mirrors QSize::scale(const QSize&, Qt::AspectRatioMode)).
+func (s *QSize) ScaleSize(other QSize, mode AspectRatioMode) { *s = s.ScaledSize(other, mode) }
+
+// ---- transforms (return new QSize) --------------------------------------
+
+// Transposed returns a QSize with width and height swapped.
+func (s QSize) Transposed() QSize { return qsizeFromC(C.qsize_transposed(qsizeToC(s))) }
+
+// Scaled returns a new QSize scaled to fit (w, h) with the given aspect ratio mode.
+func (s QSize) Scaled(w, h int, mode AspectRatioMode) QSize {
+	return qsizeFromC(C.qsize_scaled(qsizeToC(s), C.int(w), C.int(h), C.int(mode)))
 }
 
-// ScaleSize scales s in place to fit other with the given aspect ratio mode.
-func (s *QSize) ScaleSize(other *QSize, mode AspectRatioMode) {
-	C.qsize_scale_size(s.p, other.p, C.int(mode))
+// ScaledSize returns a new QSize scaled to fit other with the given aspect ratio mode.
+func (s QSize) ScaledSize(other QSize, mode AspectRatioMode) QSize {
+	return qsizeFromC(C.qsize_scaled_size(qsizeToC(s), qsizeToC(other), C.int(mode)))
 }
 
-// ---- transforms (return new handles) ------------------------------------
-
-func (s *QSize) Transposed() *QSize { return wrapQSize(C.qsize_transposed(s.p)) }
-
-func (s *QSize) Scaled(w, h int, mode AspectRatioMode) *QSize {
-	return wrapQSize(C.qsize_scaled(s.p, C.int(w), C.int(h), C.int(mode)))
+// ExpandedTo returns the component-wise max of s and other (mirrors QSize::expandedTo).
+func (s QSize) ExpandedTo(other QSize) QSize {
+	return qsizeFromC(C.qsize_expanded_to(qsizeToC(s), qsizeToC(other)))
 }
 
-func (s *QSize) ScaledSize(other *QSize, mode AspectRatioMode) *QSize {
-	return wrapQSize(C.qsize_scaled_size(s.p, other.p, C.int(mode)))
-}
-
-func (s *QSize) ExpandedTo(other *QSize) *QSize {
-	return wrapQSize(C.qsize_expanded_to(s.p, other.p))
-}
-
-func (s *QSize) BoundedTo(other *QSize) *QSize {
-	return wrapQSize(C.qsize_bounded_to(s.p, other.p))
+// BoundedTo returns the component-wise min of s and other (mirrors QSize::boundedTo).
+func (s QSize) BoundedTo(other QSize) QSize {
+	return qsizeFromC(C.qsize_bounded_to(qsizeToC(s), qsizeToC(other)))
 }
 
 // GrownBy grows each dimension by the corresponding QMargins components (mirrors QSize::grownBy).
-func (s *QSize) GrownBy(m *QMargins) *QSize {
-	return wrapQSize(C.qsize_grown_by(s.p, m.p))
+func (s QSize) GrownBy(m QMargins) QSize {
+	return qsizeFromC(C.qsize_grown_by(qsizeToC(s), marginsToC(m)))
 }
 
 // ShrunkBy shrinks each dimension by the corresponding QMargins components (mirrors QSize::shrunkBy).
-func (s *QSize) ShrunkBy(m *QMargins) *QSize {
-	return wrapQSize(C.qsize_shrunk_by(s.p, m.p))
+func (s QSize) ShrunkBy(m QMargins) QSize {
+	return qsizeFromC(C.qsize_shrunk_by(qsizeToC(s), marginsToC(m)))
 }
 
-// ---- arithmetic (return new handles) ------------------------------------
+// ---- arithmetic ----------------------------------------------------------
 
-func (s *QSize) Add(other *QSize) *QSize      { return wrapQSize(C.qsize_add(s.p, other.p)) }
-func (s *QSize) Sub(other *QSize) *QSize      { return wrapQSize(C.qsize_sub(s.p, other.p)) }
-func (s *QSize) MulFloat(c float64) *QSize    { return wrapQSize(C.qsize_mul_float(s.p, C.double(c))) }
-func (s *QSize) DivFloat(c float64) *QSize    { return wrapQSize(C.qsize_div_float(s.p, C.double(c))) }
+// Add returns s + other (component-wise).
+func (s QSize) Add(other QSize) QSize {
+	return qsizeFromC(C.qsize_add(qsizeToC(s), qsizeToC(other)))
+}
 
-// ---- in-place assign (mutate receiver) ----------------------------------
+// Sub returns s - other (component-wise).
+func (s QSize) Sub(other QSize) QSize {
+	return qsizeFromC(C.qsize_sub(qsizeToC(s), qsizeToC(other)))
+}
 
-func (s *QSize) AddAssign(other *QSize)    { C.qsize_add_assign(s.p, other.p) }
-func (s *QSize) SubAssign(other *QSize)    { C.qsize_sub_assign(s.p, other.p) }
-func (s *QSize) MulFloatAssign(c float64)  { C.qsize_mul_float_assign(s.p, C.double(c)) }
-func (s *QSize) DivFloatAssign(c float64)  { C.qsize_div_float_assign(s.p, C.double(c)) }
+// MulFloat returns s * c on each component (rounded via Qt's qSaturateRound).
+func (s QSize) MulFloat(c float64) QSize {
+	return qsizeFromC(C.qsize_mul_float(qsizeToC(s), C.double(c)))
+}
+
+// DivFloat returns s / c on each component (rounded via Qt's qSaturateRound).
+func (s QSize) DivFloat(c float64) QSize {
+	return qsizeFromC(C.qsize_div_float(qsizeToC(s), C.double(c)))
+}
+
+// ---- assign forms --------------------------------------------------------
+
+func (s *QSize) AddAssign(other QSize)    { *s = s.Add(other) }
+func (s *QSize) SubAssign(other QSize)    { *s = s.Sub(other) }
+func (s *QSize) MulFloatAssign(c float64) { *s = s.MulFloat(c) }
+func (s *QSize) DivFloatAssign(c float64) { *s = s.DivFloat(c) }
 
 // ---- comparison ----------------------------------------------------------
 
 // Equal returns true if width and height are identical (exact int comparison).
-func (s *QSize) Equal(other *QSize) bool { return bool(C.qsize_equal(s.p, other.p)) }
+func (s QSize) Equal(other QSize) bool {
+	return bool(C.qsize_equal(qsizeToC(s), qsizeToC(other)))
+}
 
 // NotEqual returns !Equal(other).
-func (s *QSize) NotEqual(other *QSize) bool { return !s.Equal(other) }
+func (s QSize) NotEqual(other QSize) bool { return !s.Equal(other) }
 
 // ---- conversions ---------------------------------------------------------
 
-// ToSizeF returns a new QSizeF handle (exact int→double per component).
-func (s *QSize) ToSizeF() *QSizeF { return wrapQSizeF(C.qsize_to_sizef(s.p)) }
+// ToSizeF converts s to QSizeF (exact int→double per component).
+func (s QSize) ToSizeF() QSizeF { return qsizefFromC(C.qsize_to_sizef(qsizeToC(s))) }
+
+// ---- internal helpers ----------------------------------------------------
+
+func qsizeToC(s QSize) C.go_qsize_t {
+	return C.go_qsize_t{width: C.int(s.width), height: C.int(s.height)}
+}
+
+func qsizeFromC(c C.go_qsize_t) QSize {
+	return QSize{width: int(c.width), height: int(c.height)}
+}

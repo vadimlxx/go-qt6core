@@ -116,6 +116,11 @@ std::tuple protocol / structured bindings — no Go equivalent; use X()/Y().
 
 get<I>(QPoint) / get<I>(QPointF) — same; use X()/Y().
 
+- QLine & QLineF
+
+- QRect & QRectF
+
+
 All details see in doc.go files
 
 ### License

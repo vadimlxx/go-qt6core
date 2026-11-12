@@ -1,43 +1,50 @@
 package qgeometry
 
 /*
- QPointF — биндинг Qt 6.11 QtCore/QPointF как HANDLE.
+ QPointF — биндинг Qt 6.11 QtCore/QPointF.
 
- QPointF — value-тип в Qt (Q_PRIMITIVE_TYPE, 2×qreal). В Go хранится handle на heap-размещённый
- C++ QPointF. Все геттеры/сеттеры идут напрямую в C++.
+ QPointF — value-тип (Q_PRIMITIVE_TYPE): 2 qreal-поля (x, y). В Go поля неэкспортируемые,
+ доступ через геттеры X()/Y(). Через C ABI передаётся плоской структурой go_qpointf_t
+ (2×double, 16 байт).
 
- ВАЖНОЕ ОГРАНИЧЕНИЕ (аналогично QPoint):
-   Qt хранит QPointF внутри других классов (QLineF, QRectF, …) ПО ЗНАЧЕНИЮ. Handle на
-   QPointF не видит изменений, сделанных C++ во встроенном QPointF. Для получения
-   актуальных значений из составных типов используйте свежие геттеры (linef.X1(), …).
-
- Семантика значений vs ссылок:
-   - QPointF — ссылочный тип (handle). Для независимой копии используйте Clone().
-   - Go-нулевое значение QPointF{} невалидно. Используйте NewQPointF/NewQPointFZero.
-
- Управление памятью:
-   - Каждый NewQPointF / QLineF.P1() / арифметика создаёт НОВЫЙ heap QPointF.
-   - Close() освобождает немедленно; иначе срабатывает finalizer.
+ ОТЛИЧИЕ ОТ QSizeF: Qt-конструктор QPointF() возвращает QPointF(0., 0.), а не (-1., -1.).
+ Поэтому:
+   - Go-нулевое значение QPointF{} — уже валидная «нулевая» точка
+   - NewQPointF(x, y)          — явный конструктор
+   - NewQPointFZero()          — удобная обёртка для (0., 0.)
+   - NewQPointFDefault() НЕ нужен (совпадает с NewQPointFZero / нулевым значением)
 
  Соглашения:
-   - Геттеры: X(), Y(), IsNull() (fuzzy — qIsNull), ManhattanLength().
-   - Мутирующие: SetX(x), SetY(y).
-   - Арифметика возвращает НОВЫЙ handle: Add, Sub, MulFloat, DivFloat, Neg, UnaryPlus, Transposed.
+
+   - Геттеры: X(), Y(), IsNull() — IsNull использует qIsNull → qFuzzyIsNull (как Qt).
+   - Мутирующие сеттеры: SetX(x), SetY(y).
+   - Трансформация: Transposed() — возвращает новый QPointF с обменом координат.
+   - ManhattanLength() — |x| + |y| (float64).
+   - Арифметика: Add(other), Sub(other), MulFloat(f), DivFloat(d), Neg(), UnaryPlus().
    - Присваивающие формы: AddAssign, SubAssign, MulFloatAssign, DivFloatAssign.
-   - DotProduct(other) → float64.
-   - Сравнение: Equal(other) — fuzzy (qFuzzyCompare), NotEqual(other);
-     EqualQPoint(other *QPoint) — кросс-сравнение QPointF == QPoint.
-   - Конвертация: ToPoint() → *QPoint (qSaturateRound); QPointFFromPoint(p *QPoint) — конструктор.
-   - Клонирование: Clone() → *QPointF.
+   - Скалярное произведение: DotProduct(other) → float64 (Qt: static QPointF::dotProduct).
+   - Сравнение: Equal(other) — fuzzy (comparesEqual → qFuzzyCompare); NotEqual(other);
+     EqualQPoint(other QPoint) — сравнение с QPoint (comparesEqual(QPointF, QPoint)).
+   - Конвертация: ToPoint() → QPoint (qSaturateRound); QPointFFromPoint(p) — QPoint → QPointF.
+
+ Особенности:
+
+   - QPointF — fuzzy-compared. Два QPointF с крошечной разницей могут быть "равны". Это Qt.
+   - DivFloat(0): в release — inf/nan; в debug — Q_ASSERT. Go — IEEE 754 inf/nan без паники.
+   - DotProduct: qpoint.x*other.x + qpoint.y*other.y — может дать inf/nan как Qt.
+   - ToPoint() использует qSaturateRound на каждой координате.
+   - Protected-секций у QPointF нет — открывать нечего.
 
  Что не реализовано (см. qpoint_doc.go):
 
    - QDataStream operator<< / operator>> — пакет qdatastream пока не готов.
    - QDebug operator<< — пакет qdebug пока не готов.
-   - qHash(QPointF) — в Qt удалён.
+   - qHash(QPointF) — в Qt удалён (QPointF не хэшируется как ключ).
    - rx()/ry() — покрыто SetX/SetY.
    - std::tuple protocol — не нужно в Go.
    - fromCGPoint / toCGPoint (Darwin) — платформо-специфично.
+   - qFuzzyCompare(QPointF, QPointF) / qFuzzyIsNull(QPointF) как свободные функции —
+     покрыты через Equal / IsNull.
 */
 
 /*
@@ -48,119 +55,116 @@ package qgeometry
 */
 import "C"
 
-import (
-	"runtime"
-)
-
-// QPointF wraps a heap-allocated Qt6 QPointF. All operations go directly to the C++ object.
+// QPointF wraps Qt6 QPointF (Q_PRIMITIVE_TYPE, 2×qreal value).
+// Fields are unexported; use X()/Y() to read, SetX()/SetY() to mutate.
 type QPointF struct {
-	p C.go_qpointf_t
-}
-
-func wrapQPointF(p C.go_qpointf_t) *QPointF {
-	if p == nil {
-		return nil
-	}
-	q := &QPointF{p: p}
-	runtime.SetFinalizer(q, finalizeQPointF)
-	return q
-}
-
-func finalizeQPointF(q *QPointF) {
-	if q.p != nil {
-		C.qpointf_delete(q.p)
-		q.p = nil
-	}
-}
-
-// Close releases the underlying C++ object immediately and disables the finalizer.
-func (q *QPointF) Close() {
-	if q.p != nil {
-		C.qpointf_delete(q.p)
-		q.p = nil
-		runtime.SetFinalizer(q, nil)
-	}
+	x float64
+	y float64
 }
 
 // ---- construction --------------------------------------------------------
 
-// NewQPointF returns a handle to QPointF(x, y).
-func NewQPointF(x, y float64) *QPointF {
-	return wrapQPointF(C.qpointf_new(C.double(x), C.double(y)))
+// NewQPointF returns QPointF(x, y).
+func NewQPointF(x, y float64) QPointF {
+	return qpointfFromC(C.qpointf_new(C.double(x), C.double(y)))
 }
 
-// NewQPointFZero returns a handle to QPointF(0., 0.) — same as Qt's default QPointF().
-func NewQPointFZero() *QPointF {
-	return wrapQPointF(C.qpointf_new_default())
-}
+// NewQPointFZero returns QPointF(0., 0.) — same as Qt's default QPointF() and the Go zero value QPointF{}.
+func NewQPointFZero() QPointF { return NewQPointF(0, 0) }
 
-// QPointFFromPoint builds a QPointF handle from a QPoint handle (exact int→double).
-// Mirrors QPointF(const QPoint&).
-func QPointFFromPoint(p *QPoint) *QPointF {
-	return wrapQPointF(C.qpointf_from_point(p.p))
-}
-
-// Clone returns a heap copy of q (independent C++ object).
-func (q *QPointF) Clone() *QPointF {
-	return wrapQPointF(C.qpointf_clone(q.p))
+// QPointFFromPoint builds QPointF from QPoint (exact int→double). Mirrors QPointF(const QPoint&).
+func QPointFFromPoint(p QPoint) QPointF {
+	return qpointfFromC(C.qpointf_from_point(qpointToC(p)))
 }
 
 // ---- accessors -----------------------------------------------------------
 
-func (q *QPointF) IsNull() bool           { return bool(C.qpointf_is_null(q.p)) }
-func (q *QPointF) X() float64             { return float64(C.qpointf_x(q.p)) }
-func (q *QPointF) Y() float64             { return float64(C.qpointf_y(q.p)) }
-func (q *QPointF) ManhattanLength() float64 { return float64(C.qpointf_manhattan_length(q.p)) }
+func (p QPointF) IsNull() bool           { return bool(C.qpointf_is_null(qpointfToC(p))) }
+func (p QPointF) X() float64             { return float64(C.qpointf_x(qpointfToC(p))) }
+func (p QPointF) Y() float64             { return float64(C.qpointf_y(qpointfToC(p))) }
+func (p QPointF) ManhattanLength() float64 { return float64(C.qpointf_manhattan_length(qpointfToC(p))) }
 
 // ---- modifiers -----------------------------------------------------------
 
-func (q *QPointF) SetX(x float64) { C.qpointf_set_x(q.p, C.double(x)) }
-func (q *QPointF) SetY(y float64) { C.qpointf_set_y(q.p, C.double(y)) }
+func (p *QPointF) SetX(x float64) { *p = qpointfFromC(C.qpointf_set_x(qpointfToC(*p), C.double(x))) }
+func (p *QPointF) SetY(y float64) { *p = qpointfFromC(C.qpointf_set_y(qpointfToC(*p), C.double(y))) }
 
 // ---- transforms ----------------------------------------------------------
 
-// Transposed returns a new handle with x and y swapped.
-func (q *QPointF) Transposed() *QPointF { return wrapQPointF(C.qpointf_transposed(q.p)) }
+// Transposed returns a QPointF with x and y swapped.
+func (p QPointF) Transposed() QPointF { return qpointfFromC(C.qpointf_transposed(qpointfToC(p))) }
 
 // ---- dot product ---------------------------------------------------------
 
-// DotProduct returns q·other = q.X()*other.X() + q.Y()*other.Y().
-func (q *QPointF) DotProduct(other *QPointF) float64 {
-	return float64(C.qpointf_dot_product(q.p, other.p))
+// DotProduct returns p·other = p.X()*other.X() + p.Y()*other.Y().
+// Mirrors the static QPointF::dotProduct(p1, p2).
+func (p QPointF) DotProduct(other QPointF) float64 {
+	return float64(C.qpointf_dot_product(qpointfToC(p), qpointfToC(other)))
 }
 
-// ---- arithmetic (return new handles) ------------------------------------
+// ---- arithmetic ----------------------------------------------------------
 
-func (q *QPointF) Add(other *QPointF) *QPointF   { return wrapQPointF(C.qpointf_add(q.p, other.p)) }
-func (q *QPointF) Sub(other *QPointF) *QPointF   { return wrapQPointF(C.qpointf_sub(q.p, other.p)) }
-func (q *QPointF) MulFloat(f float64) *QPointF   { return wrapQPointF(C.qpointf_mul_float(q.p, C.double(f))) }
-func (q *QPointF) DivFloat(d float64) *QPointF   { return wrapQPointF(C.qpointf_div_float(q.p, C.double(d))) }
-func (q *QPointF) Neg() *QPointF                 { return wrapQPointF(C.qpointf_neg(q.p)) }
-func (q *QPointF) UnaryPlus() *QPointF           { return wrapQPointF(C.qpointf_unary_plus(q.p)) }
+// Add returns p + other (component-wise).
+func (p QPointF) Add(other QPointF) QPointF {
+	return qpointfFromC(C.qpointf_add(qpointfToC(p), qpointfToC(other)))
+}
 
-// ---- in-place assign ----------------------------------------------------
+// Sub returns p - other (component-wise).
+func (p QPointF) Sub(other QPointF) QPointF {
+	return qpointfFromC(C.qpointf_sub(qpointfToC(p), qpointfToC(other)))
+}
 
-func (q *QPointF) AddAssign(other *QPointF)  { C.qpointf_add_assign(q.p, other.p) }
-func (q *QPointF) SubAssign(other *QPointF)  { C.qpointf_sub_assign(q.p, other.p) }
-func (q *QPointF) MulFloatAssign(f float64)  { C.qpointf_mul_float_assign(q.p, C.double(f)) }
-func (q *QPointF) DivFloatAssign(d float64)  { C.qpointf_div_float_assign(q.p, C.double(d)) }
+// MulFloat returns p * f (component-wise).
+func (p QPointF) MulFloat(f float64) QPointF {
+	return qpointfFromC(C.qpointf_mul_float(qpointfToC(p), C.double(f)))
+}
+
+// DivFloat returns p / d (component-wise).
+// IEEE 754 semantics: d == 0 yields inf/nan (Qt asserts only in debug builds).
+func (p QPointF) DivFloat(d float64) QPointF {
+	return qpointfFromC(C.qpointf_div_float(qpointfToC(p), C.double(d)))
+}
+
+// Neg returns -p (component-wise).
+func (p QPointF) Neg() QPointF { return qpointfFromC(C.qpointf_neg(qpointfToC(p))) }
+
+// UnaryPlus returns +p (copy).
+func (p QPointF) UnaryPlus() QPointF { return qpointfFromC(C.qpointf_unary_plus(qpointfToC(p))) }
+
+// ---- assign forms --------------------------------------------------------
+
+func (p *QPointF) AddAssign(other QPointF) { *p = p.Add(other) }
+func (p *QPointF) SubAssign(other QPointF) { *p = p.Sub(other) }
+func (p *QPointF) MulFloatAssign(f float64) { *p = p.MulFloat(f) }
+func (p *QPointF) DivFloatAssign(d float64) { *p = p.DivFloat(d) }
 
 // ---- comparison ----------------------------------------------------------
 
-// Equal returns true if both components are fuzzy-equal (qFuzzyCompare per component).
-func (q *QPointF) Equal(other *QPointF) bool { return bool(C.qpointf_equal(q.p, other.p)) }
+// Equal returns true if both components are fuzzy-equal (Qt comparesEqual → qFuzzyCompare).
+func (p QPointF) Equal(other QPointF) bool {
+	return bool(C.qpointf_equal(qpointfToC(p), qpointfToC(other)))
+}
 
 // NotEqual returns !Equal(other).
-func (q *QPointF) NotEqual(other *QPointF) bool { return !q.Equal(other) }
+func (p QPointF) NotEqual(other QPointF) bool { return !p.Equal(other) }
 
-// EqualQPoint returns true if q is fuzzy-equal to other (as QPointF).
+// EqualQPoint returns true if p is fuzzy-equal to other (as QPointF).
 // Mirrors comparesEqual(QPointF, QPoint).
-func (q *QPointF) EqualQPoint(other *QPoint) bool {
-	return bool(C.qpointf_equal_point(q.p, other.p))
+func (p QPointF) EqualQPoint(other QPoint) bool {
+	return bool(C.qpointf_equal_point(qpointfToC(p), qpointToC(other)))
 }
 
 // ---- conversions ---------------------------------------------------------
 
-// ToPoint returns a new QPoint handle via qSaturateRound on each component.
-// Mirrors QPointF::toPoint().
-func (q *QPointF) ToPoint() *QPoint { return wrapQPoint(C.qpointf_to_point(q.p)) }
+// ToPoint converts p to QPoint via qSaturateRound on each component. Mirrors QPointF::toPoint().
+func (p QPointF) ToPoint() QPoint { return qpointFromC(C.qpointf_to_point(qpointfToC(p))) }
+
+// ---- internal helpers ----------------------------------------------------
+
+func qpointfToC(p QPointF) C.go_qpointf_t {
+	return C.go_qpointf_t{x: C.double(p.x), y: C.double(p.y)}
+}
+
+func qpointfFromC(c C.go_qpointf_t) QPointF {
+	return QPointF{x: float64(c.x), y: float64(c.y)}
+}
