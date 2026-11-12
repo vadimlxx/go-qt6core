@@ -145,7 +145,9 @@ NewQCalendar()    → Qt's QCalendar() → valid, Gregorian
 
 #### All classes that store and process various data without dependencies are located in qdata.
 
+- QInternal
 
+- QKeyCombination
 
 All details see in doc.go files
 
