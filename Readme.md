@@ -91,6 +91,10 @@ QBitRef::operator bool() / operator!() / operator=(bool) / operator=(const QBitR
 
 QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size().
 
+- QRegularExpression
+- QRegularExpressionMatch
+- QRegularExpressionMatchIterator
+
 #### All geometry classes are assigned to qgeometry:
 
 - QMargins & QMarginsF
