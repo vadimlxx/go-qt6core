@@ -143,6 +143,23 @@ The Go zero value QCalendar{} is NOT a valid calendar:
 QCalendar{}       → d_ptr == nil → IsValid() == false
 NewQCalendar()    → Qt's QCalendar() → valid, Gregorian
 
+- QTime
+
+QTime{}          → msecs = 0       → valid time 00:00:00.000 (midnight)
+NewQTime()       → null QTime      → mirrors Qt's QTime() (msecs = -1)
+NewQTimeFromHMS(h,m,s,ms)          → explicit time
+
+- QDate
+
+QDate{}          → Julian day 0    → valid date (1 January 4713 BCE)
+NewQDate()       → null QDate      → mirrors Qt's QDate() (Julian day INT64_MIN)
+NewQDateFromYMD(y,m,d)             → explicit date
+
+- QDateTime
+
+The Go zero value QDateTime{} is invalid (nil pointer). Use NewQDateTime() for a null QDateTime that mirrors Qt's QDateTime().
+
+
 #### All classes that store and process various data without dependencies are located in qdata.
 
 - QInternal
