@@ -10,7 +10,7 @@
 #include "qdatetime_c.h"
 
 namespace {
-inline QTimeZone*       Z(go_qtimezone_t p)       { return reinterpret_cast<QTimeZone*>(p); }
+//inline QTimeZone*       Z(go_qtimezone_t p)       { return reinterpret_cast<QTimeZone*>(p); }
 inline const QTimeZone* Z(const go_qtimezone_t p) { return reinterpret_cast<const QTimeZone*>(p); }
 inline go_qtimezone_t   toGo(QTimeZone* p)        { return reinterpret_cast<go_qtimezone_t>(p); }
 
@@ -31,7 +31,7 @@ go_qtimezone_t qtimezone_new_default(void) { return toGo(new QTimeZone()); }
 go_qtimezone_t qtimezone_new_local(void)   { return toGo(new QTimeZone(QTimeZone::LocalTime)); }
 go_qtimezone_t qtimezone_new_utc(void)     { return toGo(new QTimeZone(QTimeZone::UTC)); }
 go_qtimezone_t qtimezone_new_from_offset(int offset_seconds) {
-    return toGo(new QTimeZone(offset_seconds));
+	return toGo(new QTimeZone(QTimeZone::fromSecondsAheadOfUtc(offset_seconds)));
 }
 go_qtimezone_t qtimezone_new_from_iana(const char* id, ptrdiff_t id_len) {
     return toGo(new QTimeZone(BA(id, id_len)));

@@ -4,7 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "qtimezone_fwd.h"
 #include "qdatetime_c.h"
+
 
 #ifdef __cplusplus
 class QTimeZone;
@@ -14,6 +16,7 @@ extern "C" {
 typedef struct go_qtimezone_s go_qtimezone_s;
 typedef go_qtimezone_s* go_qtimezone_t;
 #endif
+
 
 /* --- Lifecycle --- */
 go_qtimezone_t qtimezone_new_default(void);

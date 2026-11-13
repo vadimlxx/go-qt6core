@@ -7,7 +7,7 @@
 #include "qdate_c.h"
 #include "qtime_c.h"
 #include "qcalendar_c.h"
-#include "qtimezone_c.h"
+#include "qtimezone_fwd.h"
 
 #ifdef __cplusplus
 extern "C" {
