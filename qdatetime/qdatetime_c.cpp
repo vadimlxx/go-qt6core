@@ -4,6 +4,7 @@
 #include <QDate>
 #include <QTime>
 #include <QString>
+#include <QTimeZone>
 
 #include "qdatetime_c.h"
 #include "qcalendar_c.h"
@@ -156,6 +157,31 @@ go_qdatetime_t* qdatetime_to_utc(const go_qdatetime_t* dt) {
 }
 go_qdatetime_t* qdatetime_to_offset_from_utc(const go_qdatetime_t* dt, int offset_seconds) {
     return toGo(new QDateTime(DT(dt)->toOffsetFromUtc(offset_seconds)));
+}
+
+/* --- QTimeZone integration --- */
+go_qtimezone_t qdatetime_time_zone(const go_qdatetime_t* dt) {
+	return reinterpret_cast<go_qtimezone_t>(new QTimeZone(DT(dt)->timeZone()));
+}
+void qdatetime_set_time_zone(go_qdatetime_t* dt, const go_qtimezone_t tz) {
+	auto* z = reinterpret_cast<QTimeZone*>(tz);
+	DT(dt)->setTimeZone(*z);
+}
+go_qdatetime_t* qdatetime_to_time_zone(const go_qdatetime_t* dt, const go_qtimezone_t tz) {
+	auto* z = reinterpret_cast<QTimeZone*>(tz);
+	return toGo(new QDateTime(DT(dt)->toTimeZone(*z)));
+}
+go_qdatetime_t* qdatetime_current_date_time_zone(const go_qtimezone_t tz) {
+	auto* z = reinterpret_cast<QTimeZone*>(tz);
+	return toGo(new QDateTime(QDateTime::currentDateTime(*z)));
+}
+go_qdatetime_t* qdatetime_from_msecs_since_epoch_zone(int64_t msecs, const go_qtimezone_t tz) {
+	auto* z = reinterpret_cast<QTimeZone*>(tz);
+	return toGo(new QDateTime(QDateTime::fromMSecsSinceEpoch(msecs, *z)));
+}
+go_qdatetime_t* qdatetime_from_secs_since_epoch_zone(int64_t secs, const go_qtimezone_t tz) {
+	auto* z = reinterpret_cast<QTimeZone*>(tz);
+	return toGo(new QDateTime(QDateTime::fromSecsSinceEpoch(secs, *z)));
 }
 
 } // extern "C"

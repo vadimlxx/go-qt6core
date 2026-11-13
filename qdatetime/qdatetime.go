@@ -276,3 +276,35 @@ func (dt *QDateTime) ToUTC() *QDateTime {
 func (dt *QDateTime) ToOffsetFromUtc(offsetSeconds int) *QDateTime {
 	return wrapQDateTime(C.qdatetime_to_offset_from_utc(dt.p, C.int(offsetSeconds)))
 }
+
+// ------------------------------- QTimeZone ---------------------------------
+
+// TimeZone returns the time zone of the datetime.
+func (dt *QDateTime) TimeZone() *QTimeZone {
+	return wrapQTimeZone(C.qdatetime_time_zone(dt.p))
+}
+
+// SetTimeZone sets the datetime's time zone.
+func (dt *QDateTime) SetTimeZone(tz *QTimeZone) {
+	C.qdatetime_set_time_zone(dt.p, tz.p)
+}
+
+// ToTimeZone returns a copy of dt converted to the given time zone.
+func (dt *QDateTime) ToTimeZone(tz *QTimeZone) *QDateTime {
+	return wrapQDateTime(C.qdatetime_to_time_zone(dt.p, tz.p))
+}
+
+// CurrentDateTimeZone returns the current datetime in the given time zone.
+func CurrentDateTimeZone(tz *QTimeZone) *QDateTime {
+	return wrapQDateTime(C.qdatetime_current_date_time_zone(tz.p))
+}
+
+// FromMSecsSinceEpochZone returns a QDateTime from epoch milliseconds in the given zone.
+func FromMSecsSinceEpochZone(msecs int64, tz *QTimeZone) *QDateTime {
+	return wrapQDateTime(C.qdatetime_from_msecs_since_epoch_zone(C.int64_t(msecs), tz.p))
+}
+
+// FromSecsSinceEpochZone returns a QDateTime from epoch seconds in the given zone.
+func FromSecsSinceEpochZone(secs int64, tz *QTimeZone) *QDateTime {
+	return wrapQDateTime(C.qdatetime_from_secs_since_epoch_zone(C.int64_t(secs), tz.p))
+}

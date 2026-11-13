@@ -159,6 +159,10 @@ NewQDateFromYMD(y,m,d)             → explicit date
 
 The Go zero value QDateTime{} is invalid (nil pointer). Use NewQDateTime() for a null QDateTime that mirrors Qt's QDateTime().
 
+- QTimeZone
+
+The Go zero value QTimeZone{} is invalid (nil pointer). Use NewQTimeZone() for a null QTimeZone that mirrors Qt's QTimeZone(). Use Clone() for an independent copy, Close() to free immediately; otherwise a finalizer handles it.
+
 
 #### All classes that store and process various data without dependencies are located in qdata.
 

@@ -7,6 +7,7 @@
 #include "qdate_c.h"
 #include "qtime_c.h"
 #include "qcalendar_c.h"
+#include "qtimezone_c.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +69,14 @@ bool qdatetime_equals(const go_qdatetime_t* dt, const go_qdatetime_t* other);
 go_qdatetime_t* qdatetime_to_local_time(const go_qdatetime_t* dt);
 go_qdatetime_t* qdatetime_to_utc(const go_qdatetime_t* dt);
 go_qdatetime_t* qdatetime_to_offset_from_utc(const go_qdatetime_t* dt, int offset_seconds);
+
+/* --- QTimeZone integration --- */
+go_qtimezone_t  qdatetime_time_zone(const go_qdatetime_t* dt);
+void            qdatetime_set_time_zone(go_qdatetime_t* dt, const go_qtimezone_t tz);
+go_qdatetime_t* qdatetime_to_time_zone(const go_qdatetime_t* dt, const go_qtimezone_t tz);
+go_qdatetime_t* qdatetime_current_date_time_zone(const go_qtimezone_t tz);
+go_qdatetime_t* qdatetime_from_msecs_since_epoch_zone(int64_t msecs, const go_qtimezone_t tz);
+go_qdatetime_t* qdatetime_from_secs_since_epoch_zone(int64_t secs, const go_qtimezone_t tz);
 
 #ifdef __cplusplus
 }
