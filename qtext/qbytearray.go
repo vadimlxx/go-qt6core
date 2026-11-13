@@ -115,7 +115,7 @@ func NewQByteArray(args ...any) *QByteArray {
 		}
 	}
 
-	panic("QByteArray: NewQByteArray accepts 0 or 1 ([]byte|string) argument")
+	panic("NewQByteArray accepts 0 or 1 ([]byte|string) argument")
 }
 
 // ---- lifecycle -----------------------------------------------------------

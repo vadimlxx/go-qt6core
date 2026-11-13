@@ -45,8 +45,25 @@ type QKeyCombination struct {
 }
 
 // NewQKeyCombination returns QKeyCombination() — Key_unknown with no modifiers.
-func NewQKeyCombination() QKeyCombination {
-	return QKeyCombination{v: C.qkeycombination_default()}
+func NewQKeyCombination(arg ...any) QKeyCombination {
+	if len(arg) == 0 || arg[0] == nil {
+		return QKeyCombination{v: C.qkeycombination_default()}
+	}
+
+	if len(arg) == 1 {
+		key, ok := arg[0].(Key)
+		if ok {
+			return NewQKeyCombinationFromKey(key)
+		}
+	}
+
+	mods, ok1 := arg[0].(KeyboardModifiers)
+	key,  ok2 := arg[1].(Key)
+	if ok1 && ok2 {
+		return NewQKeyCombinationFromModifiersKey(mods, key)
+	}
+
+	panic("NewQKeyCombination unknown arguments")
 }
 
 // NewQKeyCombinationFromKey returns QKeyCombination(key).

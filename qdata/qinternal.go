@@ -42,6 +42,10 @@ import "unsafe"
 // QInternal is a purely static class; the Go type exists only to host methods.
 type QInternal struct{}
 
+func NewQInternal() *QInternal {
+	return &QInternal{}
+}
+
 // RegisterCallback registers a C callback for the given event. Mirrors
 // QInternal::registerCallback(Callback, qInternalCallback).
 //

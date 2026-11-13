@@ -164,6 +164,35 @@ func FromQByteArrayView(v QByteArrayView) *QStringBuilder {
 	return b
 }
 
+func NewQStringBuilder(arg any) *QStringBuilder {
+	switch v := arg.(type) {
+	case string:
+		return FromString(v)
+	case []byte:
+		return FromBytes(v)
+	case QChar:
+		return FromQChar(v)
+	case QLatin1Char:
+		return FromQLatin1Char(v)
+	case uint16:
+		return FromUint16(v)
+	case []uint16:
+		return FromUtf16(v)
+	case *QString:
+		return FromQString(v)
+	case QStringView:
+		return FromQStringView(v)
+	case QLatin1StringView:
+		return FromQLatin1StringView(v)
+	case *QByteArray:
+		return FromQByteArray(v)
+	case QByteArrayView:
+		return FromQByteArrayView(v)
+	}
+
+	panic("NewQStringBuilder unknown argument")
+}
+
 // addOperand is the single dispatcher for every supported type.
 func (b *QStringBuilder) addOperand(op any) {
 	switch v := op.(type) {

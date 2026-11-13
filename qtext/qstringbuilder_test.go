@@ -26,6 +26,15 @@ func TestQStringBuilderEmpty(t *testing.T) {
 	}
 }
 
+func TestNewQStringBuilder(t *testing.T) {
+	qs := QStringFromString("world")
+	defer qs.Close()
+
+	if qs.GoString() != "world" {
+		t.Fatalf("ToQString: %q", qs.GoString())
+	}
+}
+
 func TestQStringBuilderConcatStrings(t *testing.T) {
 	b := Concat("hello", ", ", "world")
 	if b.IsQStringFlavored() {
