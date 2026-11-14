@@ -3,6 +3,8 @@ package qdatetime
 import (
 	"strings"
 	"testing"
+
+	"github.com/vadimlxx/go-qt6core/qdata"
 )
 
 // helpers ------------------------------------------------------------------
@@ -30,7 +32,7 @@ func TestQTimeZoneUTC(t *testing.T) {
 	if !z.IsValid() {
 		t.Fatal("UTC zone must be valid")
 	}
-	if z.TimeSpec() != UTC {
+	if z.TimeSpec() != qdata.UTC {
 		t.Fatalf("TimeSpec = %v, want UTC", z.TimeSpec())
 	}
 	if !z.IsUTCOrFixedOffset() {
@@ -44,7 +46,7 @@ func TestQTimeZoneLocal(t *testing.T) {
 	if !z.IsValid() {
 		t.Fatal("LocalTime zone must be valid")
 	}
-	if z.TimeSpec() != LocalTime {
+	if z.TimeSpec() != qdata.LocalTime {
 		t.Fatalf("TimeSpec = %v, want LocalTime", z.TimeSpec())
 	}
 }
@@ -56,7 +58,7 @@ func TestQTimeZoneFromOffset(t *testing.T) {
 	if !z.IsValid() {
 		t.Fatal("offset zone must be valid")
 	}
-	if z.TimeSpec() != OffsetFromUTC {
+	if z.TimeSpec() != qdata.OffsetFromUTC {
 		t.Fatalf("TimeSpec = %v, want OffsetFromUTC", z.TimeSpec())
 	}
 	if got := z.FixedSecondsAheadOfUtc(); got != 5*3600+30*60 {
@@ -74,7 +76,7 @@ func TestQTimeZoneFromIANA(t *testing.T) {
 	if got := id.String(); got != "Europe/Berlin" {
 		t.Fatalf("Id = %q, want %q", got, "Europe/Berlin")
 	}
-	if z.TimeSpec() != TimeZone {
+	if z.TimeSpec() != qdata.TimeZone {
 		t.Fatalf("TimeSpec = %v, want TimeZone", z.TimeSpec())
 	}
 }
@@ -288,7 +290,7 @@ func TestQTimeZoneAsBackendZone(t *testing.T) {
 	if !backend.IsValid() {
 		t.Fatal("backend zone must be valid")
 	}
-	if backend.TimeSpec() != TimeZone {
+	if backend.TimeSpec() != qdata.TimeZone {
 		t.Fatalf("backend TimeSpec = %v, want TimeZone", backend.TimeSpec())
 	}
 }

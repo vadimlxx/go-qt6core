@@ -18,22 +18,23 @@ package qdatetime
 
  Соглашения:
    - Конструкторы: NewQDateTime (null), NewQDateTimeFromDateTime(date, time).
-   - Геттеры: Date, Time, TimeSpec, OffsetFromUtc, ToMSecsSinceEpoch, ToSecsSinceEpoch,
-     IsNull, IsValid.
+   - Геттеры: Date, Time, TimeSpec (qdata.TimeSpec), OffsetFromUtc,
+     ToMSecsSinceEpoch, ToSecsSinceEpoch, IsNull, IsValid.
    - Сеттеры: SetDate, SetTime, SetMSecsSinceEpoch, SetSecsSinceEpoch.
    - Арифметика: AddDays, AddMonths, AddYears, AddSecs, AddMSecs,
      DaysTo, SecsTo, MsecsTo.
    - Статические: NewQDateTimeCurrentDateTime, NewQDateTimeCurrentDateTimeUtc,
      NewQDateTimeFromMSecsSinceEpoch, NewQDateTimeFromSecsSinceEpoch,
      QDateTimeCurrentMSecsSinceEpoch, QDateTimeCurrentSecsSinceEpoch.
-   - Строки: ToString, ToStringFormat, ToStringFormatCal,
-     NewQDateTimeFromString, NewQDateTimeFromStringFormat.
+   - Строки: ToString (qdata.DateFormat), ToStringFormat, ToStringFormatCal,
+     NewQDateTimeFromString (qdata.DateFormat), NewQDateTimeFromStringFormat.
    - Сравнение: Equals.
    - Конвертация: ToLocalTime, ToUTC, ToOffsetFromUtc.
 
+ Типы DateFormat и TimeSpec импортируются из пакета qdata
+ (github.com/vadimlxx/go-qt6core/qdata) как единый источник истины.
+
  Что не реализовано (см. qdatetime_doc.go):
-   - Методы с QTimeZone (timeZone, setTimeZone, toTimeZone, startOfDay/endOfDay с зоной,
-     currentDateTime(zone), fromMSecsSinceEpoch(zone)).
    - TransitionResolution в сигнатурах конструкторов и сеттеров (пока только enum).
    - YearRange.
    - std::chrono interop.
@@ -56,6 +57,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/vadimlxx/go-qt6core/qdata"
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
 
@@ -102,7 +104,7 @@ func NewQDateTimeFromDateTime(date QDate, time QTime) *QDateTime {
 }
 
 // NewQDateTimeFromString returns QDateTime::fromString(str, format).
-func NewQDateTimeFromString(str string, format DateFormat) *QDateTime {
+func NewQDateTimeFromString(str string, format qdata.DateFormat) *QDateTime {
 	var p *C.char
 	if len(str) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
@@ -173,8 +175,8 @@ func (dt *QDateTime) IsNull() bool  { return bool(C.qdatetime_is_null(dt.p)) }
 func (dt *QDateTime) IsValid() bool { return bool(C.qdatetime_is_valid(dt.p)) }
 func (dt *QDateTime) Date() QDate   { return QDate(C.qdatetime_date(dt.p)) }
 func (dt *QDateTime) Time() QTime   { return QTime(C.qdatetime_time(dt.p)) }
-func (dt *QDateTime) TimeSpec() TimeSpec {
-	return TimeSpec(C.qdatetime_time_spec(dt.p))
+func (dt *QDateTime) TimeSpec() qdata.TimeSpec {
+	return qdata.TimeSpec(C.qdatetime_time_spec(dt.p))
 }
 func (dt *QDateTime) OffsetFromUtc() int {
 	return int(C.qdatetime_offset_from_utc(dt.p))
@@ -230,7 +232,7 @@ func (dt *QDateTime) MsecsTo(other *QDateTime) int64 {
 
 // ---- Strings -------------------------------------------------------------
 
-func (dt *QDateTime) ToString(format DateFormat) *qtext.QString {
+func (dt *QDateTime) ToString(format qdata.DateFormat) *qtext.QString {
 	var out unsafe.Pointer
 	C.qdatetime_to_string(dt.p, C.int(format), &out)
 	return qtext.QStringFromUnsafePtr(out)

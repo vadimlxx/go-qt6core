@@ -1,6 +1,10 @@
 package qdatetime
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/vadimlxx/go-qt6core/qdata"
+)
 
 func TestQTimeConstruction(t *testing.T) {
 	tt := NewQTimeFromHMS(14, 30, 45, 123)
@@ -52,7 +56,7 @@ func TestQTimeSecsTo(t *testing.T) {
 
 func TestQTimeToString(t *testing.T) {
 	tt := NewQTimeFromHMS(14, 30, 45, 0)
-	s := tt.ToString(ISODate)
+	s := tt.ToString(qdata.ISODate)
 	defer s.Close()
 	if s.GoString() != "14:30:45" {
 		t.Fatalf("ISODate: %q", s.GoString())

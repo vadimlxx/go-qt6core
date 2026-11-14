@@ -14,12 +14,16 @@ package qdatetime
    - Внутреннее представление: -1 = null, 0..86399999 = msecs since start of day.
 
  Соглашения:
-   - Конструкторы: NewQTime, NewQTimeFromHMS, NewQTimeCurrentTime, NewQTimeFromString,
-     NewQTimeFromStringFormat, NewQTimeFromMSecsSinceStartOfDay.
+   - Конструкторы: NewQTime, NewQTimeFromHMS, NewQTimeCurrentTime,
+     NewQTimeFromString (qdata.DateFormat), NewQTimeFromStringFormat,
+     NewQTimeFromMSecsSinceStartOfDay.
    - Геттеры: Hour, Minute, Second, Msec, MsecsSinceStartOfDay, IsNull, IsValid.
    - Арифметика: AddSecs, AddMSecs, SecsTo, MsecsTo.
-   - Строки: ToString, ToStringFormat → *qtext.QString.
+   - Строки: ToString (qdata.DateFormat), ToStringFormat → *qtext.QString.
    - Сеттеры: SetHMS.
+
+ Тип DateFormat импортируется из пакета qdata
+ (github.com/vadimlxx/go-qt6core/qdata) как единый источник истины.
 
  Что не реализовано (см. qdatetime_doc.go):
    - QDataStream операторы, qHash.
@@ -37,6 +41,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/vadimlxx/go-qt6core/qdata"
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
 
@@ -55,7 +60,7 @@ func NewQTimeFromHMS(h, m, s, ms int) QTime {
 func NewQTimeCurrentTime() QTime { return QTime(C.qtime_current_time()) }
 
 // NewQTimeFromString returns QTime::fromString(str, format).
-func NewQTimeFromString(str string, format DateFormat) QTime {
+func NewQTimeFromString(str string, format qdata.DateFormat) QTime {
 	var p *C.char
 	if len(str) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
@@ -118,7 +123,7 @@ func (t QTime) MsecsTo(other QTime) int {
 
 // ---- Strings -------------------------------------------------------------
 
-func (t QTime) ToString(format DateFormat) *qtext.QString {
+func (t QTime) ToString(format qdata.DateFormat) *qtext.QString {
 	var out unsafe.Pointer
 	C.qtime_to_string(C.int32_t(t), C.int(format), &out)
 	return qtext.QStringFromUnsafePtr(out)

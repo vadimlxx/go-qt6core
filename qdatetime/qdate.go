@@ -14,14 +14,17 @@ package qdatetime
 
  Соглашения:
    - Конструкторы: NewQDate(), NewQDateFromYMD, NewQDateFromYMDCal, NewQDateFromJulianDay,
-     NewQDateCurrentDate, NewQDateFromString, NewQDateFromStringFormat.
+     NewQDateCurrentDate, NewQDateFromString (qdata.DateFormat), NewQDateFromStringFormat.
    - Геттеры: Year, Month, Day, DayOfWeek, DayOfYear, DaysInMonth, DaysInYear, WeekNumber,
      IsNull, IsValid.
    - С QCalendar: YearCal, MonthCal, DayCal.
    - Арифметика: AddDays, AddMonths, AddYears, AddMonthsCal, AddYearsCal, DaysTo.
-   - Строки: ToString, ToStringFormat, ToStringFormatCal → *qtext.QString.
+   - Строки: ToString (qdata.DateFormat), ToStringFormat, ToStringFormatCal → *qtext.QString.
    - Сеттеры: SetDate, SetDateCal, GetDate.
    - Статические: QDateIsValid, QDateIsLeapYear, ToJulianDay.
+
+ Тип DateFormat импортируется из пакета qdata
+ (github.com/vadimlxx/go-qt6core/qdata) как единый источник истины.
 
  Что не реализовано (см. qdatetime_doc.go):
    - startOfDay/endOfDay (требуют QDateTime).
@@ -41,6 +44,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/vadimlxx/go-qt6core/qdata"
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
 
@@ -69,7 +73,7 @@ func NewQDateFromJulianDay(jd int64) QDate {
 func NewQDateCurrentDate() QDate { return QDate(C.qdate_current_date()) }
 
 // NewQDateFromString returns QDate::fromString(str, format).
-func NewQDateFromString(str string, format DateFormat) QDate {
+func NewQDateFromString(str string, format qdata.DateFormat) QDate {
 	var p *C.char
 	if len(str) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
@@ -99,15 +103,15 @@ func NewQDateFromStringFormat(str, format string) QDate {
 
 // ---- Accessors -----------------------------------------------------------
 
-func (d QDate) IsNull() bool       { return bool(C.qdate_is_null(C.int64_t(d))) }
-func (d QDate) IsValid() bool      { return bool(C.qdate_is_valid(C.int64_t(d))) }
-func (d QDate) Year() int          { return int(C.qdate_year(C.int64_t(d))) }
-func (d QDate) Month() int         { return int(C.qdate_month(C.int64_t(d))) }
-func (d QDate) Day() int           { return int(C.qdate_day(C.int64_t(d))) }
-func (d QDate) DayOfWeek() int     { return int(C.qdate_day_of_week(C.int64_t(d))) }
-func (d QDate) DayOfYear() int     { return int(C.qdate_day_of_year(C.int64_t(d))) }
-func (d QDate) DaysInMonth() int   { return int(C.qdate_days_in_month(C.int64_t(d))) }
-func (d QDate) DaysInYear() int    { return int(C.qdate_days_in_year(C.int64_t(d))) }
+func (d QDate) IsNull() bool     { return bool(C.qdate_is_null(C.int64_t(d))) }
+func (d QDate) IsValid() bool    { return bool(C.qdate_is_valid(C.int64_t(d))) }
+func (d QDate) Year() int        { return int(C.qdate_year(C.int64_t(d))) }
+func (d QDate) Month() int       { return int(C.qdate_month(C.int64_t(d))) }
+func (d QDate) Day() int         { return int(C.qdate_day(C.int64_t(d))) }
+func (d QDate) DayOfWeek() int   { return int(C.qdate_day_of_week(C.int64_t(d))) }
+func (d QDate) DayOfYear() int   { return int(C.qdate_day_of_year(C.int64_t(d))) }
+func (d QDate) DaysInMonth() int { return int(C.qdate_days_in_month(C.int64_t(d))) }
+func (d QDate) DaysInYear() int  { return int(C.qdate_days_in_year(C.int64_t(d))) }
 
 func (d QDate) WeekNumber(yearNum *int) int {
 	var yn C.int
@@ -151,7 +155,7 @@ func (d QDate) DaysTo(other QDate) int64 {
 
 // ---- Strings -------------------------------------------------------------
 
-func (d QDate) ToString(format DateFormat) *qtext.QString {
+func (d QDate) ToString(format qdata.DateFormat) *qtext.QString {
 	var out unsafe.Pointer
 	C.qdate_to_string(C.int64_t(d), C.int(format), &out)
 	return qtext.QStringFromUnsafePtr(out)

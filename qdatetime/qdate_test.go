@@ -1,6 +1,10 @@
 package qdatetime
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/vadimlxx/go-qt6core/qdata"
+)
 
 func TestQDateConstruction(t *testing.T) {
 	d := NewQDateFromYMD(2024, 1, 15)
@@ -48,7 +52,7 @@ func TestQDateAddDays(t *testing.T) {
 
 func TestQDateToString(t *testing.T) {
 	d := NewQDateFromYMD(2024, 1, 15)
-	s := d.ToString(ISODate)
+	s := d.ToString(qdata.ISODate)
 	defer s.Close()
 	if s.GoString() != "2024-01-15" {
 		t.Fatalf("ISODate: %q", s.GoString())

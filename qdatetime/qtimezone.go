@@ -20,13 +20,16 @@ package qdatetime
  Соглашения:
    - Конструкторы: NewQTimeZone (null), NewQTimeZoneLocal, NewQTimeZoneUTC,
      NewQTimeZoneFromOffset, NewQTimeZoneFromIANA, NewQTimeZoneSystem, NewQTimeZoneStaticUTC.
-   - Геттеры: Id, TimeSpec, FixedSecondsAheadOfUtc, IsUTCOrFixedOffset, IsValid,
-     OffsetFromUtc, StandardTimeOffset, DaylightTimeOffset, IsDaylightTime,
-     HasDaylightTime, HasTransitions, Territory.
+   - Геттеры: Id, TimeSpec (qdata.TimeSpec), FixedSecondsAheadOfUtc,
+     IsUTCOrFixedOffset, IsValid, OffsetFromUtc, StandardTimeOffset,
+     DaylightTimeOffset, IsDaylightTime, HasDaylightTime, HasTransitions, Territory.
    - Строки: DisplayName (две перегрузки), Abbreviation, SystemTimeZoneId.
    - Переходы: NextTransition, PreviousTransition → *QDateTime + смещения + аббревиатура.
    - Конвертации: AsBackendZone, ToQDateTime (через QDateTime).
    - Статические: SystemTimeZoneId, IsTimeZoneIdAvailable, SystemTimeZone, UTC.
+
+ Тип TimeSpec импортируется из пакета qdata
+ (github.com/vadimlxx/go-qt6core/qdata) как единый источник истины.
 
  Что не реализовано (см. qtimezone_doc.go):
    - OffsetDataList transitions() — требует QList<OffsetData>.
@@ -51,6 +54,7 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/vadimlxx/go-qt6core/qdata"
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
 
@@ -95,7 +99,8 @@ func NewQTimeZoneLocal() *QTimeZone { return wrapQTimeZone(C.qtimezone_new_local
 // NewQTimeZoneUTC returns QTimeZone(QTimeZone::UTC).
 func NewQTimeZoneUTC() *QTimeZone { return wrapQTimeZone(C.qtimezone_new_utc()) }
 
-// NewQTimeZoneFromOffset returns QTimeZone(offsetSeconds).
+// NewQTimeZoneFromOffset returns QTimeZone::fromSecondsAheadOfUtc(offsetSeconds).
+// The resulting zone has TimeSpec() == qdata.OffsetFromUTC.
 func NewQTimeZoneFromOffset(offsetSeconds int) *QTimeZone {
 	return wrapQTimeZone(C.qtimezone_new_from_offset(C.int(offsetSeconds)))
 }
@@ -127,7 +132,9 @@ func (z *QTimeZone) Id() *qtext.QByteArray {
 
 // ---- TimeSpec / offset ---------------------------------------------------
 
-func (z *QTimeZone) TimeSpec() TimeSpec { return TimeSpec(C.qtimezone_time_spec(z.p)) }
+func (z *QTimeZone) TimeSpec() qdata.TimeSpec {
+	return qdata.TimeSpec(C.qtimezone_time_spec(z.p))
+}
 func (z *QTimeZone) FixedSecondsAheadOfUtc() int {
 	return int(C.qtimezone_fixed_seconds_ahead_of_utc(z.p))
 }
