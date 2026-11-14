@@ -76,43 +76,46 @@ func (l *QByteArrayList) Close() {
 
 // ---- construction --------------------------------------------------------
 
-// New returns a new empty QByteArrayList.
-// func NewQByteArrayList() *QByteArrayList { return wrap(C.qbytearraylist_new()) }
+func NewQByteArrayListFromStrings(items []string) *QByteArrayList {
+	l := NewQByteArrayList()
+	l.Reserve(len(items))
+	for _, s := range items {
+		q := NewQByteArray(s)
+		l.Append(q)
+		q.Close()
+	}
+	return l
+}
+
+func NewQByteArrayListFromQByteArrays(items []*QByteArray) *QByteArrayList {
+	n := len(items)
+	if n == 0 {
+		return wrapQByteArrayList(C.qbytearraylist_new())
+	}
+	ptrs := make([]*C.QByteArray, n)
+	for i, ba := range items {
+		if ba == nil {
+			panic("qbytearraylist: nil *QByteArray in FromQByteArrays")
+		}
+		ptrs[i] = ba.p
+	}
+	l := wrapQByteArrayList(C.qbytearraylist_from_array(
+		(**C.QByteArray)(unsafe.Pointer(&ptrs[0])), C.ptrdiff_t(n)))
+	runtime.KeepAlive(items)
+	return l
+
+}
 
 func NewQByteArrayList(arg ...any) *QByteArrayList {
-	if len(arg) == 0 {
+	if len(arg) == 0 || arg == nil {
 		return wrapQByteArrayList(C.qbytearraylist_new())
 	}
 
-	switch arg[0].(type) {
+	switch items := arg[0].(type) {
 	case []string:
-		items := arg[0].([]string)
-		l := NewQByteArrayList()
-		l.Reserve(len(items))
-		for _, s := range items {
-			q := NewQByteArray(s)
-			l.Append(q)
-			q.Close()
-		}
-		return l
-
+		return NewQByteArrayListFromStrings(items)
 	case []*QByteArray:
-		items := arg[0].([]*QByteArray)
-		n := len(items)
-		if n == 0 {
-			return wrapQByteArrayList(C.qbytearraylist_new())
-		}
-		ptrs := make([]*C.QByteArray, n)
-		for i, ba := range items {
-			if ba == nil {
-				panic("qbytearraylist: nil *QByteArray in FromQByteArrays")
-			}
-			ptrs[i] = ba.p
-		}
-		l := wrapQByteArrayList(C.qbytearraylist_from_array(
-			(**C.QByteArray)(unsafe.Pointer(&ptrs[0])), C.ptrdiff_t(n)))
-		runtime.KeepAlive(items)
-		return l
+		return NewQByteArrayListFromQByteArrays(items)
 	}
 
 	panic("NewQByteArrayList invalid argumentes")
