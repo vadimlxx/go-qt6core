@@ -2,6 +2,16 @@
 
 Qt 6.11
 
+#### All classes that store and process various data without dependencies are located in qdata.
+
+- QInternal
+
+- QKeyCombination
+
+- QSysInfo
+
+QString -> go-string, QByteArray -> []byte, no dependency on qtext (QString & QByteArray)
+
 #### All string classes are assigned to QText:
 
 - QChar
@@ -173,12 +183,6 @@ The Go zero value QDateTime{} is invalid (nil pointer). Use NewQDateTime() for a
 
 The Go zero value QTimeZone{} is invalid (nil pointer). Use NewQTimeZone() for a null QTimeZone that mirrors Qt's QTimeZone(). Use Clone() for an independent copy, Close() to free immediately; otherwise a finalizer handles it.
 
-
-#### All classes that store and process various data without dependencies are located in qdata.
-
-- QInternal
-
-- QKeyCombination
 
 All details see in doc.go files
 
