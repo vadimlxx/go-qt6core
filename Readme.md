@@ -94,6 +94,9 @@ QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size()
 - QRegularExpression
 - QRegularExpressionMatch
 - QRegularExpressionMatchIterator
+- QStringList
+
+Element access (each returns a new *QString; ownership is the caller's): At(i) / Front() / Back() / ToSlice() / TakeAt(i) / TakeFirst() / TakeLast()
 
 #### All geometry classes are assigned to qgeometry:
 
@@ -120,7 +123,7 @@ rx() / ry() — covered by SetX / SetY.
 
 std::tuple protocol / structured bindings — no Go equivalent; use X()/Y().
 
-get<I>(QPoint) / get<I>(QPointF) — same; use X()/Y().
+get(QPoint) / get(QPointF) — same; use X()/Y().
 
 - QLine & QLineF
 

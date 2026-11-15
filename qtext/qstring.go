@@ -231,7 +231,10 @@ func NewQString(arg ...any) *QString {
 		return QStringFromQByteArray(v)
 	case QStringView:
 		return QStringFromQStringView(v)
+	case *QString:
+		return v.Clone()
 	}
+
 	panic("NewQString invalid argument")
 }
 

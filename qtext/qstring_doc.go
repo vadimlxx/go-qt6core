@@ -30,25 +30,7 @@
 //   - qdata.SplitBehavior (Qt::SplitBehavior) is used by QString.SplitQString,
 //     SplitQChar and SplitQRegularExpression.
 //
-// Implemented (as of this revision):
-//   - arg: ArgLl, ArgUll, ArgDouble, ArgQChar, ArgQString, ArgString.
-//   - compare: CompareQString, CompareQChar, CompareString, LocaleAwareCompare.
-//   - normalization: Normalized, NormalizedWithVersion.
-//   - split: SplitQString, SplitQChar, SplitQRegularExpression.
-//   - section: SectionQChar, SectionQString, SectionQRegularExpression.
-//   - escape: ToHtmlEscaped.
-//   - repeat: Repeated.
-//   - low-level accessors: Capacity, IsSharedWith, ResizeForOverwrite.
-//   - remove with cs: RemoveQChar, RemoveQString, RemoveString,
-//     RemoveQRegularExpression.
-//   - replace with cs: ReplaceQCharQCharCS, ReplaceQCharQStringCS,
-//     ReplaceQStringQStringCS, ReplaceStringStringCS;
-//     ReplaceQRegularExpression, ReplaceQRegularExpressionString.
-//   - setNum/number for int/uint/float: SetNumInt, SetNumUInt, SetNumFloat,
-//     QStringNumberInt, QStringNumberUInt.
-//   - FromLocal8Bit constructor.
-//
-// TODO (not yet bound):
+// Not yet bound:
 //   - arg() as a single variadic call chaining %1..%99 — use explicit
 //     per-type Arg* methods.
 //   - Vasprintf / Asprintf / Sprintf.
