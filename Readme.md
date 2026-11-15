@@ -98,6 +98,9 @@ QBitArray::count() (no-arg deprecated alias for size()): not exposed; use Size()
 
 Element access (each returns a new *QString; ownership is the caller's): At(i) / Front() / Back() / ToSlice() / TakeAt(i) / TakeFirst() / TakeLast()
 
+- QTextBoundaryFinder
+
+
 #### All geometry classes are assigned to qgeometry:
 
 - QMargins & QMarginsF
