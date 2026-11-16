@@ -184,6 +184,13 @@ The Go zero value QDateTime{} is invalid (nil pointer). Use NewQDateTime() for a
 The Go zero value QTimeZone{} is invalid (nil pointer). Use NewQTimeZone() for a null QTimeZone that mirrors Qt's QTimeZone(). Use Clone() for an independent copy, Close() to free immediately; otherwise a finalizer handles it.
 
 
+#### UUID class is assigned to quuid:
+
+- QUuid
+
+The raw byte representation is exported as Id128Bytes = [16]byte, mirroring QUuid::Id128Bytes.
+
+
 All details see in doc.go files
 
 ### License
