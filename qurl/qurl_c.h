@@ -9,10 +9,12 @@
 #ifdef __cplusplus
 class QUrl;
 class QString;
+class QUrlQuery;
 extern "C" {
 #else
 typedef struct QUrl QUrl;
 typedef struct QString QString;
+typedef struct QUrlQuery QUrlQuery;
 #endif
 
 /* --- lifecycle --- */
@@ -84,6 +86,12 @@ bool  qurl_has_query(const QUrl* self);
 void  qurl_set_query_qstring(QUrl* self, const QString* query, int mode);
 void  qurl_set_query_utf8(QUrl* self, const char* query, size_t size, int mode);
 char* qurl_query(const QUrl* self, int options);
+
+/* QUrlQuery interop.
+ * Qt: QUrl::setQuery(const QUrlQuery&).
+ * Takes ownership semantics: the pointer's lifetime is not transferred; the
+ * QUrlQuery may be reused or closed immediately after the call. */
+void  qurl_set_query_qurlquery(QUrl* self, const QUrlQuery* query);
 
 bool  qurl_has_fragment(const QUrl* self);
 char* qurl_fragment(const QUrl* self, int options);

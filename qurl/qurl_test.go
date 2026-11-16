@@ -313,3 +313,62 @@ func TestQUrlDetach(t *testing.T) {
 		t.Fatalf("clone path: %q", got)
 	}
 }
+
+// ---- QUrlQuery interop --------------------------------------------------
+
+func TestQUrlSetQueryQUrlQuery(t *testing.T) {
+	u := QUrlFromString("https://example.com/path", TolerantMode)
+	defer u.Close()
+
+	src := QUrlQueryFromString("a=1&b=2")
+	defer src.Close()
+
+	u.SetQueryQUrlQuery(src)
+	if !u.HasQuery() {
+		t.Fatal("expected has query")
+	}
+
+	// Round-trip through QUrlQuery(url) to check both keys.
+	got := QUrlQueryFromUrl(u)
+	defer got.Close()
+	items := got.QueryItems(PrettyDecoded)
+	if items["a"] != "1" || items["b"] != "2" {
+		t.Fatalf("items: %v", items)
+	}
+}
+
+func TestQUrlSetQueryQUrlQueryReplaces(t *testing.T) {
+	u := QUrlFromString("https://example.com/path?old=1&keep=0", TolerantMode)
+	defer u.Close()
+
+	src := QUrlQueryFromString("new=2")
+	defer src.Close()
+
+	u.SetQueryQUrlQuery(src)
+
+	got := QUrlQueryFromUrl(u)
+	defer got.Close()
+	items := got.QueryItems(PrettyDecoded)
+	if _, ok := items["old"]; ok {
+		t.Fatalf("old key still present: %v", items)
+	}
+	if items["new"] != "2" {
+		t.Fatalf("new key: %v", items)
+	}
+	if _, ok := items["keep"]; ok {
+		t.Fatalf("keep key still present: %v", items)
+	}
+}
+
+func TestQUrlSetQueryQUrlQueryNil(t *testing.T) {
+	u := QUrlFromString("https://example.com/path?a=1", TolerantMode)
+	defer u.Close()
+	if !u.HasQuery() {
+		t.Fatal("precondition: expected query")
+	}
+
+	u.SetQueryQUrlQuery(nil)
+	if u.HasQuery() {
+		t.Fatalf("expected query cleared, got %q", u.Query(FullyDecoded))
+	}
+}

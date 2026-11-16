@@ -1,6 +1,7 @@
 #include "qurl_c.h"
 
 #include <QtCore/QUrl>
+#include <QtCore/QUrlQuery>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 #include <QtCore/QByteArray>
@@ -185,6 +186,10 @@ void qurl_set_query_utf8(QUrl* self, const char* query, size_t size, int mode) {
 }
 char* qurl_query(const QUrl* self, int options) {
     return copyUtf8(self->query(QUrl::ComponentFormattingOptions(options)));
+}
+
+void qurl_set_query_qurlquery(QUrl* self, const QUrlQuery* query) {
+    self->setQuery(*query);
 }
 
 bool qurl_has_fragment(const QUrl* self) { return self->hasFragment(); }

@@ -14,6 +14,11 @@ package qurl
      - Go-версия с суффиксом String, принимающая/возвращающая string.
    Для QByteArray — суффикс Bytes; для QStringList — суффикс Strings.
 
+   QUrlQuery interop (см. qurlquery.go):
+     - SetQueryQUrlQuery(q) — QUrl::setQuery(const QUrlQuery&);
+     - QUrlQueryFromUrl(url) — QUrlQuery(const QUrl&) — уже реализован
+       в qurlquery.go.
+
    FromStringListStrings передаёт входные строки как плоский буфер
    (склейка в []byte + массив offsets), а не как массив Go-указателей на
    Go-память — это требование cgo (запрещено передавать Go pointer to
@@ -21,7 +26,6 @@ package qurl
 
    Что сознательно не вошло:
 
-   - Конструктор и сеттеры с QUrlQuery — QUrlQuery не привязан.
    - toCFURL / fromCFURL, toNSURL / fromNSURL — только Darwin.
    - idnWhitelist() / setIdnWhitelist(QStringList) — TODO.
    - QDataStream / QDebug операторы — не идиоматичны в Go.
@@ -82,12 +86,6 @@ func (q *QUrl) Close() {
 
 // ---- construction --------------------------------------------------------
 
-// NewQUrl returns an empty (invalid) QUrl.
-// Qt: QUrl().
-// func NewQUrl() *QUrl {
-// 	return wrapQUrl(unsafe.Pointer(C.qurl_new_empty()))
-// }
-
 // QUrlFromQString parses a URL from a QString. nil maps to the empty QUrl.
 // Qt: QUrl(const QString&, ParsingMode).
 func QUrlFromQString(s *qtext.QString, mode ParsingMode) *QUrl {
@@ -109,6 +107,11 @@ func QUrlFromString(s string, mode ParsingMode) *QUrl {
 	return q
 }
 
+// NewQUrl is a convenience dispatcher for the most common constructors:
+//   - NewQUrl()             → QUrl()
+//   - NewQUrl(*QUrl)        → QUrl(const QUrl&)  (clone)
+//   - NewQUrl(string, m)    → QUrl(const QString&, ParsingMode) [fromUtf8]
+//   - NewQUrl(*qtext.QString, m) → QUrl(const QString&, ParsingMode)
 func NewQUrl(arg ...any) *QUrl {
 	if len(arg) == 0 || arg[0] == nil {
 		return wrapQUrl(unsafe.Pointer(C.qurl_new_empty()))
@@ -487,6 +490,23 @@ func (q *QUrl) SetQueryString(s string, mode ParsingMode) {
 	}
 	C.qurl_set_query_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
+}
+
+// SetQueryQUrlQuery sets the query component from a QUrlQuery.
+// The QUrlQuery is read-only here — its lifetime is not transferred; it can
+// be reused or closed immediately after the call.
+// Qt: QUrl::setQuery(const QUrlQuery&).
+//
+// Passing nil clears the query (equivalent to setting an empty QUrlQuery).
+func (q *QUrl) SetQueryQUrlQuery(query *QUrlQuery) {
+	if query == nil || query.p == nil {
+		empty := NewQUrlQuery()
+		defer empty.Close()
+		C.qurl_set_query_qurlquery(q.p, empty.p)
+		return
+	}
+	C.qurl_set_query_qurlquery(q.p, query.p)
+	runtime.KeepAlive(query)
 }
 
 // Query returns the query component as a Go string.
