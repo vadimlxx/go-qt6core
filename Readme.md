@@ -150,6 +150,7 @@ Free operator+(QRect, QMargins) / operator+(QMargins, QRect) — covered by Marg
 
 Free operator-(QRect, QMargins) — covered by MarginsRemoved.
 
+
 #### All date, time & locate classes are assigned to qdatetime:
 
 - QLocate
@@ -161,18 +162,23 @@ see qlocate_doc
 The Go zero value QCalendar{} is NOT a valid calendar:
 
 QCalendar{}       → d_ptr == nil → IsValid() == false
+
 NewQCalendar()    → Qt's QCalendar() → valid, Gregorian
 
 - QTime
 
 QTime{}          → msecs = 0       → valid time 00:00:00.000 (midnight)
+
 NewQTime()       → null QTime      → mirrors Qt's QTime() (msecs = -1)
+
 NewQTimeFromHMS(h,m,s,ms)          → explicit time
 
 - QDate
 
 QDate{}          → Julian day 0    → valid date (1 January 4713 BCE)
+
 NewQDate()       → null QDate      → mirrors Qt's QDate() (Julian day INT64_MIN)
+
 NewQDateFromYMD(y,m,d)             → explicit date
 
 - QDateTime
@@ -189,6 +195,16 @@ The Go zero value QTimeZone{} is invalid (nil pointer). Use NewQTimeZone() for a
 - QUuid
 
 The raw byte representation is exported as Id128Bytes = [16]byte, mirroring QUuid::Id128Bytes.
+
+#### All url classes are assigned to qurl:
+
+- QUrl
+
+- QUrlQuery
+
+SetQueryItems(map[string]string)       → setQueryItems(const QList<std::pair<QString,QString>>&)
+
+QueryItems(enc) map[string]string      → queryItems(ComponentFormattingOptions)
 
 
 All details see in doc.go files
