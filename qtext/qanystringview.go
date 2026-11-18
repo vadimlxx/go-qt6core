@@ -79,7 +79,7 @@ func EmptyQAnyStringView() QAnyStringView {
 }
 
 // FromBytes returns a view over b as UTF-8 (KindUtf8). The Go slice is kept alive.
-func QAnyStringViewFromBytes(b []byte) QAnyStringView {
+func NewQAnyStringViewFromBytes(b []byte) QAnyStringView {
 	if len(b) == 0 {
 		return EmptyQAnyStringView()
 	}
@@ -87,7 +87,7 @@ func QAnyStringViewFromBytes(b []byte) QAnyStringView {
 }
 
 // FromString returns a view over s as UTF-8 (KindUtf8). Go strings are immutable.
-func QAnyStringViewFromString(s string) QAnyStringView {
+func NewQAnyStringViewFromString(s string) QAnyStringView {
 	if len(s) == 0 {
 		return EmptyQAnyStringView()
 	}
@@ -95,7 +95,7 @@ func QAnyStringViewFromString(s string) QAnyStringView {
 }
 
 // FromQByteArray returns a zero-copy UTF-8 view over q's internal buffer. The view keeps q alive.
-func QAnyStringViewFromQByteArray(q *QByteArray) QAnyStringView {
+func NewQAnyStringViewFromQByteArray(q *QByteArray) QAnyStringView {
 	if q == nil || q.IsNull() {
 		return EmptyQAnyStringView()
 	}
@@ -103,7 +103,7 @@ func QAnyStringViewFromQByteArray(q *QByteArray) QAnyStringView {
 }
 
 // FromQUtf8StringView wraps a QUtf8StringView (KindUtf8). The original view is kept alive.
-func QAnyStringViewFromQUtf8StringView(v QUtf8StringView) QAnyStringView {
+func NewQAnyStringViewFromQUtf8StringView(v QUtf8StringView) QAnyStringView {
 	if v.IsNull() {
 		return EmptyQAnyStringView()
 	}
@@ -111,7 +111,7 @@ func QAnyStringViewFromQUtf8StringView(v QUtf8StringView) QAnyStringView {
 }
 
 // FromQLatin1StringView wraps a QLatin1StringView (KindLatin1).
-func QAnyStringViewFromQLatin1StringView(v QLatin1StringView) QAnyStringView {
+func NewQAnyStringViewFromQLatin1StringView(v QLatin1StringView) QAnyStringView {
 	if v.IsNull() {
 		return EmptyQAnyStringView()
 	}
@@ -119,7 +119,7 @@ func QAnyStringViewFromQLatin1StringView(v QLatin1StringView) QAnyStringView {
 }
 
 // FromQStringView wraps a QStringView (KindUtf16).
-func QAnyStringViewFromQStringView(v QStringView) QAnyStringView {
+func NewQAnyStringViewFromQStringView(v QStringView) QAnyStringView {
 	if v.IsNull() {
 		return EmptyQAnyStringView()
 	}
@@ -133,17 +133,17 @@ func NewQAnyStringView(arg ...any) QAnyStringView {
 
 	switch s := arg[0].(type) {
 	case []byte:
-		return QAnyStringViewFromBytes(s)
+		return NewQAnyStringViewFromBytes(s)
 	case string:
-		return QAnyStringViewFromString(s)
+		return NewQAnyStringViewFromString(s)
 	case *QByteArray:
-		return QAnyStringViewFromQByteArray(s)
+		return NewQAnyStringViewFromQByteArray(s)
 	case QUtf8StringView:
-		return QAnyStringViewFromQUtf8StringView(s)
+		return NewQAnyStringViewFromQUtf8StringView(s)
 	case QLatin1StringView:
-		return QAnyStringViewFromQLatin1StringView(s)
+		return NewQAnyStringViewFromQLatin1StringView(s)
 	case QStringView:
-		return QAnyStringViewFromQStringView(s)
+		return NewQAnyStringViewFromQStringView(s)
 	}
 
 	panic("NewQAnyStringView invalid argumentes")

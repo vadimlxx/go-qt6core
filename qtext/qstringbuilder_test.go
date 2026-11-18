@@ -106,7 +106,7 @@ func TestQStringBuilderConcatQStringView(t *testing.T) {
 }
 
 func TestQStringBuilderConcatQLatin1StringView(t *testing.T) {
-	l1 := QLatin1StringViewFromBytes([]byte{0xE9}) // "é"
+	l1 := NewQLatin1StringViewFromBytes([]byte{0xE9}) // "é"
 	b := Concat("caf", l1)
 	if !b.IsQStringFlavored() {
 		t.Fatal("QLatin1StringView must be QString-flavored")

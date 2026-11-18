@@ -1,11 +1,8 @@
 package qtext
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestNewRoundTrip(t *testing.T) {
-	// Every byte 0..255 must survive New → ToLatin1 → Unicode round-trips.
 	for b := 0; b < 256; b++ {
 		c := NewQLatin1Char(byte(b))
 		if got := c.ToLatin1(); got != byte(b) {
@@ -17,10 +14,10 @@ func TestNewRoundTrip(t *testing.T) {
 	}
 }
 
-func TestFromRune(t *testing.T) {
+func TestNewQLatin1CharFromRune(t *testing.T) {
 	cases := []struct {
-		r   rune
-		ok  bool
+		r    rune
+		ok   bool
 		want QLatin1Char
 	}{
 		{'A', true, NewQLatin1Char('A')},
@@ -32,37 +29,35 @@ func TestFromRune(t *testing.T) {
 		{-1, false, 0},
 	}
 	for _, tc := range cases {
-		c, ok := QLatin1CharFromRune(tc.r)
+		c, ok := NewQLatin1CharFromRune(tc.r)
 		if ok != tc.ok || (tc.ok && c != tc.want) {
-			t.Fatalf("FromRune(%U): got (%v,%v), want (%v,%v)", tc.r, c, ok, tc.want, tc.ok)
+			t.Fatalf("NewQLatin1CharFromRune(%U): got (%v,%v), want (%v,%v)",
+				tc.r, c, ok, tc.want, tc.ok)
 		}
 	}
 }
 
 func TestToQChar(t *testing.T) {
-	// Latin-1 byte value == Unicode code point for 0x00..0xFF.
 	for b := 0; b < 256; b++ {
 		q := NewQLatin1Char(byte(b)).ToQChar()
 		if q.Unicode() != uint16(b) {
-			t.Fatalf("New(%d).ToQChar().Unicode() = %#x", b, q.Unicode())
+			t.Fatalf("NewQLatin1Char(%d).ToQChar().Unicode() = %#x", b, q.Unicode())
 		}
 	}
 }
 
-func TestFromQChar(t *testing.T) {
-	// Valid Latin-1 range.
+func TestNewQLatin1CharFromQChar(t *testing.T) {
 	for b := 0; b < 256; b++ {
-		c, ok := QLatin1CharFromQChar(NewQChar(uint16(b)))
+		c, ok := NewQLatin1CharFromQChar(NewQChar(uint16(b)))
 		if !ok || byte(c) != byte(b) {
-			t.Fatalf("FromQChar(%d): got (%d,%v)", b, c, ok)
+			t.Fatalf("NewQLatin1CharFromQChar(%d): got (%d,%v)", b, c, ok)
 		}
 	}
-	// Out of range.
-	if _, ok := QLatin1CharFromQChar(NewQChar(0x100)); ok {
-		t.Fatal("FromQChar(0x100) must be !ok")
+	if _, ok := NewQLatin1CharFromQChar(NewQChar(0x100)); ok {
+		t.Fatal("NewQLatin1CharFromQChar(0x100) must be !ok")
 	}
-	if _, ok := QLatin1CharFromQChar(NewQChar(0x4E16)); ok { // 世
-		t.Fatal("FromQChar(世) must be !ok")
+	if _, ok := NewQLatin1CharFromQChar(NewQChar(0x4E16)); ok {
+		t.Fatal("NewQLatin1CharFromQChar(世) must be !ok")
 	}
 }
 
@@ -72,21 +67,11 @@ func TestComparisons(t *testing.T) {
 	z := NewQLatin1Char(0x00)
 	w := NewQLatin1Char(0xFF)
 
-	if !a.Equal(a) {
-		t.Fatal("a.Equal(a) must be true")
-	}
-	if a.Equal(b) {
-		t.Fatal("a.Equal(b) must be false")
-	}
-	if a.Compare(a) != 0 {
-		t.Fatal("a.Compare(a) must be 0")
-	}
-	if a.Compare(b) != -1 {
-		t.Fatal("a.Compare(b) must be -1")
-	}
-	if b.Compare(a) != 1 {
-		t.Fatal("b.Compare(a) must be 1")
-	}
+	if !a.Equal(a) { t.Fatal("a.Equal(a) must be true") }
+	if a.Equal(b)  { t.Fatal("a.Equal(b) must be false") }
+	if a.Compare(a) != 0 { t.Fatal("a.Compare(a) must be 0") }
+	if a.Compare(b) != -1 { t.Fatal("a.Compare(b) must be -1") }
+	if b.Compare(a) != 1 { t.Fatal("b.Compare(a) must be 1") }
 	if z.Compare(w) != -1 || w.Compare(z) != 1 {
 		t.Fatal("0x00 vs 0xFF ordering wrong")
 	}
@@ -94,21 +79,11 @@ func TestComparisons(t *testing.T) {
 
 func TestByteComparisons(t *testing.T) {
 	a := NewQLatin1Char('a')
-	if !a.EqualByte('a') {
-		t.Fatal("EqualByte('a')")
-	}
-	if a.EqualByte('b') {
-		t.Fatal("EqualByte('b') must be false")
-	}
-	if a.CompareByte('a') != 0 {
-		t.Fatal("CompareByte('a')")
-	}
-	if a.CompareByte('b') != -1 {
-		t.Fatal("CompareByte('b')")
-	}
-	if a.CompareByte('A') != 1 {
-		t.Fatal("CompareByte('A')")
-	}
+	if !a.EqualByte('a')     { t.Fatal("EqualByte('a')") }
+	if a.EqualByte('b')      { t.Fatal("EqualByte('b') must be false") }
+	if a.CompareByte('a') != 0  { t.Fatal("CompareByte('a')") }
+	if a.CompareByte('b') != -1 { t.Fatal("CompareByte('b')") }
+	if a.CompareByte('A') != 1  { t.Fatal("CompareByte('A')") }
 }
 
 func TestString(t *testing.T) {

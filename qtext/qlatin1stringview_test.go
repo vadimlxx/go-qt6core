@@ -16,9 +16,9 @@ func TestEmptyQLatin1StringView(t *testing.T) {
 	}
 }
 
-func TestQLatin1StringViewFromBytes(t *testing.T) {
+func TestNewQLatin1StringViewFromBytes(t *testing.T) {
 	b := []byte("hello")
-	v := QLatin1StringViewFromBytes(b)
+	v := NewQLatin1StringViewFromBytes(b)
 	if v.Size() != 5 || v.IsNull() || v.IsEmpty() {
 		t.Fatalf("Size=%d IsNull=%v IsEmpty=%v", v.Size(), v.IsNull(), v.IsEmpty())
 	}
@@ -27,10 +27,10 @@ func TestQLatin1StringViewFromBytes(t *testing.T) {
 	}
 }
 
-func TestQLatin1StringViewFromBytesLatin1(t *testing.T) {
+func TestNewQLatin1StringViewFromBytesLatin1(t *testing.T) {
 	// "héllo" as Latin-1 bytes: h=0x68, é=0xE9, l, l, o
 	b := []byte{0x68, 0xE9, 0x6C, 0x6C, 0x6F}
-	v := QLatin1StringViewFromBytes(b)
+	v := NewQLatin1StringViewFromBytes(b)
 	if v.Size() != 5 {
 		t.Fatalf("Size: %d", v.Size())
 	}
@@ -40,7 +40,7 @@ func TestQLatin1StringViewFromBytesLatin1(t *testing.T) {
 }
 
 func TestQLatin1StringViewFromString(t *testing.T) {
-	v := QLatin1StringViewFromString("hello")
+	v := NewQLatin1StringViewFromString("hello")
 	if v.GoString() != "hello" {
 		t.Fatalf("GoString: %q", v.GoString())
 	}
@@ -50,7 +50,7 @@ func TestQLatin1StringViewFromQByteArray(t *testing.T) {
 	q := NewQByteArray("hello")
 	defer q.Close()
 
-	v := QLatin1StringViewFromQByteArray(q)
+	v := NewQLatin1StringViewFromQByteArray(q)
 	if v.GoString() != "hello" {
 		t.Fatalf("FromQByteArray: %q", v.GoString())
 	}
@@ -63,13 +63,13 @@ func TestQLatin1StringViewFromQByteArray(t *testing.T) {
 	// Null QByteArray → null view.
 	qnull := NewQByteArray()
 	defer qnull.Close()
-	if !QLatin1StringViewFromQByteArray(qnull).IsNull() {
+	if !NewQLatin1StringViewFromQByteArray(qnull).IsNull() {
 		t.Fatal("FromQByteArray(null) must be null view")
 	}
 }
 
 func TestQLatin1StringViewAtFrontBack(t *testing.T) {
-	v := QLatin1StringViewFromString("abc")
+	v := NewQLatin1StringViewFromString("abc")
 
 	if v.At(0) != NewQLatin1Char('a') {
 		t.Fatalf("At(0): %#x", uint8(v.At(0)))
@@ -83,7 +83,7 @@ func TestQLatin1StringViewAtFrontBack(t *testing.T) {
 }
 
 func TestQLatin1StringViewSlicing(t *testing.T) {
-	v := QLatin1StringViewFromString("the quick brown fox")
+	v := NewQLatin1StringViewFromString("the quick brown fox")
 
 	check := func(name string, got QLatin1StringView, want string) {
 		t.Helper()
@@ -103,14 +103,14 @@ func TestQLatin1StringViewSlicing(t *testing.T) {
 }
 
 func TestQLatin1StringViewTrimmed(t *testing.T) {
-	v := QLatin1StringViewFromString("   hello   ").Trimmed()
+	v := NewQLatin1StringViewFromString("   hello   ").Trimmed()
 	if v.GoString() != "hello" {
 		t.Fatalf("Trimmed: %q", v.GoString())
 	}
 }
 
 func TestQLatin1StringViewSearchView(t *testing.T) {
-	v := QLatin1StringViewFromString("a,b,c,,d")
+	v := NewQLatin1StringViewFromString("a,b,c,,d")
 
 	if v.IndexOfQChar(NewQChar(','), 0, true) != 1 {
 		t.Fatalf("IndexOfQChar(','): %d", v.IndexOfQChar(NewQChar(','), 0, true))
@@ -122,21 +122,21 @@ func TestQLatin1StringViewSearchView(t *testing.T) {
 		t.Fatalf("CountQChar(','): %d", v.CountQChar(NewQChar(','), true))
 	}
 
-	if !v.ContainsView(QLatin1StringViewFromString("b,c"), true) {
+	if !v.ContainsView(NewQLatin1StringViewFromString("b,c"), true) {
 		t.Fatal("ContainsView(b,c)")
 	}
-	if v.IndexOfView(QLatin1StringViewFromString("zz"), 0, true) != -1 {
+	if v.IndexOfView(NewQLatin1StringViewFromString("zz"), 0, true) != -1 {
 		t.Fatal("missing needle found")
 	}
-	if !v.StartsWithView(QLatin1StringViewFromString("a,"), true) ||
-		!v.EndsWithView(QLatin1StringViewFromString("d"), true) {
+	if !v.StartsWithView(NewQLatin1StringViewFromString("a,"), true) ||
+		!v.EndsWithView(NewQLatin1StringViewFromString("d"), true) {
 
 		t.Fatal("StartsWithView/EndsWithView")
 	}
 }
 
 func TestSearchQStringView(t *testing.T) {
-	v := QLatin1StringViewFromString("a,b,c,,d")
+	v := NewQLatin1StringViewFromString("a,b,c,,d")
 
 	// QStringView interop: search for "," as UTF-16 code unit.
 	sv := QStringViewFromUtf16(utf16.Encode([]rune(",")))
@@ -159,9 +159,9 @@ func TestSearchQStringView(t *testing.T) {
 }
 
 func TestQLatin1StringViewCompare(t *testing.T) {
-	a := QLatin1StringViewFromString("hello")
-	b := QLatin1StringViewFromString("hello")
-	c := QLatin1StringViewFromString("world")
+	a := NewQLatin1StringViewFromString("hello")
+	b := NewQLatin1StringViewFromString("hello")
+	c := NewQLatin1StringViewFromString("world")
 
 	if a.CompareView(b, true) != 0 {
 		t.Fatal("equal views must compare 0")
@@ -176,7 +176,7 @@ func TestQLatin1StringViewCompare(t *testing.T) {
 }
 
 func TestCompareQStringView(t *testing.T) {
-	a := QLatin1StringViewFromString("hello")
+	a := NewQLatin1StringViewFromString("hello")
 	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	if a.CompareQStringView(sv, true) != 0 {
 		t.Fatal("CompareQStringView equal views must compare 0")
@@ -184,7 +184,7 @@ func TestCompareQStringView(t *testing.T) {
 }
 
 func TestQLatin1StringViewCaseInsensitive(t *testing.T) {
-	v := QLatin1StringViewFromString("Hello, World!")
+	v := NewQLatin1StringViewFromString("Hello, World!")
 
 	if v.IndexOfQChar(NewQChar('w'), 0, true) != -1 {
 		t.Fatal("case-sensitive IndexOf('w') must be -1")
@@ -195,21 +195,21 @@ func TestQLatin1StringViewCaseInsensitive(t *testing.T) {
 }
 
 func TestQLatin1StringViewNumeric(t *testing.T) {
-	v := QLatin1StringViewFromString("42")
+	v := NewQLatin1StringViewFromString("42")
 	if r, ok := v.ToInt(10); !ok || r != 42 {
 		t.Fatalf("ToInt: %d %v", r, ok)
 	}
-	if _, ok := QLatin1StringViewFromString("x").ToInt(10); ok {
+	if _, ok := NewQLatin1StringViewFromString("x").ToInt(10); ok {
 		t.Fatal("ToInt should fail")
 	}
-	if r, ok := QLatin1StringViewFromString("3.14").ToDouble(); !ok || r < 3.13 || r > 3.15 {
+	if r, ok := NewQLatin1StringViewFromString("3.14").ToDouble(); !ok || r < 3.13 || r > 3.15 {
 		t.Fatalf("ToDouble: %f %v", r, ok)
 	}
 }
 
 func TestQLatin1StringViewToUtf8(t *testing.T) {
 	// Latin-1 bytes 0x68 0xE9 0x6C 0x6C 0x6F → "héllo" in UTF-8 (6 bytes).
-	v := QLatin1StringViewFromBytes([]byte{0x68, 0xE9, 0x6C, 0x6C, 0x6F})
+	v := NewQLatin1StringViewFromBytes([]byte{0x68, 0xE9, 0x6C, 0x6C, 0x6F})
 	u := v.ToUtf8()
 	defer u.Close()
 
@@ -219,7 +219,7 @@ func TestQLatin1StringViewToUtf8(t *testing.T) {
 }
 
 func TestQLatin1StringViewMutatorsInPlace(t *testing.T) {
-	v := QLatin1StringViewFromString("abcdef")
+	v := NewQLatin1StringViewFromString("abcdef")
 
 	v.Chop(2)
 	if v.GoString() != "abcd" {
@@ -237,7 +237,7 @@ func TestQLatin1StringViewMutatorsInPlace(t *testing.T) {
 
 func TestQLatin1StringAlias(t *testing.T) {
 	// Compile-time check: QLatin1String and QLatin1StringView are the same type.
-	var a QLatin1String = QLatin1StringViewFromString("abc")
+	var a QLatin1String = NewQLatin1StringViewFromString("abc")
 	var b QLatin1StringView = a
 	if b.GoString() != "abc" {
 		t.Fatalf("alias: %q", b.GoString())
@@ -246,7 +246,7 @@ func TestQLatin1StringAlias(t *testing.T) {
 
 func TestQLatin1StringViewBytesCopyIndependent(t *testing.T) {
 	b := []byte("hello")
-	v := QLatin1StringViewFromBytes(b)
+	v := NewQLatin1StringViewFromBytes(b)
 
 	out := v.Bytes()
 	out[0] = 'X'

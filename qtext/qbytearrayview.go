@@ -59,9 +59,6 @@ type QByteArrayView struct {
 
 // ---- construction --------------------------------------------------------
 
-// Empty returns a null QByteArrayView (matches QByteArrayView()).
-func EmptyQByteArrayView() QByteArrayView { return QByteArrayView{} }
-
 // NewUnsafe builds a view directly from a raw pointer and size.
 // The caller is solely responsible for keeping the underlying data alive
 // and unmutated for as long as the view (or any of its slices) is used.
@@ -75,9 +72,9 @@ func NewUnsafe(data unsafe.Pointer, size int) QByteArrayView {
 // FromBytes returns a view over b. The Go slice b is kept alive by the view;
 // mutations of b (e.g. b[0] = x) are visible through the view — same semantics
 // as Qt QByteArrayView.
-func QByteArrayViewFromBytes(b []byte) QByteArrayView {
+func NewQByteArrayViewFromBytes(b []byte) QByteArrayView {
 	if len(b) == 0 {
-		return EmptyQByteArrayView()
+		return QByteArrayView{}
 	}
 	return QByteArrayView{
 		data:      unsafe.Pointer(&b[0]),
@@ -88,9 +85,9 @@ func QByteArrayViewFromBytes(b []byte) QByteArrayView {
 
 // FromString returns a view over the bytes of s.
 // Go strings are immutable, so the view is effectively read-only.
-func QByteArrayViewFromString(s string) QByteArrayView {
+func NewQByteArrayViewFromString(s string) QByteArrayView {
 	if len(s) == 0 {
-		return EmptyQByteArrayView()
+		return QByteArrayView{}
 	}
 	return QByteArrayView{
 		data:      unsafe.Pointer(unsafe.StringData(s)),
@@ -111,9 +108,9 @@ func QByteArrayViewFromString(s string) QByteArrayView {
 //     mutate/Close q.
 //
 // For a lifetime-independent snapshot, use q.ToByteArray() instead.
-func QByteArrayViewFromQByteArray(q *QByteArray) QByteArrayView {
+func NewQByteArrayViewFromQByteArray(q *QByteArray) QByteArrayView {
 	if q == nil || q.IsNull() {
-		return EmptyQByteArrayView()
+		return QByteArrayView{}
 	}
 	return QByteArrayView{
 		data:      q.ConstDataUnsafe(),
@@ -124,19 +121,17 @@ func QByteArrayViewFromQByteArray(q *QByteArray) QByteArrayView {
 
 func NewQByteArrayView(arg ...any) QByteArrayView {
 	if len(arg) == 0 || arg[0] == nil {
-		return EmptyQByteArrayView()
+		// Empty returns a null QByteArrayView (matches QByteArrayView()).
+		return QByteArrayView{}
 	}
 
-	switch arg[0].(type) {
+	switch b := arg[0].(type) {
 		case string:
-			return QByteArrayViewFromString(arg[0].(string))
+			return NewQByteArrayViewFromString(b)
 		case []byte:
-			return QByteArrayViewFromBytes(arg[0].([]byte))
-		case QByteArray:
-			ba := arg[0].(QByteArray)
-			return QByteArrayViewFromQByteArray(&ba)
+			return NewQByteArrayViewFromBytes(b)
 		case *QByteArray:
-			return QByteArrayViewFromQByteArray(arg[0].(*QByteArray))
+			return NewQByteArrayViewFromQByteArray(b)
 	}
 
 	panic("NewQByteArrayView invalid argumentes")

@@ -159,7 +159,7 @@ func TestQUtf8StringViewCompareQStringView(t *testing.T) {
 
 func TestQUtf8StringViewCompareQLatin1StringView(t *testing.T) {
 	v := NewQUtf8StringView("hello")
-	l1 := QLatin1StringViewFromString("hello")
+	l1 := NewQLatin1StringViewFromString("hello")
 
 	if v.CompareQLatin1StringView(l1, true) != 0 {
 		t.Fatal("CompareQLatin1StringView equal")

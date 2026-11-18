@@ -53,9 +53,6 @@ type QLatin1String = QLatin1StringView
 
 // ---- construction --------------------------------------------------------
 
-// Empty returns a null QLatin1StringView (matches QLatin1StringView()).
-func EmptyQLatin1StringView() QLatin1StringView { return QLatin1StringView{} }
-
 // NewUnsafe builds a view directly from a raw Latin-1 byte pointer and size.
 // Caller is solely responsible for keeping the underlying data alive and
 // unmutated for as long as the view (or any of its slices) is used.
@@ -72,7 +69,7 @@ func NewQLatin1StringViewUnsafe(data unsafe.Pointer, size int) QLatin1StringView
 // FromBytes returns a view over b interpreted as raw Latin-1 bytes.
 // The Go slice is kept alive by the view; mutations of b are visible
 // through the view.
-func QLatin1StringViewFromBytes(b []byte) QLatin1StringView {
+func NewQLatin1StringViewFromBytes(b []byte) QLatin1StringView {
 	if len(b) == 0 {
 		return QLatin1StringView{}
 	}
@@ -90,7 +87,7 @@ func QLatin1StringViewFromBytes(b []byte) QLatin1StringView {
 //
 // For proper UTF-8 → Latin-1 transcoding, encode manually or wait for
 // the qstring package.
-func QLatin1StringViewFromString(s string) QLatin1StringView {
+func NewQLatin1StringViewFromString(s string) QLatin1StringView {
 	if len(s) == 0 {
 		return QLatin1StringView{}
 	}
@@ -104,7 +101,7 @@ func QLatin1StringViewFromString(s string) QLatin1StringView {
 // FromQByteArray returns a zero-copy view into q's internal buffer,
 // interpreting the bytes as Latin-1. The view keeps q alive. Do NOT
 // mutate or Close q while the view exists.
-func QLatin1StringViewFromQByteArray(q *QByteArray) QLatin1StringView {
+func NewQLatin1StringViewFromQByteArray(q *QByteArray) QLatin1StringView {
 	if q == nil || q.IsNull() {
 		return QLatin1StringView{}
 	}
@@ -113,6 +110,24 @@ func QLatin1StringViewFromQByteArray(q *QByteArray) QLatin1StringView {
 		size:      q.Size(),
 		keepAlive: q,
 	}
+}
+
+func NewQLatin1StringView(arg ...any) QLatin1StringView {
+	if len(arg) == 0 || arg[0] == nil {
+		// Empty returns a null QLatin1StringView (matches QLatin1StringView()).
+		return QLatin1StringView{}
+	}
+
+	switch s := arg[0].(type) {
+	case []byte:
+		return NewQLatin1StringViewFromBytes(s)
+	case string:
+		return NewQLatin1StringViewFromString(s)
+	case *QByteArray:
+		return NewQLatin1StringViewFromQByteArray(s)
+	}
+
+	panic("NewQLatin1StringView invalid argumentes")
 }
 
 // ---- accessors -----------------------------------------------------------

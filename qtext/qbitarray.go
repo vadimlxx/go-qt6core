@@ -61,9 +61,9 @@ func finalizeQBitArray(a *QBitArray) {
 
 // ---- construction --------------------------------------------------------
 
-// New returns an empty (null and empty) QBitArray. Mirrors QBitArray().
 func NewQBitArray(arg ...any) *QBitArray {
 	if len(arg) == 0 || arg[0] == nil {
+		// New returns an empty (null and empty) QBitArray. Mirrors QBitArray().
 		return wrapQBitArray(C.qbitarray_new_empty())
 	}
 

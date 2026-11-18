@@ -56,7 +56,7 @@ func TestQAnyStringViewFromQStringView(t *testing.T) {
 }
 
 func TestQAnyStringViewFromQLatin1StringView(t *testing.T) {
-	l1 := QLatin1StringViewFromBytes([]byte{'h', 0xE9, 'l', 'l', 'o'}) // "héllo" in Latin-1
+	l1 := NewQLatin1StringViewFromBytes([]byte{'h', 0xE9, 'l', 'l', 'o'}) // "héllo" in Latin-1
 	v := NewQAnyStringView(l1)
 	if v.Kind() != KindLatin1 || v.Size() != 5 || v.SizeBytes() != 5 {
 		t.Fatalf("kind=%v size=%d sizeBytes=%d", v.Kind(), v.Size(), v.SizeBytes())

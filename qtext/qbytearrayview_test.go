@@ -6,7 +6,7 @@ import (
 )
 
 func TestEmptyQByteArrayView(t *testing.T) {
-	v := EmptyQByteArrayView()
+	v := NewQByteArrayView()
 	if !v.IsNull() || !v.IsEmpty() || v.Size() != 0 {
 		t.Fatalf("Empty: null=%v empty=%v size=%d", v.IsNull(), v.IsEmpty(), v.Size())
 	}

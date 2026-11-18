@@ -134,8 +134,31 @@ func (q *QRegularExpression) Close() {
 	}
 }
 
-func NewQRegularExpression() *QRegularExpression {
-	return wrapQRegularExpression(unsafe.Pointer(C.qregexp_new()))
+func NewQRegularExpression(arg ...any) *QRegularExpression {
+	if len(arg) == 0 || arg[0] == nil {
+		return wrapQRegularExpression(unsafe.Pointer(C.qregexp_new()))
+	}
+
+	if len(arg) == 1 {
+		re, ok := arg[0].(*QRegularExpression)
+		if ok {
+			return re.Clone()
+		}
+	}
+
+	if len(arg) == 2 {
+		opt, ok := arg[1].(PatternOption)
+		if ok {
+			switch s := arg[1].(type) {
+			case *QString:
+				return NewQRegularExpressionFromPattern(s, opt)
+			case string:
+				return NewQRegularExpressionFromString(s, opt)
+			}
+		}
+	}
+
+	panic("NewQRegularExpression invalid argumentes")
 }
 
 func NewQRegularExpressionFromPattern(pattern *QString, options PatternOption) *QRegularExpression {
