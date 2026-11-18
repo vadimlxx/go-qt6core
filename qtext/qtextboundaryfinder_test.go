@@ -17,7 +17,7 @@ func TestQTextBoundaryFinderDefault(t *testing.T) {
 func TestQTextBoundaryFinderFromQString(t *testing.T) {
 	s := QStringFromString("hello world")
 	defer s.Close()
-	f := QTextBoundaryFinderFromString(Word, s)
+	f := QTextBoundaryFinderFromQString(Word, s)
 	defer f.Close()
 	if !f.IsValid() {
 		t.Fatal("expected valid finder")
@@ -32,8 +32,8 @@ func TestQTextBoundaryFinderFromQString(t *testing.T) {
 	}
 }
 
-func TestQTextBoundaryFinderFromGoString(t *testing.T) {
-	f := QTextBoundaryFinderFromGoString(Grapheme, "héllo")
+func TestQTextBoundaryFinderFromString(t *testing.T) {
+	f := QTextBoundaryFinderFromString(Grapheme, "héllo")
 	defer f.Close()
 	if !f.IsValid() {
 		t.Fatal("expected valid finder")
@@ -58,7 +58,7 @@ func TestQTextBoundaryFinderFromView(t *testing.T) {
 func TestQTextBoundaryFinderClone(t *testing.T) {
 	s := QStringFromString("ab cd")
 	defer s.Close()
-	f := QTextBoundaryFinderFromString(Word, s)
+	f := QTextBoundaryFinderFromQString(Word, s)
 	defer f.Close()
 
 	f.ToNextBoundary() // now at pos 2 ("ab")
@@ -73,8 +73,8 @@ func TestQTextBoundaryFinderClone(t *testing.T) {
 }
 
 func TestQTextBoundaryFinderSwap(t *testing.T) {
-	a := QTextBoundaryFinderFromGoString(Word, "ab cd")
-	b := QTextBoundaryFinderFromGoString(Line, "xy z")
+	a := QTextBoundaryFinderFromString(Word, "ab cd")
+	b := QTextBoundaryFinderFromString(Line, "xy z")
 	defer a.Close()
 	defer b.Close()
 	a.Swap(b)
@@ -88,7 +88,7 @@ func TestQTextBoundaryFinderSwap(t *testing.T) {
 func TestQTextBoundaryFinderToStartToEnd(t *testing.T) {
 	s := QStringFromString("hello")
 	defer s.Close()
-	f := QTextBoundaryFinderFromString(Word, s)
+	f := QTextBoundaryFinderFromQString(Word, s)
 	defer f.Close()
 
 	f.ToStart()
@@ -102,7 +102,7 @@ func TestQTextBoundaryFinderToStartToEnd(t *testing.T) {
 }
 
 func TestQTextBoundaryFinderSetPosition(t *testing.T) {
-	f := QTextBoundaryFinderFromGoString(Word, "hello world")
+	f := QTextBoundaryFinderFromString(Word, "hello world")
 	defer f.Close()
 	f.SetPosition(3)
 	if f.Position() != 3 {
@@ -111,7 +111,7 @@ func TestQTextBoundaryFinderSetPosition(t *testing.T) {
 }
 
 func TestQTextBoundaryFinderNextPrevBoundary(t *testing.T) {
-	f := QTextBoundaryFinderFromGoString(Word, "a bb ccc")
+	f := QTextBoundaryFinderFromString(Word, "a bb ccc")
 	defer f.Close()
 	f.ToStart()
 
@@ -147,7 +147,7 @@ func TestQTextBoundaryFinderNextPrevBoundary(t *testing.T) {
 // ---- predicates ----------------------------------------------------------
 
 func TestQTextBoundaryFinderIsAtBoundary(t *testing.T) {
-	f := QTextBoundaryFinderFromGoString(Word, "a b")
+	f := QTextBoundaryFinderFromString(Word, "a b")
 	defer f.Close()
 
 	f.ToStart()
@@ -161,7 +161,7 @@ func TestQTextBoundaryFinderIsAtBoundary(t *testing.T) {
 }
 
 func TestQTextBoundaryFinderBoundaryReasons(t *testing.T) {
-	f := QTextBoundaryFinderFromGoString(Word, "abc\ndef")
+	f := QTextBoundaryFinderFromString(Word, "abc\ndef")
 	defer f.Close()
 
 	f.ToStart()

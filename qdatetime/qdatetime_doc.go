@@ -3,9 +3,7 @@
 // This file documents QDate, QTime, and QDateTime. For other classes in the same package,
 // see their dedicated files:
 //
-//   - qlocale_doc.go      — QLocale
 //   - qcalendar_doc.go    — QCalendar
-//   - qinternal_doc.go    — QInternal, QKeyCombination
 //
 // # QDate
 //

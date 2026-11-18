@@ -34,7 +34,7 @@ func TestQUuidFromUint32(t *testing.T) {
 
 func TestQUuidStringRoundTrip(t *testing.T) {
 	const src = "12345678-9abc-def0-1234-56789abcdef0"
-	q := NewQUuidFromString(src)
+	q := NewQUuid(src)
 	defer q.Close()
 	if q.IsNull() {
 		t.Fatal("parse failed")

@@ -62,8 +62,27 @@ func finalizeQBitArray(a *QBitArray) {
 // ---- construction --------------------------------------------------------
 
 // New returns an empty (null and empty) QBitArray. Mirrors QBitArray().
-func NewQBitArray() *QBitArray {
-	return wrapQBitArray(C.qbitarray_new_empty())
+func NewQBitArray(arg ...any) *QBitArray {
+	if len(arg) == 0 || arg[0] == nil {
+		return wrapQBitArray(C.qbitarray_new_empty())
+	}
+
+	if len(arg) == 1 {
+		b, ok := arg[0].(*QBitArray)
+		if ok {
+			return b.Clone()
+		}
+	}
+
+	if len(arg) == 2 {
+		size, ok1 := arg[0].(int)
+		val, ok2 := arg[1].(bool)
+		if ok1 && ok2 {
+			return NewQBitArraySized(size, val)
+		}
+	}
+
+	panic("NewQBitArray invalid argument")
 }
 
 // NewSized returns a QBitArray of the given size, with all bits initialized to val.

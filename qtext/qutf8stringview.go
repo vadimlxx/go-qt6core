@@ -126,21 +126,15 @@ func NewQUtf8StringView(arg ...any) QUtf8StringView {
 		return QUtf8StringView{}
 	}
 
-	switch arg[0].(type) {
+	switch s := arg[0].(type) {
 	case []byte:
-		return QUtf8StringViewFromBytes(arg[0].([]byte))
+		return QUtf8StringViewFromBytes(s)
 	case string:
-		return QUtf8StringViewFromString(arg[0].(string))
-	case QByteArray:
-		ba := arg[0].(QByteArray)
-		return QUtf8StringViewFromQByteArray(&ba)
+		return QUtf8StringViewFromString(s)
 	case *QByteArray:
-		return QUtf8StringViewFromQByteArray(arg[0].(*QByteArray))
-	case QString:
-		s := arg[0].(QString)
-		return QUtf8StringViewFromQString(&s)
+		return QUtf8StringViewFromQByteArray(s)
 	case *QString:
-		return QUtf8StringViewFromQString(arg[0].(*QString))
+		return QUtf8StringViewFromQString(s)
 	}
 
 	panic("NewQUtf8StringView invalid argumentes")

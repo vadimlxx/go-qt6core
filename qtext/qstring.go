@@ -1,8 +1,6 @@
 package qtext
 
 /*
- Краткое описание реализации:
-
    QString — handle над C++ QString; владение через finalizer + Close().
    Мутирующие методы идут напрямую в C++ (COW detach — внутри Qt). Строки
    Go и []byte передаются как UTF-8 через unsafe.StringData / &b[0] без

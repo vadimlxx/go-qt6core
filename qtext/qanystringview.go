@@ -127,26 +127,23 @@ func QAnyStringViewFromQStringView(v QStringView) QAnyStringView {
 }
 
 func NewQAnyStringView(arg ...any) QAnyStringView {
-	if len(arg) == 0 {
+	if len(arg) == 0 || arg[0] == nil {
 		return EmptyQAnyStringView()
 	}
 
-	switch arg[0].(type) {
+	switch s := arg[0].(type) {
 	case []byte:
-		return QAnyStringViewFromBytes(arg[0].([]byte))
+		return QAnyStringViewFromBytes(s)
 	case string:
-		return QAnyStringViewFromString(arg[0].(string))
-	case QByteArray:
-		ba := arg[0].(QByteArray)
-		return QAnyStringViewFromQByteArray(&ba)
+		return QAnyStringViewFromString(s)
 	case *QByteArray:
-		return QAnyStringViewFromQByteArray(arg[0].(*QByteArray))
+		return QAnyStringViewFromQByteArray(s)
 	case QUtf8StringView:
-		return QAnyStringViewFromQUtf8StringView(arg[0].(QUtf8StringView))
+		return QAnyStringViewFromQUtf8StringView(s)
 	case QLatin1StringView:
-		return QAnyStringViewFromQLatin1StringView(arg[0].(QLatin1StringView))
+		return QAnyStringViewFromQLatin1StringView(s)
 	case QStringView:
-		return QAnyStringViewFromQStringView(arg[0].(QStringView))
+		return QAnyStringViewFromQStringView(s)
 	}
 
 	panic("NewQAnyStringView invalid argumentes")

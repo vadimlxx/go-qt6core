@@ -93,8 +93,43 @@ func (q *QUuid) Close() {
 
 // NewQUuid returns a null UUID (all zero bytes).
 // Qt: QUuid().
-func NewQUuid() *QUuid {
-	return wrapQUuid(unsafe.Pointer(C.quuid_new_empty()))
+func NewQUuid(arg ...any) *QUuid {
+	if len(arg) == 0 || arg[0] == nil {
+		return wrapQUuid(unsafe.Pointer(C.quuid_new_empty()))
+	}
+
+	if len(arg) == 1 {
+		switch s := arg[0].(type) {
+		case string:
+			return NewQUuidFromString(s)
+		case *qtext.QString:
+			return NewQUuidFromQString(s)
+		case []byte:
+			return NewQUuidFromRfc4122(s)
+		case *QUuid:
+			return s.Clone()
+		}
+	}
+
+	if len(arg) == 11 {
+		l,  ok1 := arg[0].(uint32)
+		w1, ok2 := arg[1].(uint16)
+		w2, ok3 := arg[2].(uint16)
+		b1, ok4 := arg[3].(uint8)
+		b2, ok5 := arg[4].(uint8)
+		b3, ok6 := arg[5].(uint8)
+		b4, ok7 := arg[6].(uint8)
+		b5, ok8 := arg[7].(uint8)
+		b6, ok9 := arg[8].(uint8)
+		b7, ok10 := arg[9].(uint8)
+		b8, ok11 := arg[10].(uint8)
+
+		if ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 {
+			return NewQUuidFromUint32(l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8)
+		}
+	}
+
+	panic("NewQUuid invalid argument")
 }
 
 // NewQUuidFromUint32 builds a QUuid from the individual fields.

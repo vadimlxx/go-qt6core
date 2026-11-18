@@ -1,7 +1,6 @@
 // Package qdatetime provides Go bindings for Qt 6.11 QtCore date/time-related types.
 //
 // Currently supported:
-//   - QLocale  (handle-based; COW via QSharedDataPointer)
 //   - QCalendar (VALUE-based; trivially copyable struct with a single pointer)
 //
 // # Value semantics (QCalendar)

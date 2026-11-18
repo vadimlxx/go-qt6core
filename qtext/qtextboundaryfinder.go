@@ -90,13 +90,39 @@ func (q *QTextBoundaryFinder) Close() {
 
 // NewQTextBoundaryFinder returns a default-constructed (invalid) finder.
 // Qt: QTextBoundaryFinder() — default constructor; isValid() returns false.
-func NewQTextBoundaryFinder() *QTextBoundaryFinder {
-	return wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_empty()))
+func NewQTextBoundaryFinder(arg ...any) *QTextBoundaryFinder {
+	if len(arg) == 0 || arg[0] == nil {
+		return wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_empty()))
+	}
+
+	if len(arg) == 1 {
+		b, ok := arg[0].(*QTextBoundaryFinder)
+		if ok {
+			return b.Clone()
+		}
+	}
+
+	if len(arg) == 2 {
+		t, ok := arg[0].(BoundaryType)
+
+		if ok {
+			switch s := arg[1].(type) {
+			case string:
+				return QTextBoundaryFinderFromString(t, s)
+			case *QString:
+				return QTextBoundaryFinderFromQString(t, s)
+			case QStringView:
+				return QTextBoundaryFinderFromView(t, s)
+			}
+		}
+	}
+
+	panic("NewQTextBoundaryFinder invalid argument")
 }
 
-// QTextBoundaryFinderFromString creates a finder for the given QString.
+// QTextBoundaryFinderFromQString creates a finder for the given QString.
 // Qt: QTextBoundaryFinder(BoundaryType, const QString&).
-func QTextBoundaryFinderFromString(t BoundaryType, s *QString) *QTextBoundaryFinder {
+func QTextBoundaryFinderFromQString(t BoundaryType, s *QString) *QTextBoundaryFinder {
 	if s == nil || s.p == nil {
 		return NewQTextBoundaryFinder()
 	}
@@ -105,12 +131,12 @@ func QTextBoundaryFinderFromString(t BoundaryType, s *QString) *QTextBoundaryFin
 	return q
 }
 
-// QTextBoundaryFinderFromGoString creates a finder for a Go string (UTF-8).
+// QTextBoundaryFinderFromString creates a finder for a Go string (UTF-8).
 // Qt: QTextBoundaryFinder(BoundaryType, const QString&) — with QString::fromUtf8.
-func QTextBoundaryFinderFromGoString(t BoundaryType, s string) *QTextBoundaryFinder {
+func QTextBoundaryFinderFromString(t BoundaryType, s string) *QTextBoundaryFinder {
 	qs := QStringFromString(s)
 	defer qs.Close()
-	return QTextBoundaryFinderFromString(t, qs)
+	return QTextBoundaryFinderFromQString(t, qs)
 }
 
 // QTextBoundaryFinderFromView creates a finder over the given QStringView.
