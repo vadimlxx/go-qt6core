@@ -97,10 +97,10 @@ func (q *QStringList) Close() {
 // QStringListFromQString returns a QStringList with a single element.
 // Qt: QStringList(const QString&) — explicit constructor.
 func QStringListFromQString(s *QString) *QStringList {
-	if s == nil || s.p == nil {
+	if s == nil || s.handle() == nil {
 		return NewQStringList()
 	}
-	q := wrapQStringList(unsafe.Pointer(C.qstringlist_new_from_string(s.p)))
+	q := wrapQStringList(unsafe.Pointer(C.qstringlist_new_from_string(s.handle())))
 	runtime.KeepAlive(s)
 	return q
 }
@@ -108,7 +108,7 @@ func QStringListFromQString(s *QString) *QStringList {
 // QStringListFromGoString returns a QStringList with a single element from s (UTF-8).
 // Qt: QStringList(const QString&) — with QString constructed via fromUtf8.
 func QStringListFromGoString(s string) *QStringList {
-	qs := QStringFromString(s)
+	qs := NewQStringFromString(s)
 	defer qs.Close()
 	return QStringListFromQString(qs)
 }
@@ -122,8 +122,9 @@ func QStringListFromQStrings(items []*QString) *QStringList {
 	}
 	cArr := make([]*C.QString, n)
 	for i, s := range items {
-		if s != nil && s.p != nil {
-			cArr[i] = s.p
+		if s != nil {
+			p := s.handle()
+			if p != nil { cArr[i] = p }
 		}
 	}
 	q := wrapQStringList(unsafe.Pointer(C.qstringlist_from_array(
@@ -141,7 +142,7 @@ func QStringListFromGoStrings(items []string) *QStringList {
 	}
 	qs := make([]*QString, n)
 	for i, s := range items {
-		qs[i] = QStringFromString(s)
+		qs[i] = NewQStringFromString(s)
 	}
 	out := QStringListFromQStrings(qs)
 	for _, s := range qs {
@@ -231,7 +232,7 @@ func (q *QStringList) SetAt(i int, s *QString) {
 	if i < 0 || i >= q.Size() {
 		panic("qstringlist: SetAt out of range")
 	}
-	C.qstringlist_set_at(q.p, C.ptrdiff_t(i), s.p)
+	C.qstringlist_set_at(q.p, C.ptrdiff_t(i), s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -283,14 +284,14 @@ func (q *QStringList) ToSlice() []*QString {
 // Append adds s to the end of the list.
 // Qt: QStringList::operator<<(const QString&) / QList<QString>::append(const QString&).
 func (q *QStringList) Append(s *QString) {
-	C.qstringlist_append(q.p, s.p)
+	C.qstringlist_append(q.p, s.handle())
 	runtime.KeepAlive(s)
 }
 
 // AppendGoString adds a Go string (UTF-8) to the end of the list.
 // Qt: QStringList::operator<<(const QString&) — with QString::fromUtf8.
 func (q *QStringList) AppendGoString(s string) {
-	qs := QStringFromString(s)
+	qs := NewQStringFromString(s)
 	defer qs.Close()
 	q.Append(qs)
 }
@@ -307,7 +308,7 @@ func (q *QStringList) AppendList(other *QStringList) {
 // Prepend inserts s at the beginning of the list.
 // Qt: QList<QString>::prepend(const QString&).
 func (q *QStringList) Prepend(s *QString) {
-	C.qstringlist_prepend(q.p, s.p)
+	C.qstringlist_prepend(q.p, s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -317,7 +318,7 @@ func (q *QStringList) Insert(i int, s *QString) {
 	if i < 0 || i > q.Size() {
 		panic("qstringlist: Insert out of range")
 	}
-	C.qstringlist_insert(q.p, C.ptrdiff_t(i), s.p)
+	C.qstringlist_insert(q.p, C.ptrdiff_t(i), s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -389,7 +390,7 @@ func (q *QStringList) RemoveDuplicates() int {
 // JoinString joins all elements with sep.
 // Qt: QStringList::join(const QString&).
 func (q *QStringList) JoinString(sep *QString) *QString {
-	r := wrapQString(unsafe.Pointer(C.qstringlist_join_qstring(q.p, sep.p)))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_join_qstring(q.p, sep.handle())))
 	runtime.KeepAlive(sep)
 	return r
 }
@@ -397,7 +398,7 @@ func (q *QStringList) JoinString(sep *QString) *QString {
 // JoinGoString joins all elements with sep (UTF-8).
 // Qt: QStringList::join(const QString&) — with QString::fromUtf8.
 func (q *QStringList) JoinGoString(sep string) *QString {
-	qs := QStringFromString(sep)
+	qs := NewQStringFromString(sep)
 	defer qs.Close()
 	return q.JoinString(qs)
 }
@@ -411,7 +412,7 @@ func (q *QStringList) JoinChar(sep QChar) *QString {
 // FilterString returns a new list with elements containing needle.
 // Qt: QStringList::filter(const QString&, Qt::CaseSensitivity).
 func (q *QStringList) FilterString(needle *QString, caseSensitive bool) *QStringList {
-	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qstring(q.p, needle.p, csInt(caseSensitive))))
+	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qstring(q.p, needle.handle(), csInt(caseSensitive))))
 	runtime.KeepAlive(needle)
 	return r
 }
@@ -419,7 +420,7 @@ func (q *QStringList) FilterString(needle *QString, caseSensitive bool) *QString
 // FilterGoString returns a new list with elements containing needle (UTF-8).
 // Qt: QStringList::filter(const QString&, Qt::CaseSensitivity) — with QString::fromUtf8.
 func (q *QStringList) FilterGoString(needle string, caseSensitive bool) *QStringList {
-	qs := QStringFromString(needle)
+	qs := NewQStringFromString(needle)
 	defer qs.Close()
 	return q.FilterString(qs, caseSensitive)
 }
@@ -427,10 +428,8 @@ func (q *QStringList) FilterGoString(needle string, caseSensitive bool) *QString
 // FilterQRegularExpression returns a new list with elements matching re.
 // Qt: QStringList::filter(const QRegularExpression&).
 func (q *QStringList) FilterQRegularExpression(re *QRegularExpression) *QStringList {
-	if re == nil || re.p == nil {
-		panic("qstringlist: FilterQRegularExpression nil regexp")
-	}
-	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qregexp(q.p, re.p)))
+	p := re.handle()
+	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qregexp(q.p, p)))
 	runtime.KeepAlive(re)
 	return r
 }
@@ -438,7 +437,7 @@ func (q *QStringList) FilterQRegularExpression(re *QRegularExpression) *QStringL
 // ReplaceInStringsString replaces every occurrence of before with after in each element.
 // Qt: QStringList::replaceInStrings(const QString&, const QString&, Qt::CaseSensitivity).
 func (q *QStringList) ReplaceInStringsString(before, after *QString, caseSensitive bool) {
-	C.qstringlist_replace_in_strings_qstring(q.p, before.p, after.p, csInt(caseSensitive))
+	C.qstringlist_replace_in_strings_qstring(q.p, before.handle(), after.handle(), csInt(caseSensitive))
 	runtime.KeepAlive(before)
 	runtime.KeepAlive(after)
 }
@@ -446,8 +445,8 @@ func (q *QStringList) ReplaceInStringsString(before, after *QString, caseSensiti
 // ReplaceInStringsGoString replaces every occurrence of before with after (UTF-8).
 // Qt: QStringList::replaceInStrings(const QString&, const QString&, Qt::CaseSensitivity).
 func (q *QStringList) ReplaceInStringsGoString(before, after string, caseSensitive bool) {
-	qsBefore := QStringFromString(before)
-	qsAfter := QStringFromString(after)
+	qsBefore := NewQStringFromString(before)
+	qsAfter := NewQStringFromString(after)
 	defer qsBefore.Close()
 	defer qsAfter.Close()
 	q.ReplaceInStringsString(qsBefore, qsAfter, caseSensitive)
@@ -456,10 +455,8 @@ func (q *QStringList) ReplaceInStringsGoString(before, after string, caseSensiti
 // ReplaceInStringsQRegularExpression replaces every match of re with after in each element.
 // Qt: QStringList::replaceInStrings(const QRegularExpression&, const QString&).
 func (q *QStringList) ReplaceInStringsQRegularExpression(re *QRegularExpression, after *QString) {
-	if re == nil || re.p == nil {
-		panic("qstringlist: ReplaceInStringsQRegularExpression nil regexp")
-	}
-	C.qstringlist_replace_in_strings_qregexp(q.p, re.p, after.p)
+	p := re.handle()
+	C.qstringlist_replace_in_strings_qregexp(q.p, p, after.handle())
 	runtime.KeepAlive(re)
 	runtime.KeepAlive(after)
 }
@@ -467,7 +464,7 @@ func (q *QStringList) ReplaceInStringsQRegularExpression(re *QRegularExpression,
 // ContainsQString reports whether the list contains s (comparing each element).
 // Qt: QStringList::contains(const QString&, Qt::CaseSensitivity).
 func (q *QStringList) ContainsQString(s *QString, caseSensitive bool) bool {
-	r := bool(C.qstringlist_contains_qstring(q.p, s.p, csInt(caseSensitive)))
+	r := bool(C.qstringlist_contains_qstring(q.p, s.handle(), csInt(caseSensitive)))
 	runtime.KeepAlive(s)
 	return r
 }
@@ -475,7 +472,7 @@ func (q *QStringList) ContainsQString(s *QString, caseSensitive bool) bool {
 // ContainsGoString reports whether the list contains s (UTF-8).
 // Qt: QStringList::contains(const QString&, Qt::CaseSensitivity).
 func (q *QStringList) ContainsGoString(s string, caseSensitive bool) bool {
-	qs := QStringFromString(s)
+	qs := NewQStringFromString(s)
 	defer qs.Close()
 	return q.ContainsQString(qs, caseSensitive)
 }
@@ -483,7 +480,7 @@ func (q *QStringList) ContainsGoString(s string, caseSensitive bool) bool {
 // IndexOfQString returns the index of the first element equal to s at or after from (or -1).
 // Qt: QStringList::indexOf(const QString&, qsizetype, Qt::CaseSensitivity).
 func (q *QStringList) IndexOfQString(s *QString, from int, caseSensitive bool) int {
-	r := C.qstringlist_index_of_qstring(q.p, s.p, C.ptrdiff_t(from), csInt(caseSensitive))
+	r := C.qstringlist_index_of_qstring(q.p, s.handle(), C.ptrdiff_t(from), csInt(caseSensitive))
 	runtime.KeepAlive(s)
 	return int(r)
 }
@@ -491,7 +488,7 @@ func (q *QStringList) IndexOfQString(s *QString, from int, caseSensitive bool) i
 // IndexOfGoString returns the index of the first element equal to s at or after from (or -1).
 // Qt: QStringList::indexOf(const QString&, qsizetype, Qt::CaseSensitivity).
 func (q *QStringList) IndexOfGoString(s string, from int, caseSensitive bool) int {
-	qs := QStringFromString(s)
+	qs := NewQStringFromString(s)
 	defer qs.Close()
 	return q.IndexOfQString(qs, from, caseSensitive)
 }
@@ -499,10 +496,7 @@ func (q *QStringList) IndexOfGoString(s string, from int, caseSensitive bool) in
 // IndexOfQRegularExpression returns the index of the first element matching re at or after from (or -1).
 // Qt: QStringList::indexOf(const QRegularExpression&, qsizetype).
 func (q *QStringList) IndexOfQRegularExpression(re *QRegularExpression, from int) int {
-	if re == nil || re.p == nil {
-		panic("qstringlist: IndexOfQRegularExpression nil regexp")
-	}
-	r := C.qstringlist_index_of_qregexp(q.p, re.p, C.ptrdiff_t(from))
+	r := C.qstringlist_index_of_qregexp(q.p, re.handle(), C.ptrdiff_t(from))
 	runtime.KeepAlive(re)
 	return int(r)
 }
@@ -510,7 +504,7 @@ func (q *QStringList) IndexOfQRegularExpression(re *QRegularExpression, from int
 // LastIndexOfQString returns the index of the last element equal to s at or before from (or -1).
 // Qt: QStringList::lastIndexOf(const QString&, qsizetype, Qt::CaseSensitivity).
 func (q *QStringList) LastIndexOfQString(s *QString, from int, caseSensitive bool) int {
-	r := C.qstringlist_last_index_of_qstring(q.p, s.p, C.ptrdiff_t(from), csInt(caseSensitive))
+	r := C.qstringlist_last_index_of_qstring(q.p, s.handle(), C.ptrdiff_t(from), csInt(caseSensitive))
 	runtime.KeepAlive(s)
 	return int(r)
 }
@@ -518,7 +512,7 @@ func (q *QStringList) LastIndexOfQString(s *QString, from int, caseSensitive boo
 // LastIndexOfGoString returns the index of the last element equal to s at or before from (or -1).
 // Qt: QStringList::lastIndexOf(const QString&, qsizetype, Qt::CaseSensitivity).
 func (q *QStringList) LastIndexOfGoString(s string, from int, caseSensitive bool) int {
-	qs := QStringFromString(s)
+	qs := NewQStringFromString(s)
 	defer qs.Close()
 	return q.LastIndexOfQString(qs, from, caseSensitive)
 }
@@ -526,10 +520,7 @@ func (q *QStringList) LastIndexOfGoString(s string, from int, caseSensitive bool
 // LastIndexOfQRegularExpression returns the index of the last element matching re at or before from (or -1).
 // Qt: QStringList::lastIndexOf(const QRegularExpression&, qsizetype).
 func (q *QStringList) LastIndexOfQRegularExpression(re *QRegularExpression, from int) int {
-	if re == nil || re.p == nil {
-		panic("qstringlist: LastIndexOfQRegularExpression nil regexp")
-	}
-	r := C.qstringlist_last_index_of_qregexp(q.p, re.p, C.ptrdiff_t(from))
+	r := C.qstringlist_last_index_of_qregexp(q.p, re.handle(), C.ptrdiff_t(from))
 	runtime.KeepAlive(re)
 	return int(r)
 }

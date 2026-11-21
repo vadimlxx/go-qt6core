@@ -27,7 +27,7 @@ func TestQStringBuilderEmpty(t *testing.T) {
 }
 
 func TestNewQStringBuilder(t *testing.T) {
-	qs := QStringFromString("world")
+	qs := NewQStringFromString("world")
 	defer qs.Close()
 
 	if qs.GoString() != "world" {
@@ -54,7 +54,7 @@ func TestQStringBuilderConcatStrings(t *testing.T) {
 
 func TestQStringBuilderConcatMixedFlavors(t *testing.T) {
 	// char is QByteArray-flavored, QString is QString-flavored → result QString.
-	qs := QStringFromString("world")
+	qs := NewQStringFromString("world")
 	defer qs.Close()
 	b := Concat(byte('A'), "hello, ", qs)
 	if !b.IsQStringFlavored() {
@@ -191,7 +191,7 @@ func TestQStringBuilderAppendPart(t *testing.T) {
 }
 
 func TestQStringBuilderAppendToQString(t *testing.T) {
-	q := QStringFromString("prefix: ")
+	q := NewQStringFromString("prefix: ")
 	defer q.Close()
 	b := Concat("a", "b", "c")
 	b.AppendToQString(q)

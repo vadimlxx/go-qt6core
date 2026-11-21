@@ -123,10 +123,10 @@ func NewQTextBoundaryFinder(arg ...any) *QTextBoundaryFinder {
 // QTextBoundaryFinderFromQString creates a finder for the given QString.
 // Qt: QTextBoundaryFinder(BoundaryType, const QString&).
 func QTextBoundaryFinderFromQString(t BoundaryType, s *QString) *QTextBoundaryFinder {
-	if s == nil || s.p == nil {
+	if s == nil || s.handle() == nil {
 		return NewQTextBoundaryFinder()
 	}
-	q := wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_from_qstring(C.int(t), s.p)))
+	q := wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_from_qstring(C.int(t), s.handle())))
 	runtime.KeepAlive(s)
 	return q
 }
@@ -134,7 +134,7 @@ func QTextBoundaryFinderFromQString(t BoundaryType, s *QString) *QTextBoundaryFi
 // QTextBoundaryFinderFromString creates a finder for a Go string (UTF-8).
 // Qt: QTextBoundaryFinder(BoundaryType, const QString&) — with QString::fromUtf8.
 func QTextBoundaryFinderFromString(t BoundaryType, s string) *QTextBoundaryFinder {
-	qs := QStringFromString(s)
+	qs := NewQStringFromString(s)
 	defer qs.Close()
 	return QTextBoundaryFinderFromQString(t, qs)
 }

@@ -18,7 +18,7 @@ func TestQStringEncoderDefaultInvalid(t *testing.T) {
 	}
 
 	// Encoding on an invalid encoder must return empty and set HasError.
-	q := QStringFromString("hello")
+	q := NewQStringFromString("hello")
 	defer q.Close()
 	out := e.Encode(q)
 	defer out.Close()
@@ -41,7 +41,7 @@ func TestQStringEncoderFromEncodingUtf8(t *testing.T) {
 		t.Fatalf("Name: %q", e.Name())
 	}
 
-	q := QStringFromString("héllo")
+	q := NewQStringFromString("héllo")
 	defer q.Close()
 	out := e.Encode(q)
 	defer out.Close()
@@ -83,7 +83,7 @@ func TestQStringEncoderEncodeLatin1(t *testing.T) {
 	defer e.Close()
 
 	// "héllo" — Latin1 encodes é as single byte 0xE9.
-	q := QStringFromString("héllo")
+	q := NewQStringFromString("héllo")
 	defer q.Close()
 	out := e.Encode(q)
 	defer out.Close()
@@ -193,7 +193,7 @@ func TestQStringEncoderEncodeMultipleChars(t *testing.T) {
 	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
-	q := QStringFromString("a😀b") // 😀 = U+1F600 = 2 UTF-16 units, 4 UTF-8 bytes
+	q := NewQStringFromString("a😀b") // 😀 = U+1F600 = 2 UTF-16 units, 4 UTF-8 bytes
 	defer q.Close()
 
 	out := e.Encode(q)
@@ -210,7 +210,7 @@ func TestQStringEncoderEncodeThenEncodeAgain(t *testing.T) {
 	defer e.Close()
 
 	for _, s := range []string{"hello", "world", "!"} {
-		q := QStringFromString(s)
+		q := NewQStringFromString(s)
 		out := e.Encode(q)
 		q.Close()
 		if !bytes.Equal(out.Bytes(), []byte(s)) {

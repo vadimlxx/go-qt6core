@@ -163,7 +163,7 @@ func (q *QUrlQuery) QueryString(encoding ComponentFormattingOptions) string {
 // Query returns the query as a QString.
 // Qt: QUrlQuery::query(ComponentFormattingOptions) const → QString.
 func (q *QUrlQuery) Query(encoding ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.QueryString(encoding))
+	return qtext.NewQString(q.QueryString(encoding))
 }
 
 // ToString returns the query as a Go string (alias of QueryString).
@@ -177,7 +177,7 @@ func (q *QUrlQuery) ToString(encoding ComponentFormattingOptions) string {
 // ToQString returns the query as a QString (alias of Query).
 // Qt: QUrlQuery::toString(ComponentFormattingOptions) const → QString.
 func (q *QUrlQuery) ToQString(encoding ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.ToString(encoding))
+	return qtext.NewQString(q.ToString(encoding))
 }
 
 // SetQueryQString replaces the query with the given QString.

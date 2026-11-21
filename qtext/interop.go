@@ -35,10 +35,10 @@ import "unsafe"
 // Borrowed: the caller does NOT own; qtext remains responsible for freeing.
 // The C++ object is valid until this wrapper is Close()d.
 func (q *QByteArray) UnsafePtr() unsafe.Pointer {
-	if q == nil || q.p == nil {
+	if q == nil || q.handle() == nil {
 		return nil
 	}
-	return unsafe.Pointer(q.p)
+	return unsafe.Pointer(q.handle())
 }
 
 func QByteArrayFromUnsafePtr(p unsafe.Pointer) *QByteArray {
@@ -51,7 +51,7 @@ func QByteArrayFromUnsafePtr(p unsafe.Pointer) *QByteArray {
 // Intended for zero-copy QByteArrayView construction. The caller must keep q
 // alive and unmutated for as long as the pointer is used.
 func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
-	return unsafe.Pointer(C.qbytearray_data(q.p))
+	return unsafe.Pointer(C.qbytearray_data(q.handle()))
 }
 
 // ---- QString -------------------------------------------------------------
@@ -60,10 +60,7 @@ func (q *QByteArray) ConstDataUnsafe() unsafe.Pointer {
 // Borrowed: the caller does NOT own; qtext remains responsible for freeing.
 // The C++ object is valid until this wrapper is Close()d.
 func (q *QString) UnsafePtr() unsafe.Pointer {
-	if q == nil || q.p == nil {
-		return nil
-	}
-	return unsafe.Pointer(q.p)
+	return unsafe.Pointer(q.handle())
 }
 
 func QStringFromUnsafePtr(p unsafe.Pointer) *QString {

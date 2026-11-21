@@ -4,7 +4,7 @@ import "testing"
 
 func TestQRegularExpressionMatch(t *testing.T) {
 	re := NewQRegularExpressionFromString(`(\d+)-(\d+)`, NoPatternOption)
-	subject := QStringFromString("abc 123-456 def")
+	subject := NewQStringFromString("abc 123-456 def")
 	m := re.MatchString(subject, 0, NormalMatch, NoMatchOption)
 	if !m.HasMatch() {
 		t.Fatal("expected match")
@@ -50,7 +50,7 @@ func TestQRegularExpressionMatchView(t *testing.T) {
 
 func TestQRegularExpressionMatchNamedGroup(t *testing.T) {
 	re := NewQRegularExpressionFromString(`(?<num>\d+)`, NoPatternOption)
-	subject := QStringFromString("abc 42 def")
+	subject := NewQStringFromString("abc 42 def")
 	m := re.MatchString(subject, 0, NormalMatch, NoMatchOption)
 	if !m.HasMatch() {
 		t.Fatal("expected match")
@@ -75,7 +75,7 @@ func TestQRegularExpressionMatchNamedGroup(t *testing.T) {
 
 func TestQRegularExpressionMatchNoMatch(t *testing.T) {
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
-	subject := QStringFromString("abc def")
+	subject := NewQStringFromString("abc def")
 	m := re.MatchString(subject, 0, NormalMatch, NoMatchOption)
 	if m.HasMatch() {
 		t.Fatal("expected no match")

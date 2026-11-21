@@ -4,7 +4,7 @@ import "testing"
 
 func TestQRegularExpressionGlobalMatch(t *testing.T) {
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
-	subject := QStringFromString("a1 b22 c333")
+	subject := NewQStringFromString("a1 b22 c333")
 	it := re.GlobalMatchString(subject, 0, NormalMatch, NoMatchOption)
 	if !it.IsValid() {
 		t.Fatal("invalid iterator")
@@ -41,7 +41,7 @@ func TestQRegularExpressionGlobalMatchView(t *testing.T) {
 
 func TestQRegularExpressionPeekNext(t *testing.T) {
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
-	subject := QStringFromString("a1 b2")
+	subject := NewQStringFromString("a1 b2")
 	it := re.GlobalMatchString(subject, 0, NormalMatch, NoMatchOption)
 	first := it.PeekNext()
 	if !first.HasMatch() {
@@ -62,7 +62,7 @@ func TestQRegularExpressionPeekNext(t *testing.T) {
 
 func TestQRegularExpressionIteratorMeta(t *testing.T) {
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
-	subject := QStringFromString("a1 b2")
+	subject := NewQStringFromString("a1 b2")
 	it := re.GlobalMatchString(subject, 0, NormalMatch, NoMatchOption)
 	if it.MatchType() != NormalMatch {
 		t.Fatalf("unexpected match type: %d", it.MatchType())

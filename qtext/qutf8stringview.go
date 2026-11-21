@@ -326,7 +326,7 @@ func (v QUtf8StringView) Compare(other QUtf8StringView, caseSensitive bool) int 
 }
 
 func (v QUtf8StringView) CompareQByteArray(other *QByteArray, caseSensitive bool) int {
-	r := C.qutf8stringview_compare_qbytearray((*C.char)(v.data), C.ptrdiff_t(v.size), other.p, csInt(caseSensitive))
+	r := C.qutf8stringview_compare_qbytearray((*C.char)(v.data), C.ptrdiff_t(v.size), other.handle(), csInt(caseSensitive))
 	runtime.KeepAlive(v)
 	runtime.KeepAlive(other)
 	return int(r)
@@ -371,7 +371,7 @@ func (v QUtf8StringView) Equal(other QUtf8StringView) bool {
 }
 
 func (v QUtf8StringView) EqualQByteArray(other *QByteArray) bool {
-	r := C.qutf8stringview_equal_qbytearray((*C.char)(v.data), C.ptrdiff_t(v.size), other.p)
+	r := C.qutf8stringview_equal_qbytearray((*C.char)(v.data), C.ptrdiff_t(v.size), other.handle())
 	runtime.KeepAlive(v)
 	runtime.KeepAlive(other)
 	return bool(r)

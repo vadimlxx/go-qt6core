@@ -59,7 +59,7 @@ func TestQUtf8StringViewFromQByteArray(t *testing.T) {
 }
 
 func TestQUtf8StringViewFromQString(t *testing.T) {
-	s := QStringFromString("héllo")
+	s := NewQStringFromString("héllo")
 	defer s.Close()
 	v := NewQUtf8StringView(s)
 	if v.String() != "héllo" {

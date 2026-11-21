@@ -119,7 +119,7 @@ func (m *QRegularExpressionMatch) HasCapturedInt(nth int) bool {
 }
 
 func (m *QRegularExpressionMatch) HasCapturedName(name string) bool {
-	qname := QStringFromString(name)
+	qname := NewQStringFromString(name)
 	defer qname.Close()
 	return bool(C.qregexpmatch_has_captured_view(m.p,
 		(*C.uint16_t)(qname.Utf16Unsafe()), C.ptrdiff_t(qname.Size())))
@@ -130,7 +130,7 @@ func (m *QRegularExpressionMatch) CapturedInt(nth int) *QString {
 }
 
 func (m *QRegularExpressionMatch) CapturedName(name string) *QString {
-	qname := QStringFromString(name)
+	qname := NewQStringFromString(name)
 	defer qname.Close()
 	return wrapQString(unsafe.Pointer(C.qregexpmatch_captured_view(m.p,
 		(*C.uint16_t)(qname.Utf16Unsafe()), C.ptrdiff_t(qname.Size()))))
@@ -144,7 +144,7 @@ func (m *QRegularExpressionMatch) CapturedViewInt(nth int) QStringView {
 }
 
 func (m *QRegularExpressionMatch) CapturedViewName(name string) QStringView {
-	qname := QStringFromString(name)
+	qname := NewQStringFromString(name)
 	defer qname.Close()
 	var outData *C.uint16_t
 	var outSize C.ptrdiff_t
@@ -167,21 +167,21 @@ func (m *QRegularExpressionMatch) CapturedEndInt(nth int) int {
 }
 
 func (m *QRegularExpressionMatch) CapturedStartName(name string) int {
-	qname := QStringFromString(name)
+	qname := NewQStringFromString(name)
 	defer qname.Close()
 	return int(C.qregexpmatch_captured_start_view(m.p,
 		(*C.uint16_t)(qname.Utf16Unsafe()), C.ptrdiff_t(qname.Size())))
 }
 
 func (m *QRegularExpressionMatch) CapturedLengthName(name string) int {
-	qname := QStringFromString(name)
+	qname := NewQStringFromString(name)
 	defer qname.Close()
 	return int(C.qregexpmatch_captured_length_view(m.p,
 		(*C.uint16_t)(qname.Utf16Unsafe()), C.ptrdiff_t(qname.Size())))
 }
 
 func (m *QRegularExpressionMatch) CapturedEndName(name string) int {
-	qname := QStringFromString(name)
+	qname := NewQStringFromString(name)
 	defer qname.Close()
 	return int(C.qregexpmatch_captured_end_view(m.p,
 		(*C.uint16_t)(qname.Utf16Unsafe()), C.ptrdiff_t(qname.Size())))

@@ -448,6 +448,32 @@ uint32_t* qstring_to_ucs4(const QString* self, ptrdiff_t* out_count) {
 }
 void qstring_free_ucs4_array(uint32_t* arr) { delete[] arr; }
 
+/* --- swap --- */
+void qstring_swap(QString* self, QString* other) { self->swap(*other); }
+
+/* --- QString::fromUcs4 --- */
+QString* qstring_new_from_ucs4(const uint32_t* data, ptrdiff_t size) {
+    return new QString(QString::fromUcs4(
+        reinterpret_cast<const char32_t*>(data),
+        static_cast<qsizetype>(size)));
+}
+
+/* --- percent encoding --- */
+void qstring_to_percent_encoding(const QString* self, const QByteArray* exclude,
+                                 const QByteArray* include, char percent,
+                                 QByteArray** out) {
+    static const QByteArray kEmpty;
+    const QByteArray& ex = exclude ? *exclude : kEmpty;
+    const QByteArray& in = include ? *include : kEmpty;
+    *out = new QByteArray(self->toUtf8().toPercentEncoding(ex, in, percent));
+}
+
+QString* qstring_from_percent_encoding(const QByteArray* input, char percent) {
+    if (!input) return new QString();
+    return new QString(QString::fromUtf8(
+        QByteArray::fromPercentEncoding(*input, percent)));
+}
+
 /* --- QRegularExpression interop --- */
 ptrdiff_t qstring_index_of_qregexp(const QString* self, const QRegularExpression* re,
                                    ptrdiff_t from, QRegularExpressionMatch* match) {

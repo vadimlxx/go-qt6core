@@ -19,7 +19,7 @@ func TestEmptyQString(t *testing.T) {
 	}
 }
 
-func TestQStringFromString(t *testing.T) {
+func TestNewQStringFromString(t *testing.T) {
 	cases := []string{"", "hello", "héllo", "Привет", "日本語", "a😀b"}
 	for _, in := range cases {
 		s := NewQString(in)
@@ -30,7 +30,7 @@ func TestQStringFromString(t *testing.T) {
 	}
 }
 
-func TestQStringFromUtf16(t *testing.T) {
+func TestNewQStringFromUtf16(t *testing.T) {
 	units := utf16.Encode([]rune("a😀b"))
 	s := NewQString(units)
 	defer s.Close()
@@ -42,19 +42,19 @@ func TestQStringFromUtf16(t *testing.T) {
 	}
 }
 
-func TestQStringFromLatin1(t *testing.T) {
+func TestNewQStringFromLatin1(t *testing.T) {
 	in := []byte{0x68, 0xE9, 0x6C, 0x6C, 0x6F}
-	s := QStringFromLatin1(in)
+	s := NewQStringFromLatin1(in)
 	defer s.Close()
 	if s.GoString() != "héllo" {
 		t.Fatalf("GoString: %q", s.GoString())
 	}
 }
 
-func TestQStringFromLocal8Bit(t *testing.T) {
+func TestNewQStringFromLocal8Bit(t *testing.T) {
 	// ASCII-only to avoid locale dependence in tests.
 	in := []byte("hello")
-	s := QStringFromLocal8Bit(in)
+	s := NewQStringFromLocal8Bit(in)
 	defer s.Close()
 	if s.GoString() != "hello" {
 		t.Fatalf("GoString: %q", s.GoString())
@@ -81,7 +81,7 @@ func TestQStringFromQStringView(t *testing.T) {
 }
 
 func TestQStringToQStringView(t *testing.T) {
-	s := QStringFromString("hello")
+	s := NewQStringFromString("hello")
 	defer s.Close()
 	v := s.ToQStringView()
 	if v.GoString() != "hello" {
@@ -101,7 +101,7 @@ func TestQStringAtFrontBack(t *testing.T) {
 }
 
 func TestQStringAppendPrependInsert(t *testing.T) {
-	s := QStringFromString("bc")
+	s := NewQStringFromString("bc")
 	defer s.Close()
 	s.PrependString("a")
 	s.AppendString("d")
@@ -112,7 +112,7 @@ func TestQStringAppendPrependInsert(t *testing.T) {
 }
 
 func TestQStringCaseConversion(t *testing.T) {
-	s := QStringFromString("Hello, World!")
+	s := NewQStringFromString("Hello, World!")
 	defer s.Close()
 	if s.ToLower().GoString() != "hello, world!" {
 		t.Fatalf("ToLower: %q", s.ToLower().GoString())
@@ -123,7 +123,7 @@ func TestQStringCaseConversion(t *testing.T) {
 }
 
 func TestQStringTrimmedSimplified(t *testing.T) {
-	s := QStringFromString("  Hello,  World!  ")
+	s := NewQStringFromString("  Hello,  World!  ")
 	defer s.Close()
 	if s.Trimmed().GoString() != "Hello,  World!" {
 		t.Fatalf("Trimmed: %q", s.Trimmed().GoString())
@@ -134,7 +134,7 @@ func TestQStringTrimmedSimplified(t *testing.T) {
 }
 
 func TestQStringSlicing(t *testing.T) {
-	s := QStringFromString("the quick brown fox")
+	s := NewQStringFromString("the quick brown fox")
 	defer s.Close()
 	check := func(name string, got *QString, want string) {
 		t.Helper()
@@ -154,7 +154,7 @@ func TestQStringSlicing(t *testing.T) {
 }
 
 func TestQStringSearch(t *testing.T) {
-	s := QStringFromString("a,b,c,,d")
+	s := NewQStringFromString("a,b,c,,d")
 	defer s.Close()
 	if s.IndexOfQChar(NewQChar(','), 0, true) != 1 {
 		t.Fatalf("IndexOfQChar(','): %d", s.IndexOfQChar(NewQChar(','), 0, true))
@@ -177,7 +177,7 @@ func TestQStringSearch(t *testing.T) {
 }
 
 func TestQStringReplace(t *testing.T) {
-	s := QStringFromString("hello world")
+	s := NewQStringFromString("hello world")
 	defer s.Close()
 	s.ReplaceStringString("world", "there")
 	if s.GoString() != "hello there" {
@@ -190,7 +190,7 @@ func TestQStringReplace(t *testing.T) {
 }
 
 func TestQStringReplaceCS(t *testing.T) {
-	s := QStringFromString("Hello hello HELLO")
+	s := NewQStringFromString("Hello hello HELLO")
 	defer s.Close()
 	s.ReplaceStringStringCS("hello", "X", false)
 	if s.GoString() != "X X X" {
@@ -199,7 +199,7 @@ func TestQStringReplaceCS(t *testing.T) {
 }
 
 func TestQStringRemove(t *testing.T) {
-	s := QStringFromString("a-b-c-d")
+	s := NewQStringFromString("a-b-c-d")
 	defer s.Close()
 	s.RemoveQChar('-', true)
 	if s.GoString() != "abcd" {
@@ -208,9 +208,9 @@ func TestQStringRemove(t *testing.T) {
 }
 
 func TestQStringCompare(t *testing.T) {
-	a := QStringFromString("hello")
-	b := QStringFromString("hello")
-	c := QStringFromString("world")
+	a := NewQStringFromString("hello")
+	b := NewQStringFromString("hello")
+	c := NewQStringFromString("world")
 	defer a.Close()
 	defer b.Close()
 	defer c.Close()
@@ -226,8 +226,8 @@ func TestQStringCompare(t *testing.T) {
 }
 
 func TestQStringLocaleAwareCompare(t *testing.T) {
-	a := QStringFromString("a")
-	b := QStringFromString("b")
+	a := NewQStringFromString("a")
+	b := NewQStringFromString("b")
 	defer a.Close()
 	defer b.Close()
 	if a.LocaleAwareCompare(b) >= 0 {
@@ -236,17 +236,17 @@ func TestQStringLocaleAwareCompare(t *testing.T) {
 }
 
 func TestQStringNumeric(t *testing.T) {
-	s := QStringFromString("42")
+	s := NewQStringFromString("42")
 	defer s.Close()
 	if v, ok := s.ToInt(10); !ok || v != 42 {
 		t.Fatalf("ToInt: %d %v", v, ok)
 	}
-	f := QStringFromString("3.14")
+	f := NewQStringFromString("3.14")
 	defer f.Close()
 	if v, ok := f.ToDouble(); !ok || v < 3.13 || v > 3.15 {
 		t.Fatalf("ToDouble: %f %v", v, ok)
 	}
-	n := QStringNumberLL(-123, 10)
+	n := NewQStringNumberLL(-123, 10)
 	defer n.Close()
 	if n.GoString() != "-123" {
 		t.Fatalf("NumberLL: %q", n.GoString())
@@ -270,13 +270,13 @@ func TestQStringSetNum(t *testing.T) {
 	}
 }
 
-func TestQStringNumberInt(t *testing.T) {
-	s := QStringNumberInt(-7, 10)
+func TestNewQStringNumberInt(t *testing.T) {
+	s := NewQStringNumberInt(-7, 10)
 	defer s.Close()
 	if s.GoString() != "-7" {
 		t.Fatalf("NumberInt: %q", s.GoString())
 	}
-	s2 := QStringNumberUInt(255, 16)
+	s2 := NewQStringNumberUInt(255, 16)
 	defer s2.Close()
 	if s2.GoString() != "ff" {
 		t.Fatalf("NumberUInt: %q", s2.GoString())
@@ -284,7 +284,7 @@ func TestQStringNumberInt(t *testing.T) {
 }
 
 func TestQStringUtf8Latin1(t *testing.T) {
-	s := QStringFromString("héllo")
+	s := NewQStringFromString("héllo")
 	defer s.Close()
 	u := s.Utf8()
 	defer u.Close()
@@ -300,7 +300,7 @@ func TestQStringUtf8Latin1(t *testing.T) {
 }
 
 func TestQStringToUcs4(t *testing.T) {
-	s := QStringFromString("a😀b")
+	s := NewQStringFromString("a😀b")
 	defer s.Close()
 	cps := s.ToUcs4()
 	if len(cps) != 3 {
@@ -312,7 +312,7 @@ func TestQStringToUcs4(t *testing.T) {
 }
 
 func TestQStringToHtmlEscaped(t *testing.T) {
-	s := QStringFromString("<a href=\"x\">&</a>")
+	s := NewQStringFromString("<a href=\"x\">&</a>")
 	defer s.Close()
 	e := s.ToHtmlEscaped()
 	defer e.Close()
@@ -323,7 +323,7 @@ func TestQStringToHtmlEscaped(t *testing.T) {
 }
 
 func TestQStringRepeated(t *testing.T) {
-	s := QStringFromString("ab")
+	s := NewQStringFromString("ab")
 	defer s.Close()
 	r := s.Repeated(3)
 	defer r.Close()
@@ -334,7 +334,7 @@ func TestQStringRepeated(t *testing.T) {
 
 func TestQStringNormalized(t *testing.T) {
 	// U+00E9 (é) vs U+0065 U+0301 (e + combining acute).
-	decomposed := QStringFromString("e\u0301")
+	decomposed := NewQStringFromString("e\u0301")
 	defer decomposed.Close()
 	composed := decomposed.Normalized(NormalizationForm_C)
 	defer composed.Close()
@@ -344,7 +344,7 @@ func TestQStringNormalized(t *testing.T) {
 }
 
 func TestQStringSplitQChar(t *testing.T) {
-	s := QStringFromString("a,b,c")
+	s := NewQStringFromString("a,b,c")
 	defer s.Close()
 	parts := s.SplitQChar(NewQChar(','), qdata.KeepEmptyParts, true)
 	if len(parts) != 3 {
@@ -359,8 +359,8 @@ func TestQStringSplitQChar(t *testing.T) {
 }
 
 func TestQStringSplitQString(t *testing.T) {
-	s := QStringFromString("a::b::c")
-	sep := QStringFromString("::")
+	s := NewQStringFromString("a::b::c")
+	sep := NewQStringFromString("::")
 	defer s.Close()
 	defer sep.Close()
 	parts := s.SplitQString(sep, qdata.KeepEmptyParts, true)
@@ -376,7 +376,7 @@ func TestQStringSplitQString(t *testing.T) {
 }
 
 func TestQStringSplitSkipEmpty(t *testing.T) {
-	s := QStringFromString("a,,b")
+	s := NewQStringFromString("a,,b")
 	defer s.Close()
 	parts := s.SplitQChar(NewQChar(','), qdata.SkipEmptyParts, true)
 	if len(parts) != 2 {
@@ -388,7 +388,7 @@ func TestQStringSplitSkipEmpty(t *testing.T) {
 }
 
 func TestQStringSection(t *testing.T) {
-	s := QStringFromString("a,b,c,d")
+	s := NewQStringFromString("a,b,c,d")
 	defer s.Close()
 	sec := s.SectionQChar(NewQChar(','), 1, 2, SectionDefault)
 	defer sec.Close()
@@ -398,7 +398,7 @@ func TestQStringSection(t *testing.T) {
 }
 
 func TestQStringArgLl(t *testing.T) {
-	s := QStringFromString("n=%1")
+	s := NewQStringFromString("n=%1")
 	defer s.Close()
 	r := s.ArgLl(42, 0, 10, NewQChar(' '))
 	defer r.Close()
@@ -408,7 +408,7 @@ func TestQStringArgLl(t *testing.T) {
 }
 
 func TestQStringArgString(t *testing.T) {
-	s := QStringFromString("%1 %2")
+	s := NewQStringFromString("%1 %2")
 	defer s.Close()
 	r := s.ArgString("hello", 0, NewQChar(' '))
 	defer r.Close()
@@ -423,7 +423,7 @@ func TestQStringArgString(t *testing.T) {
 }
 
 func TestQStringArgQChar(t *testing.T) {
-	s := QStringFromString("x=%1")
+	s := NewQStringFromString("x=%1")
 	defer s.Close()
 	r := s.ArgQChar(NewQChar('7'), 0, NewQChar(' '))
 	defer r.Close()
@@ -433,7 +433,7 @@ func TestQStringArgQChar(t *testing.T) {
 }
 
 func TestQStringArgDouble(t *testing.T) {
-	s := QStringFromString("pi=%1")
+	s := NewQStringFromString("pi=%1")
 	defer s.Close()
 	r := s.ArgDouble(3.14159, 0, 'f', 2, NewQChar(' '))
 	defer r.Close()
@@ -449,7 +449,7 @@ func TestQStringMaxSize(t *testing.T) {
 }
 
 func TestQStringCloneCOW(t *testing.T) {
-	a := QStringFromString("abc")
+	a := NewQStringFromString("abc")
 	defer a.Close()
 	b := a.Clone()
 	defer b.Close()
@@ -463,7 +463,7 @@ func TestQStringCloneCOW(t *testing.T) {
 }
 
 func TestQStringCapacity(t *testing.T) {
-	s := QStringFromString("hello")
+	s := NewQStringFromString("hello")
 	defer s.Close()
 	if s.Capacity() < s.Size() {
 		t.Fatalf("Capacity < Size: %d < %d", s.Capacity(), s.Size())
@@ -471,7 +471,7 @@ func TestQStringCapacity(t *testing.T) {
 }
 
 func TestQStringIsSharedWith(t *testing.T) {
-	a := QStringFromString("abc")
+	a := NewQStringFromString("abc")
 	defer a.Close()
 	b := a.Clone()
 	defer b.Close()
@@ -491,4 +491,109 @@ func TestQStringResizeForOverwrite(t *testing.T) {
 	if s.Size() != 5 {
 		t.Fatalf("ResizeForOverwrite: size=%d", s.Size())
 	}
+}
+
+func TestNewEmptyQStringIsNull(t *testing.T) {
+	s := NewEmptyQString()
+	defer s.Close()
+	if !s.IsNull() {
+		t.Fatal("NewEmptyQString must produce a null QString (Qt: QString())")
+	}
+	if !s.IsEmpty() || s.Size() != 0 {
+		t.Fatal("null QString must also be empty")
+	}
+}
+
+func TestQStringFromEmptyIsNull(t *testing.T) {
+	// Documented: empty input -> null QString (Qt::fromUtf8(nullptr, 0)).
+	s := NewQStringFromString("")
+	defer s.Close()
+	if !s.IsNull() || !s.IsEmpty() {
+		t.Fatalf("NewQStringFromString(\"\"): null=%v empty=%v", s.IsNull(), s.IsEmpty())
+	}
+	b := NewQStringFromUtf8(nil)
+	defer b.Close()
+	if !b.IsNull() || !b.IsEmpty() {
+		t.Fatalf("NewQStringFromUtf8(nil): null=%v empty=%v", b.IsNull(), b.IsEmpty())
+	}
+}
+
+func TestIsSharedWithNil(t *testing.T) {
+	s := NewQStringFromString("abc")
+	defer s.Close()
+	if s.IsSharedWith(nil) {
+		t.Fatal("IsSharedWith(nil) must be false")
+	}
+}
+
+func TestUseAfterClosePanics(t *testing.T) {
+	s := NewQStringFromString("abc")
+	s.Close()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Size() after Close() must panic")
+		}
+	}()
+	_ = s.Size()
+}
+
+func TestNewQStringFromUcs4(t *testing.T) {
+	s := NewQStringFromUcs4([]rune{'a', 0x1F600, 'b'})
+	defer s.Close()
+	if s.GoString() != "a😀b" {
+		t.Fatalf("NewQStringFromUcs4: %q", s.GoString())
+	}
+	if s.Size() != 4 {
+		t.Fatalf("Size: %d, want 4", s.Size())
+	}
+}
+
+func TestQStringSwap(t *testing.T) {
+	a := NewQStringFromString("hello")
+	b := NewQStringFromString("world")
+	defer a.Close()
+	defer b.Close()
+	a.Swap(b)
+	if a.GoString() != "world" || b.GoString() != "hello" {
+		t.Fatalf("Swap: a=%q b=%q", a.GoString(), b.GoString())
+	}
+}
+
+func TestNewQStringPercentEncoding(t *testing.T) {
+	s := NewQStringFromString("a b+c")
+	defer s.Close()
+	enc := s.ToPercentEncoding(nil, nil, '%')
+	defer enc.Close()
+	if enc.String() != "a%20b%2Bc" {
+		t.Fatalf("ToPercentEncoding: %q", enc.String())
+	}
+	dec := NewQStringFromPercentEncoding(enc, '%')
+	defer dec.Close()
+	if dec.GoString() != "a b+c" {
+		t.Fatalf("fromPercentEncoding round-trip: %q", dec.GoString())
+	}
+}
+
+func TestQStringUseAfterClosePanics(t *testing.T) {
+	s := NewQStringFromString("abc")
+	s.Close()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Size() after Close() must panic")
+		}
+	}()
+	_ = s.Size()
+}
+
+func TestQStringIsSharedWithNil(t *testing.T) {
+	s := NewQStringFromString("abc")
+	defer s.Close()
+	if s.IsSharedWith(nil) {
+		t.Fatal("IsSharedWith(nil) must be false")
+	}
+}
+
+func TestCloseNilSafe(t *testing.T) {
+	var s *QString
+	s.Close() // must not panic
 }

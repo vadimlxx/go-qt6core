@@ -18,7 +18,7 @@ func TestQStringListEmpty(t *testing.T) {
 }
 
 func TestQStringListFromQString(t *testing.T) {
-	s := QStringFromString("hello")
+	s := NewQStringFromString("hello")
 	defer s.Close()
 	l := QStringListFromQString(s)
 	defer l.Close()
@@ -44,9 +44,9 @@ func TestQStringListFromGoString(t *testing.T) {
 }
 
 func TestQStringListFromQStrings(t *testing.T) {
-	a := QStringFromString("a")
-	b := QStringFromString("b")
-	c := QStringFromString("c")
+	a := NewQStringFromString("a")
+	b := NewQStringFromString("b")
+	c := NewQStringFromString("c")
 	defer a.Close()
 	defer b.Close()
 	defer c.Close()
@@ -129,7 +129,7 @@ func TestQStringListAtSetAt(t *testing.T) {
 	}
 	e.Close()
 
-	n := QStringFromString("B")
+	n := NewQStringFromString("B")
 	defer n.Close()
 	l.SetAt(1, n)
 
@@ -160,11 +160,11 @@ func TestQStringListFrontBack(t *testing.T) {
 func TestQStringListAppendPrependInsert(t *testing.T) {
 	l := NewQStringList()
 	defer l.Close()
-	s := QStringFromString("b")
+	s := NewQStringFromString("b")
 	defer s.Close()
 	l.Append(s)
 	l.Prepend(s)
-	x := QStringFromString("x")
+	x := NewQStringFromString("x")
 	defer x.Close()
 	l.Insert(1, x) // a b x b → actually b x b
 	want := []string{"b", "x", "b"}
@@ -284,7 +284,7 @@ func TestQStringListRemoveDuplicates(t *testing.T) {
 func TestQStringListJoinString(t *testing.T) {
 	l := QStringListFromGoStrings([]string{"a", "b", "c"})
 	defer l.Close()
-	sep := QStringFromString(", ")
+	sep := NewQStringFromString(", ")
 	defer sep.Close()
 	r := l.JoinString(sep)
 	defer r.Close()
@@ -316,7 +316,7 @@ func TestQStringListJoinChar(t *testing.T) {
 func TestQStringListFilterString(t *testing.T) {
 	l := QStringListFromGoStrings([]string{"apple", "banana", "apricot", "cherry"})
 	defer l.Close()
-	needle := QStringFromString("ap")
+	needle := NewQStringFromString("ap")
 	defer needle.Close()
 	f := l.FilterString(needle, true)
 	defer f.Close()
@@ -350,8 +350,8 @@ func TestQStringListFilterQRegularExpression(t *testing.T) {
 func TestQStringListReplaceInStringsString(t *testing.T) {
 	l := QStringListFromGoStrings([]string{"foo bar", "bar baz", "FOO qux"})
 	defer l.Close()
-	before := QStringFromString("foo")
-	after := QStringFromString("X")
+	before := NewQStringFromString("foo")
+	after := NewQStringFromString("X")
 	defer before.Close()
 	defer after.Close()
 	l.ReplaceInStringsString(before, after, true)
@@ -391,7 +391,7 @@ func TestQStringListReplaceInStringsQRegularExpression(t *testing.T) {
 	defer l.Close()
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer re.Close()
-	after := QStringFromString("#")
+	after := NewQStringFromString("#")
 	defer after.Close()
 	l.ReplaceInStringsQRegularExpression(re, after)
 	got := l.ToSlice()
@@ -413,13 +413,13 @@ func TestQStringListReplaceInStringsQRegularExpression(t *testing.T) {
 func TestQStringListContainsQString(t *testing.T) {
 	l := QStringListFromGoStrings([]string{"Apple", "apple", "banana"})
 	defer l.Close()
-	needle := QStringFromString("apple")
+	needle := NewQStringFromString("apple")
 	defer needle.Close()
 
 	if !l.ContainsQString(needle, true) {
 		t.Fatal("expected case-sensitive contains")
 	}
-	upper := QStringFromString("APPLE")
+	upper := NewQStringFromString("APPLE")
 	defer upper.Close()
 	if l.ContainsQString(upper, true) {
 		t.Fatal("did not expect case-sensitive contains of APPLE")
@@ -443,7 +443,7 @@ func TestQStringListContainsGoString(t *testing.T) {
 func TestQStringListIndexOfQString(t *testing.T) {
 	l := QStringListFromGoStrings([]string{"a", "b", "a", "c"})
 	defer l.Close()
-	needle := QStringFromString("a")
+	needle := NewQStringFromString("a")
 	defer needle.Close()
 	if got := l.IndexOfQString(needle, 0, true); got != 0 {
 		t.Fatalf("IndexOfQString from 0: %d", got)
@@ -486,7 +486,7 @@ func TestQStringListIndexOfQRegularExpression(t *testing.T) {
 func TestQStringListLastIndexOfQString(t *testing.T) {
 	l := QStringListFromGoStrings([]string{"a", "b", "a", "c", "a"})
 	defer l.Close()
-	needle := QStringFromString("a")
+	needle := NewQStringFromString("a")
 	defer needle.Close()
 	if got := l.LastIndexOfQString(needle, -1, true); got != 4 {
 		t.Fatalf("LastIndexOfQString -1: %d", got)

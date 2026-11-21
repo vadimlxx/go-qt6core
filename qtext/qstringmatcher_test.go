@@ -16,12 +16,12 @@ func TestQStringMatcherDefault(t *testing.T) {
 }
 
 func TestQStringMatcherFromQStringBasic(t *testing.T) {
-	pattern := QStringFromString("quick")
+	pattern := NewQStringFromString("quick")
 	defer pattern.Close()
 	m := QStringMatcherFromQString(pattern, true)
 	defer m.Close()
 
-	haystack := QStringFromString("the quick brown fox")
+	haystack := NewQStringFromString("the quick brown fox")
 	defer haystack.Close()
 
 	if got := m.IndexIn(haystack, 0); got != 4 {
@@ -54,13 +54,13 @@ func TestQStringMatcherFromUtf16(t *testing.T) {
 }
 
 func TestQStringMatcherCaseSensitivity(t *testing.T) {
-	pattern := QStringFromString("QUICK")
+	pattern := NewQStringFromString("QUICK")
 	defer pattern.Close()
 
 	// case-sensitive: no match
 	cs := QStringMatcherFromQString(pattern, true)
 	defer cs.Close()
-	haystack := QStringFromString("the quick brown fox")
+	haystack := NewQStringFromString("the quick brown fox")
 	defer haystack.Close()
 	if got := cs.IndexIn(haystack, 0); got != -1 {
 		t.Fatalf("case-sensitive IndexIn: %d, want -1", got)
@@ -85,27 +85,27 @@ func TestQStringMatcherSetPattern(t *testing.T) {
 	m := NewQStringMatcher()
 	defer m.Close()
 
-	haystack := QStringFromString("the quick brown fox")
+	haystack := NewQStringFromString("the quick brown fox")
 	defer haystack.Close()
 
-	m.SetPattern(QStringFromString("brown"))
+	m.SetPattern(NewQStringFromString("brown"))
 	if got := m.IndexIn(haystack, 0); got != 10 {
 		t.Fatalf("IndexIn(brown): %d, want 10", got)
 	}
 
-	m.SetPattern(QStringFromString("zzz"))
+	m.SetPattern(NewQStringFromString("zzz"))
 	if got := m.IndexIn(haystack, 0); got != -1 {
 		t.Fatalf("IndexIn(zzz): %d, want -1", got)
 	}
 }
 
 func TestQStringMatcherSetCaseSensitivity(t *testing.T) {
-	pattern := QStringFromString("QUICK")
+	pattern := NewQStringFromString("QUICK")
 	defer pattern.Close()
 	m := QStringMatcherFromQString(pattern, true)
 	defer m.Close()
 
-	haystack := QStringFromString("the quick brown fox")
+	haystack := NewQStringFromString("the quick brown fox")
 	defer haystack.Close()
 
 	if got := m.IndexIn(haystack, 0); got != -1 {
@@ -119,7 +119,7 @@ func TestQStringMatcherSetCaseSensitivity(t *testing.T) {
 }
 
 func TestQStringMatcherClone(t *testing.T) {
-	pattern := QStringFromString("fox")
+	pattern := NewQStringFromString("fox")
 	defer pattern.Close()
 	orig := QStringMatcherFromQString(pattern, true)
 	defer orig.Close()
@@ -127,7 +127,7 @@ func TestQStringMatcherClone(t *testing.T) {
 	cpy := orig.Clone()
 	defer cpy.Close()
 
-	haystack := QStringFromString("the quick brown fox")
+	haystack := NewQStringFromString("the quick brown fox")
 	defer haystack.Close()
 
 	if got := cpy.IndexIn(haystack, 0); got != 16 {
@@ -142,14 +142,14 @@ func TestQStringMatcherClone(t *testing.T) {
 }
 
 func TestQStringMatcherAssign(t *testing.T) {
-	src := QStringMatcherFromQString(QStringFromString("fox"), true)
+	src := QStringMatcherFromQString(NewQStringFromString("fox"), true)
 	defer src.Close()
-	dst := QStringMatcherFromQString(QStringFromString("zzz"), false)
+	dst := QStringMatcherFromQString(NewQStringFromString("zzz"), false)
 	defer dst.Close()
 
 	dst.Assign(src)
 
-	haystack := QStringFromString("the quick brown fox")
+	haystack := NewQStringFromString("the quick brown fox")
 	defer haystack.Close()
 
 	if got := dst.IndexIn(haystack, 0); got != 16 {
@@ -161,7 +161,7 @@ func TestQStringMatcherAssign(t *testing.T) {
 }
 
 func TestQStringMatcherPattern(t *testing.T) {
-	pattern := QStringFromString("hello")
+	pattern := NewQStringFromString("hello")
 	defer pattern.Close()
 	m := QStringMatcherFromQString(pattern, true)
 	defer m.Close()
@@ -174,7 +174,7 @@ func TestQStringMatcherPattern(t *testing.T) {
 }
 
 func TestQStringMatcherPatternView(t *testing.T) {
-	pattern := QStringFromString("hello")
+	pattern := NewQStringFromString("hello")
 	defer pattern.Close()
 	m := QStringMatcherFromQString(pattern, true)
 	defer m.Close()
@@ -187,12 +187,12 @@ func TestQStringMatcherPatternView(t *testing.T) {
 
 func TestQStringMatcherIndexInMultiByte(t *testing.T) {
 	// "😀" = U+1F600 = 2 UTF-16 code units
-	pattern := QStringFromString("😀")
+	pattern := NewQStringFromString("😀")
 	defer pattern.Close()
 	m := QStringMatcherFromQString(pattern, true)
 	defer m.Close()
 
-	haystack := QStringFromString("a😀b")
+	haystack := NewQStringFromString("a😀b")
 	defer haystack.Close()
 
 	if got := m.IndexIn(haystack, 0); got != 1 {
@@ -204,7 +204,7 @@ func TestQStringMatcherEmptyPattern(t *testing.T) {
 	m := NewQStringMatcher()
 	defer m.Close()
 
-	haystack := QStringFromString("hello")
+	haystack := NewQStringFromString("hello")
 	defer haystack.Close()
 
 	// Empty pattern matches at position 0.

@@ -1,37 +1,17 @@
-// Package qbytearray provides a Go binding for Qt 6.11 QtCore's QByteArray.
+// Class QByteArray provides a Go binding for Qt 6.11 QtCore's QByteArray.
 //
 // QByteArray is a COW (copy-on-write) byte container. In Go, each *QByteArray is a handle to a
 // C++ QByteArray object; cloning is cheap (refcount++), and mutating methods trigger detach as in
 // Qt.
 //
-// Memory management: each *QByteArray is finalized by runtime.SetFinalizer; call Close() to
-// release the C++ object immediately.
-//
 // # Type mapping
 //
 //	Qt                                  Go
-//	QByteArray                          *qbytearray.QByteArray
-//	QByteArray::Base64Option            qbytearray.Base64Option / Base64Options
-//	QByteArray::Base64DecodingStatus    qbytearray.Base64DecodingStatus
+//	QByteArray                          *qtext.QByteArray
+//	QByteArray::Base64Option            qtext.Base64Option / Base64Options
+//	QByteArray::Base64DecodingStatus    qtext.Base64DecodingStatus
 //	const char* / char16_t*             []byte / string
 //	qsizetype                           int
-//
-// # Interop with sibling packages
-//
-// qbytearray is a foundation package imported by many others:
-//
-//	qstring           → qbytearray (Utf8/Latin1/Local8Bit return *QByteArray)
-//	qstringview       → qbytearray (ToUtf8/ToLatin1/ToLocal8Bit)
-//	qlatin1stringview → qbytearray (ToUtf8)
-//	qutf8stringview   → qbytearray (Compare/Equal with QByteArray)
-//	qbytearraylist    → qbytearray (list element type)
-//	qbytearrayview    → qbytearray (ToByteArray, FromQByteArray)
-//
-// Because qbytearray is imported BY these packages, it CANNOT import them back (Go import
-// cycle). Cross-package helpers therefore either:
-//
-//   - live on the OTHER side (qstring.FromQByteArray, qstringview.FromQByteArray, …), or
-//   - live here as unsafe.Pointer <-> *QByteArray adapters (ToQString, FromQStringUnsafePtr).
 //
 // Latin-1 and Local8Bit variants follow the same pattern: ToQStringLatin1 /
 // FromQStringLatin1UnsafePtr / ToQStringLocal8Bit / FromQStringLocal8BitUnsafePtr.
@@ -42,10 +22,10 @@
 // QChar::decomposition() which returns QString). This package provides convenience wrappers that
 // decode that QString as UTF-8 / Latin-1:
 //
-//	c := qchar.New(0x00C0)                              // À
-//	d := qbytearray.FromQCharDecomposition(c)           // UTF-8 bytes of "A\u0300"
+//	c := qtext.NewQChar(0x00C0)                    // À
+//	d := qtext.FromQCharDecomposition(c)           // UTF-8 bytes of "A\u0300"
 //	defer d.Close()
-//	l := qbytearray.FromQCharDecompositionLatin1(c)     // Latin-1 bytes
+//	l := qtext.FromQCharDecompositionLatin1(c)     // Latin-1 bytes
 //	defer l.Close()
 //
 // # QArrayData / COW inspection
@@ -57,8 +37,7 @@
 //	q.IsDetached()                         // true if refcount == 1
 //	q.IsSharedWith(other)                  // same internal buffer (ptr + size)
 //
-// Advanced QArrayData inspection (ref counts, capacity vs size) is not currently exposed; see
-// TODO below.
+// Advanced QArrayData inspection (ref counts, capacity vs size) is not currently exposed.
 //
 // # Bound API (summary)
 //
@@ -128,7 +107,7 @@
 //
 //	Clone, Close, Bytes, String, UnsafePtr, AdoptUnsafePtr, ConstDataUnsafe
 //
-// # TODO (not yet bound, or exposed differently vs Qt 6.11)
+// # not yet bound, or exposed differently vs Qt 6.11
 //
 //   - fromRawData / setRawData — requires runtime.Pinner + careful lifetime management; not
 //     idiomatic in Go. Use FromBytes (copies) instead.

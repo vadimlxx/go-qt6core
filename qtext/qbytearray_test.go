@@ -12,13 +12,13 @@ func TestConstructors(t *testing.T) {
         t.Fatalf("New(): empty=%v null=%v", e.IsEmpty(), e.IsNull())
     }
 
-    q := QByteArrayFromBytes([]byte("hello"))
+    q := NewQByteArrayFromBytes([]byte("hello"))
     defer q.Close()
     if q.Size() != 5 || q.String() != "hello" {
         t.Fatalf("FromBytes: size=%d str=%q", q.Size(), q.String())
     }
 
-    f := QByteArrayFromFill(4, 'x')
+    f := NewQByteArrayFromFill(4, 'x')
     defer f.Close()
     if f.String() != "xxxx" {
         t.Fatalf("FromFill: %q", f.String())
@@ -154,10 +154,10 @@ func TestNumeric(t *testing.T) {
         t.Fatal("ToInt should fail")
     }
 
-    n := NumberLL(-123, 10)
+    n := NewQByteArrayNumberLL(-123, 10)
     defer n.Close()
     if n.String() != "-123" {
-        t.Fatalf("NumberLL: %q", n.String())
+        t.Fatalf("NewQByteArrayNumberLL: %q", n.String())
     }
 }
 
@@ -171,13 +171,13 @@ func TestBase64(t *testing.T) {
         t.Fatalf("ToBase64: %q", b64.String())
     }
 
-    dec, status := FromBase64Encoding([]byte("aGVsbG8gd29ybGQ="), 0)
+    dec, status := NewQByteArrayFromBase64Encoding([]byte("aGVsbG8gd29ybGQ="), 0)
     defer dec.Close()
     if status != Base64DecodingStatusOk || dec.String() != "hello world" {
         t.Fatalf("FromBase64: %q status=%v", dec.String(), status)
     }
 
-    bad, status := FromBase64Encoding([]byte("!!!not-base64!!!"), Base64Options(AbortOnBase64DecodingErrors))
+    bad, status := NewQByteArrayFromBase64Encoding([]byte("!!!not-base64!!!"), Base64Options(AbortOnBase64DecodingErrors))
     if bad != nil {
         bad.Close()
     }
@@ -196,10 +196,10 @@ func TestHex(t *testing.T) {
         t.Fatalf("ToHex: %q", h.String())
     }
 
-    back := FromHex([]byte("deadbeef"))
+    back := NewQByteArrayFromHex([]byte("deadbeef"))
     defer back.Close()
     if !bytes.Equal(back.Bytes(), []byte{0xDE, 0xAD, 0xBE, 0xEF}) {
-        t.Fatalf("FromHex: %v", back.Bytes())
+        t.Fatalf("NewQByteArrayFromHex: %v", back.Bytes())
     }
 
     sep := src.ToHex(':')
@@ -219,7 +219,7 @@ func TestPercent(t *testing.T) {
         t.Fatalf("ToPercent: %q", p.String())
     }
 
-    back := FromPercentEncoding([]byte("a%20b%2Fc%3Fd"), '%')
+    back := NewQByteArrayFromPercentEncoding([]byte("a%20b%2Fc%3Fd"), '%')
     defer back.Close()
     if back.String() != "a b/c?d" {
         t.Fatalf("FromPercent: %q", back.String())

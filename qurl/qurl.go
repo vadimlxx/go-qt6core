@@ -188,7 +188,7 @@ func (q *QUrl) URLString(options FormattingOptions) string {
 // URL returns the URL as a QString.
 // Qt: QUrl::url(FormattingOptions) → QString.
 func (q *QUrl) URL(options FormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.URLString(options))
+	return qtext.NewQString(q.URLString(options))
 }
 
 // ToString returns the URL as a Go string (alias of URLString).
@@ -202,7 +202,7 @@ func (q *QUrl) ToString(options FormattingOptions) string {
 // ToQString returns the URL as a QString (alias of URL).
 // Qt: QUrl::toString(FormattingOptions) → QString.
 func (q *QUrl) ToQString(options FormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.ToString(options))
+	return qtext.NewQString(q.ToString(options))
 }
 
 // ToDisplayString returns the URL as a display-friendly Go string.
@@ -216,7 +216,7 @@ func (q *QUrl) ToDisplayString(options FormattingOptions) string {
 // ToDisplayQString returns the URL as a display-friendly QString.
 // Qt: QUrl::toDisplayString(FormattingOptions) → QString.
 func (q *QUrl) ToDisplayQString(options FormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.ToDisplayString(options))
+	return qtext.NewQString(q.ToDisplayString(options))
 }
 
 // Adjusted returns a new URL with the given formatting options applied.
@@ -255,7 +255,7 @@ func (q *QUrl) ErrorString() string { return goString(C.qurl_error_string(q.p)) 
 
 // ErrorQString returns the error string as a QString.
 // Qt: QUrl::errorString() const → QString.
-func (q *QUrl) ErrorQString() *qtext.QString { return qtext.QStringFromString(q.ErrorString()) }
+func (q *QUrl) ErrorQString() *qtext.QString { return qtext.NewQString(q.ErrorString()) }
 
 // IsEmpty reports whether the URL has no content.
 // Qt: QUrl::isEmpty() const.
@@ -294,7 +294,7 @@ func (q *QUrl) SchemeString() string { return goString(C.qurl_scheme(q.p)) }
 
 // Scheme returns the scheme as a QString.
 // Qt: QUrl::scheme() const → QString.
-func (q *QUrl) Scheme() *qtext.QString { return qtext.QStringFromString(q.SchemeString()) }
+func (q *QUrl) Scheme() *qtext.QString { return qtext.NewQString(q.SchemeString()) }
 
 // ---- authority -----------------------------------------------------------
 
@@ -328,7 +328,7 @@ func (q *QUrl) Authority(options ComponentFormattingOptions) string {
 // AuthorityQString returns the authority component as a QString.
 // Qt: QUrl::authority(ComponentFormattingOptions) const → QString.
 func (q *QUrl) AuthorityQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.Authority(options))
+	return qtext.NewQString(q.Authority(options))
 }
 
 // ---- user info / user name / password -----------------------------------
@@ -356,7 +356,7 @@ func (q *QUrl) UserInfo(options ComponentFormattingOptions) string {
 // UserInfoQString returns the user-info component as a QString.
 // Qt: QUrl::userInfo(ComponentFormattingOptions) const → QString.
 func (q *QUrl) UserInfoQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.UserInfo(options))
+	return qtext.NewQString(q.UserInfo(options))
 }
 
 // SetUserNameString sets the user-name component from a Go string.
@@ -379,7 +379,7 @@ func (q *QUrl) UserName(options ComponentFormattingOptions) string {
 // UserNameQString returns the user-name component as a QString.
 // Qt: QUrl::userName(ComponentFormattingOptions) const → QString.
 func (q *QUrl) UserNameQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.UserName(options))
+	return qtext.NewQString(q.UserName(options))
 }
 
 // SetPasswordString sets the password component from a Go string.
@@ -402,7 +402,7 @@ func (q *QUrl) Password(options ComponentFormattingOptions) string {
 // PasswordQString returns the password component as a QString.
 // Qt: QUrl::password(ComponentFormattingOptions) const → QString.
 func (q *QUrl) PasswordQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.Password(options))
+	return qtext.NewQString(q.Password(options))
 }
 
 // ---- host / port ---------------------------------------------------------
@@ -427,7 +427,7 @@ func (q *QUrl) Host(options ComponentFormattingOptions) string {
 // HostQString returns the host component as a QString.
 // Qt: QUrl::host(ComponentFormattingOptions) const → QString.
 func (q *QUrl) HostQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.Host(options))
+	return qtext.NewQString(q.Host(options))
 }
 
 // SetPort sets the port (-1 clears it).
@@ -460,7 +460,7 @@ func (q *QUrl) Path(options ComponentFormattingOptions) string {
 // PathQString returns the path component as a QString.
 // Qt: QUrl::path(ComponentFormattingOptions) const → QString.
 func (q *QUrl) PathQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.Path(options))
+	return qtext.NewQString(q.Path(options))
 }
 
 // FileName returns the last segment of the path as a Go string.
@@ -472,7 +472,7 @@ func (q *QUrl) FileName(options ComponentFormattingOptions) string {
 // FileNameQString returns the last segment of the path as a QString.
 // Qt: QUrl::fileName(ComponentFormattingOptions) const → QString.
 func (q *QUrl) FileNameQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.FileName(options))
+	return qtext.NewQString(q.FileName(options))
 }
 
 // ---- query / fragment ----------------------------------------------------
@@ -518,7 +518,7 @@ func (q *QUrl) Query(options ComponentFormattingOptions) string {
 // QueryQString returns the query component as a QString.
 // Qt: QUrl::query(ComponentFormattingOptions) const → QString.
 func (q *QUrl) QueryQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.Query(options))
+	return qtext.NewQString(q.Query(options))
 }
 
 // HasFragment reports whether a fragment component is present.
@@ -545,7 +545,7 @@ func (q *QUrl) Fragment(options ComponentFormattingOptions) string {
 // FragmentQString returns the fragment component as a QString.
 // Qt: QUrl::fragment(ComponentFormattingOptions) const → QString.
 func (q *QUrl) FragmentQString(options ComponentFormattingOptions) *qtext.QString {
-	return qtext.QStringFromString(q.Fragment(options))
+	return qtext.NewQString(q.Fragment(options))
 }
 
 // ---- relations -----------------------------------------------------------
@@ -594,7 +594,7 @@ func (q *QUrl) ToLocalFile() string { return goString(C.qurl_to_local_file(q.p))
 // ToLocalFileQString returns the local file path as a QString.
 // Qt: QUrl::toLocalFile() const → QString.
 func (q *QUrl) ToLocalFileQString() *qtext.QString {
-	return qtext.QStringFromString(q.ToLocalFile())
+	return qtext.NewQString(q.ToLocalFile())
 }
 
 // ---- detach --------------------------------------------------------------
@@ -683,7 +683,7 @@ func FromPercentEncodingString(b []byte) string {
 // FromPercentEncoding decodes percent-encoded bytes into a QString.
 // Qt: QUrl::fromPercentEncoding(const QByteArray&) → QString.
 func FromPercentEncoding(b []byte) *qtext.QString {
-	return qtext.QStringFromString(FromPercentEncodingString(b))
+	return qtext.NewQString(FromPercentEncodingString(b))
 }
 
 // ToPercentEncodingBytes percent-encodes a Go string into []byte.
@@ -723,7 +723,7 @@ func FromAceString(b []byte) string { return goString(C.qurl_from_ace(uint8Ptr(b
 
 // FromAce decodes a Punycode-encoded domain into a QString.
 // Qt: QUrl::fromAce(const QByteArray&, AceProcessingOptions) → QString.
-func FromAce(b []byte) *qtext.QString { return qtext.QStringFromString(FromAceString(b)) }
+func FromAce(b []byte) *qtext.QString { return qtext.NewQString(FromAceString(b)) }
 
 // ToAceBytes encodes a Go string domain into Punycode []byte.
 // Qt: QUrl::toAce(const QString&, AceProcessingOptions) → QByteArray.

@@ -212,6 +212,30 @@ QString* qstring_section_qstring(const QString* self, const QString* sep, ptrdif
 uint32_t* qstring_to_ucs4(const QString* self, ptrdiff_t* out_count);
 void qstring_free_ucs4_array(uint32_t* arr);
 
+/* --- swap (no data copy; swaps only refcounted handles) --- */
+void qstring_swap(QString* self, QString* other);
+
+/* --- QString::fromUcs4(const char32_t *, qsizetype) --- */
+QString* qstring_new_from_ucs4(const uint32_t* data, ptrdiff_t size);
+
+/* --- percent encoding ---
+ *
+ * qstring_to_percent_encoding:
+ *   Qt: QString::toPercentEncoding(const QByteArray &exclude,
+ *                                  const QByteArray &include, char percent) const
+ *   exclude/include may be NULL (defaults to empty QByteArray).
+ *   Writes a freshly allocated QByteArray* to *out.
+ *
+ * qstring_from_percent_encoding:
+ *   Qt: QString::fromPercentEncoding(const QByteArray &input, char percent)
+ */
+void     qstring_to_percent_encoding(const QString* self,
+									 const QByteArray* exclude,
+									 const QByteArray* include,
+									 char percent,
+									 QByteArray** out);
+QString* qstring_from_percent_encoding(const QByteArray* input, char percent);
+
 /* --- QRegularExpression interop ---
  *
  * `match` may be NULL: the corresponding QString method then skips filling

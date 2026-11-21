@@ -220,7 +220,7 @@ func (q *QUuid) ToString(format StringFormat) string {
 // ToQString returns the textual representation as a QString.
 // Qt: QUuid::toString(StringFormat).
 func (q *QUuid) ToQString(format StringFormat) *qtext.QString {
-	return qtext.QStringFromString(q.ToString(format))
+	return qtext.NewQString(q.ToString(format))
 }
 
 // ToByteArray returns the textual representation as UTF-8 bytes.
@@ -238,7 +238,7 @@ func (q *QUuid) ToByteArray(format StringFormat) []byte {
 // ToQByteArray returns the textual representation as a QByteArray.
 // Qt: QUuid::toByteArray(StringFormat).
 func (q *QUuid) ToQByteArray(format StringFormat) *qtext.QByteArray {
-	qs := qtext.QStringFromString(q.ToString(format))
+	qs := qtext.NewQString(q.ToString(format))
 	return qs.Utf8()
 }
 

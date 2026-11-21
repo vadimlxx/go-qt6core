@@ -15,7 +15,7 @@ func TestQTextBoundaryFinderDefault(t *testing.T) {
 }
 
 func TestQTextBoundaryFinderFromQString(t *testing.T) {
-	s := QStringFromString("hello world")
+	s := NewQStringFromString("hello world")
 	defer s.Close()
 	f := QTextBoundaryFinderFromQString(Word, s)
 	defer f.Close()
@@ -56,7 +56,7 @@ func TestQTextBoundaryFinderFromView(t *testing.T) {
 }
 
 func TestQTextBoundaryFinderClone(t *testing.T) {
-	s := QStringFromString("ab cd")
+	s := NewQStringFromString("ab cd")
 	defer s.Close()
 	f := QTextBoundaryFinderFromQString(Word, s)
 	defer f.Close()
@@ -86,7 +86,7 @@ func TestQTextBoundaryFinderSwap(t *testing.T) {
 // ---- navigation ----------------------------------------------------------
 
 func TestQTextBoundaryFinderToStartToEnd(t *testing.T) {
-	s := QStringFromString("hello")
+	s := NewQStringFromString("hello")
 	defer s.Close()
 	f := QTextBoundaryFinderFromQString(Word, s)
 	defer f.Close()

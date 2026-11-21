@@ -42,7 +42,7 @@ func TestQRegularExpressionClone(t *testing.T) {
 func TestQRegularExpressionSetPattern(t *testing.T) {
 	re := NewQRegularExpression()
 	defer re.Close()
-	p := QStringFromString(`\w+`)
+	p := NewQStringFromString(`\w+`)
 	defer p.Close()
 	re.SetPattern(p)
 	if !re.IsValid() {
@@ -84,9 +84,9 @@ func TestQRegularExpressionInvalidPattern(t *testing.T) {
 }
 
 func TestQRegularExpressionEscape(t *testing.T) {
-	s := QStringFromString(`\d+`)
+	s := NewQStringFromString(`\d+`)
 	defer s.Close()
-	esc := QRegularExpressionEscape(s)
+	esc := NewQStringFromRegexpEscape(s)
 	defer esc.Close()
 	if esc.String() != `\\d\+` {
 		t.Fatalf("unexpected escape: %q", esc.String())
@@ -94,9 +94,9 @@ func TestQRegularExpressionEscape(t *testing.T) {
 }
 
 func TestQRegularExpressionWildcard(t *testing.T) {
-	s := QStringFromString(`*.txt`)
+	s := NewQStringFromString(`*.txt`)
 	defer s.Close()
-	pattern := QRegularExpressionWildcardToRegularExpression(s, DefaultWildcardConversion)
+	pattern := NewQStringFromRegexpWildcard(s, DefaultWildcardConversion)
 	defer pattern.Close()
 	if pattern.IsEmpty() {
 		t.Fatal("wildcard conversion returned empty pattern")
@@ -109,9 +109,9 @@ func TestQRegularExpressionWildcard(t *testing.T) {
 }
 
 func TestQRegularExpressionAnchoredPattern(t *testing.T) {
-	s := QStringFromString(`\d+`)
+	s := NewQStringFromString(`\d+`)
 	defer s.Close()
-	ap := QRegularExpressionAnchoredPattern(s)
+	ap := NewQStringFromRegexpAnchoredPattern(s)
 	defer ap.Close()
 	if ap.String() == "" {
 		t.Fatal("expected non-empty anchored pattern")
@@ -119,9 +119,9 @@ func TestQRegularExpressionAnchoredPattern(t *testing.T) {
 }
 
 func TestQRegularExpressionFromWildcard(t *testing.T) {
-	s := QStringFromString(`*.txt`)
+	s := NewQStringFromString(`*.txt`)
 	defer s.Close()
-	re := QRegularExpressionFromWildcard(s, true, DefaultWildcardConversion)
+	re := NewQRegularExpressionFromWildcard(s, true, DefaultWildcardConversion)
 	defer re.Close()
 	if !re.IsValid() {
 		t.Fatal("fromWildcard regex invalid")
@@ -131,7 +131,7 @@ func TestQRegularExpressionFromWildcard(t *testing.T) {
 // ---- QString ↔ QRegularExpression interop ------------------------------
 
 func TestQStringIndexOfQRegularExpression(t *testing.T) {
-	s := QStringFromString("abc 123 def 456")
+	s := NewQStringFromString("abc 123 def 456")
 	// Use word-bounded \b\d+\b rather than bare \d+: QString::count(QRegularExpression)
 	// counts OVERLAPPING matches in Qt, so a bare \d+ here would report 6 matches
 	// ("123", "23", "3", "456", "56", "6") instead of 2. See the dedicated
@@ -158,7 +158,7 @@ func TestQStringIndexOfQRegularExpression(t *testing.T) {
 // semantics for QString::count(const QRegularExpression&): \d+ over "123" yields
 // three matches ("123", "23", "3"), not one.
 func TestQStringCountQRegularExpressionOverlapping(t *testing.T) {
-	s := QStringFromString("abc 123 def 456")
+	s := NewQStringFromString("abc 123 def 456")
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()
@@ -167,7 +167,7 @@ func TestQStringCountQRegularExpressionOverlapping(t *testing.T) {
 		t.Fatalf("expected overlapping count 6, got %d", got)
 	}
 
-	single := QStringFromString("123")
+	single := NewQStringFromString("123")
 	singleRe := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer single.Close()
 	defer singleRe.Close()
@@ -178,7 +178,7 @@ func TestQStringCountQRegularExpressionOverlapping(t *testing.T) {
 }
 
 func TestQStringIndexOfQRegularExpressionWithMatch(t *testing.T) {
-	s := QStringFromString("abc 123 def")
+	s := NewQStringFromString("abc 123 def")
 	re := NewQRegularExpressionFromString(`(\d+)`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()
@@ -200,7 +200,7 @@ func TestQStringIndexOfQRegularExpressionWithMatch(t *testing.T) {
 }
 
 func TestQStringContainsQRegularExpressionWithMatch(t *testing.T) {
-	s := QStringFromString("abc 42")
+	s := NewQStringFromString("abc 42")
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()
@@ -218,7 +218,7 @@ func TestQStringContainsQRegularExpressionWithMatch(t *testing.T) {
 }
 
 func TestQStringSectionQRegularExpression(t *testing.T) {
-	s := QStringFromString("a1b22c333d")
+	s := NewQStringFromString("a1b22c333d")
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()
@@ -234,7 +234,7 @@ func TestQStringSectionQRegularExpression(t *testing.T) {
 }
 
 func TestQStringReplaceQRegularExpression(t *testing.T) {
-	s := QStringFromString("a1b22c333")
+	s := NewQStringFromString("a1b22c333")
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()
@@ -246,7 +246,7 @@ func TestQStringReplaceQRegularExpression(t *testing.T) {
 }
 
 func TestQStringRemoveQRegularExpression(t *testing.T) {
-	s := QStringFromString("a1b22c333d")
+	s := NewQStringFromString("a1b22c333d")
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()
@@ -258,7 +258,7 @@ func TestQStringRemoveQRegularExpression(t *testing.T) {
 }
 
 func TestQStringSplitQRegularExpression(t *testing.T) {
-	s := QStringFromString("a1b22c333d")
+	s := NewQStringFromString("a1b22c333d")
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
 	defer s.Close()
 	defer re.Close()

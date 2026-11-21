@@ -97,7 +97,7 @@ func NewQByteArrayListFromQByteArrays(items []*QByteArray) *QByteArrayList {
 		if ba == nil {
 			panic("qbytearraylist: nil *QByteArray in FromQByteArrays")
 		}
-		ptrs[i] = ba.p
+		ptrs[i] = ba.handle()
 	}
 	l := wrapQByteArrayList(C.qbytearraylist_from_array(
 		(**C.QByteArray)(unsafe.Pointer(&ptrs[0])), C.ptrdiff_t(n)))
@@ -157,13 +157,13 @@ func (l *QByteArrayList) Squeeze() { C.qbytearraylist_squeeze(l.p); runtime.Keep
 // ---- append / prepend / insert ------------------------------------------
 
 func (l *QByteArrayList) Append(ba *QByteArray) {
-	C.qbytearraylist_append(l.p, ba.p)
+	C.qbytearraylist_append(l.p, ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
 
 func (l *QByteArrayList) Prepend(ba *QByteArray) {
-	C.qbytearraylist_prepend(l.p, ba.p)
+	C.qbytearraylist_prepend(l.p, ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -172,7 +172,7 @@ func (l *QByteArrayList) Insert(i int, ba *QByteArray) {
 	if i < 0 || i > l.Size() {
 		panic("qbytearraylist: Insert out of range")
 	}
-	C.qbytearraylist_insert(l.p, C.ptrdiff_t(i), ba.p)
+	C.qbytearraylist_insert(l.p, C.ptrdiff_t(i), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -195,7 +195,7 @@ func (l *QByteArrayList) Set(i int, ba *QByteArray) {
 	if i < 0 || i >= l.Size() {
 		panic("qbytearraylist: Set out of range")
 	}
-	C.qbytearraylist_set(l.p, C.ptrdiff_t(i), ba.p)
+	C.qbytearraylist_set(l.p, C.ptrdiff_t(i), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -223,21 +223,21 @@ func (l *QByteArrayList) RemoveLast() {
 // ---- search --------------------------------------------------------------
 
 func (l *QByteArrayList) IndexOf(ba *QByteArray) int {
-	v := C.qbytearraylist_index_of(l.p, ba.p)
+	v := C.qbytearraylist_index_of(l.p, ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return int(v)
 }
 
 func (l *QByteArrayList) LastIndexOf(ba *QByteArray) int {
-	v := C.qbytearraylist_last_index_of(l.p, ba.p)
+	v := C.qbytearraylist_last_index_of(l.p, ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return int(v)
 }
 
 func (l *QByteArrayList) Contains(ba *QByteArray) bool {
-	v := C.qbytearraylist_contains(l.p, ba.p)
+	v := C.qbytearraylist_contains(l.p, ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return bool(v)
