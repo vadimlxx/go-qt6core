@@ -37,35 +37,75 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
+type qregexpmatchiterState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qregexpmatchiterState) cpp() *C.QRegularExpressionMatchIterator {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QRegularExpressionMatchIterator)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qregexpmatchiterState) claim() *C.QRegularExpressionMatchIterator {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QRegularExpressionMatchIterator)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // QRegularExpressionMatchIterator wraps a Qt6 QRegularExpressionMatchIterator.
 type QRegularExpressionMatchIterator struct {
-	p *C.QRegularExpressionMatchIterator
+	// p *C.QRegularExpressionMatchIterator
+	state   *qregexpmatchiterState
+	cleanup runtime.Cleanup
 }
 
 func wrapQRegularExpressionMatchIterator(p unsafe.Pointer) *QRegularExpressionMatchIterator {
 	if p == nil {
 		return nil
 	}
-	it := &QRegularExpressionMatchIterator{p: (*C.QRegularExpressionMatchIterator)(p)}
-	runtime.SetFinalizer(it, finalizeQRegularExpressionMatchIterator)
-	return it
+
+	st := &qregexpmatchiterState{}
+	st.p.Store((*byte)(p))
+	q := &QRegularExpressionMatchIterator{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *qregexpmatchiterState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qregexpmatchiter_delete(cpp)
+		}
+	}, st)
+	return q
 }
 
-func finalizeQRegularExpressionMatchIterator(it *QRegularExpressionMatchIterator) {
-	if it.p != nil {
-		C.qregexpmatchiter_delete(it.p)
-		it.p = nil
+func (q *QRegularExpressionMatchIterator) handle() *C.QRegularExpressionMatchIterator {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("qregexpmatchiter: use after Close (or nil receiver)")
 }
 
-func (it *QRegularExpressionMatchIterator) Close() {
-	if it.p != nil {
-		C.qregexpmatchiter_delete(it.p)
-		it.p = nil
-		runtime.SetFinalizer(it, nil)
+func (q *QRegularExpressionMatchIterator) tryHandle() (*C.QRegularExpressionMatchIterator, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
+}
+
+func (q *QRegularExpressionMatchIterator) Close() {
+	if q == nil || q.state == nil {
+		return
+	}
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.qregexpmatchiter_delete(cpp)
 	}
 }
 
@@ -74,37 +114,37 @@ func NewQRegularExpressionMatchIterator() *QRegularExpressionMatchIterator {
 }
 
 func (it *QRegularExpressionMatchIterator) Clone() *QRegularExpressionMatchIterator {
-	return wrapQRegularExpressionMatchIterator(unsafe.Pointer(C.qregexpmatchiter_new_copy(it.p)))
+	return wrapQRegularExpressionMatchIterator(unsafe.Pointer(C.qregexpmatchiter_new_copy(it.handle())))
 }
 
 func (it *QRegularExpressionMatchIterator) IsValid() bool {
-	return bool(C.qregexpmatchiter_is_valid(it.p))
+	return bool(C.qregexpmatchiter_is_valid(it.handle()))
 }
 
 func (it *QRegularExpressionMatchIterator) HasNext() bool {
-	return bool(C.qregexpmatchiter_has_next(it.p))
+	return bool(C.qregexpmatchiter_has_next(it.handle()))
 }
 
 func (it *QRegularExpressionMatchIterator) Next() *QRegularExpressionMatch {
-	return wrapQRegularExpressionMatch(unsafe.Pointer(C.qregexpmatchiter_next(it.p)))
+	return wrapQRegularExpressionMatch(unsafe.Pointer(C.qregexpmatchiter_next(it.handle())))
 }
 
 func (it *QRegularExpressionMatchIterator) PeekNext() *QRegularExpressionMatch {
-	return wrapQRegularExpressionMatch(unsafe.Pointer(C.qregexpmatchiter_peek_next(it.p)))
+	return wrapQRegularExpressionMatch(unsafe.Pointer(C.qregexpmatchiter_peek_next(it.handle())))
 }
 
 func (it *QRegularExpressionMatchIterator) RegularExpression() *QRegularExpression {
-	return wrapQRegularExpression(unsafe.Pointer(C.qregexpmatchiter_regular_expression(it.p)))
+	return wrapQRegularExpression(unsafe.Pointer(C.qregexpmatchiter_regular_expression(it.handle())))
 }
 
 func (it *QRegularExpressionMatchIterator) MatchType() MatchType {
-	return MatchType(C.qregexpmatchiter_match_type(it.p))
+	return MatchType(C.qregexpmatchiter_match_type(it.handle()))
 }
 
 func (it *QRegularExpressionMatchIterator) MatchOptions() MatchOption {
-	return MatchOption(C.qregexpmatchiter_match_options(it.p))
+	return MatchOption(C.qregexpmatchiter_match_options(it.handle()))
 }
 
 func (it *QRegularExpressionMatchIterator) Swap(other *QRegularExpressionMatchIterator) {
-	C.qregexpmatchiter_swap(it.p, other.p)
+	C.qregexpmatchiter_swap(it.handle(), other.handle())
 }

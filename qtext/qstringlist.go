@@ -49,39 +49,79 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
+type qstringlistState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qstringlistState) cpp() *C.QStringList {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QStringList)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qstringlistState) claim() *C.QStringList {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QStringList)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // QStringList wraps a Qt6 QStringList (QList<QString>).
-// Each *QStringList owns a heap-allocated C++ QStringList; the finalizer
-// (and explicit Close) frees it.
+// Each *QStringList owns a heap-allocated C++ QStringList.
 type QStringList struct {
-	p *C.QStringList
+	// p *C.QStringList
+	state   *qstringlistState
+	cleanup runtime.Cleanup
 }
 
 func wrapQStringList(p unsafe.Pointer) *QStringList {
 	if p == nil {
 		return nil
 	}
-	q := &QStringList{p: (*C.QStringList)(p)}
-	runtime.SetFinalizer(q, finalizeQStringList)
+
+	st := &qstringlistState{}
+	st.p.Store((*byte)(p))
+	q := &QStringList{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *qstringlistState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qstringlist_delete(cpp)
+		}
+	}, st)
 	return q
 }
 
-func finalizeQStringList(q *QStringList) {
-	if q.p != nil {
-		C.qstringlist_delete(q.p)
-		q.p = nil
+func (q *QStringList) handle() *C.QStringList {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("qstringlist: use after Close (or nil receiver)")
+}
+
+func (q *QStringList) tryHandle() (*C.QStringList, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
 // Qt: ~QStringList() — explicit Close maps to the destructor call.
 func (q *QStringList) Close() {
-	if q.p != nil {
-		C.qstringlist_delete(q.p)
-		q.p = nil
-		runtime.SetFinalizer(q, nil)
+	if q == nil || q.state == nil {
+		return
+	}
+
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.qstringlist_delete(cpp)
 	}
 }
 
@@ -175,13 +215,13 @@ func NewQStringList(arg ...any) *QStringList {
 // Clone returns a deep copy of the list (each QString is copied).
 // Qt: QStringList(const QStringList&) — copy constructor.
 func (q *QStringList) Clone() *QStringList {
-	return wrapQStringList(unsafe.Pointer(C.qstringlist_new_copy(q.p)))
+	return wrapQStringList(unsafe.Pointer(C.qstringlist_new_copy(q.handle())))
 }
 
 // Swap exchanges the contents of q and other.
 // Qt: QStringList::swap(QStringList&).
 func (q *QStringList) Swap(other *QStringList) {
-	C.qstringlist_swap(q.p, other.p)
+	C.qstringlist_swap(q.handle(), other.handle())
 	runtime.KeepAlive(other)
 }
 
@@ -189,7 +229,7 @@ func (q *QStringList) Swap(other *QStringList) {
 
 // Size returns the number of elements.
 // Qt: QList<QString>::size() const.
-func (q *QStringList) Size() int { return int(C.qstringlist_size(q.p)) }
+func (q *QStringList) Size() int { return int(C.qstringlist_size(q.handle())) }
 
 // Len is an alias for Size.
 // Qt: QList<QString>::length() const (which forwards to size()).
@@ -197,21 +237,21 @@ func (q *QStringList) Len() int { return q.Size() }
 
 // IsEmpty reports whether the list has zero elements.
 // Qt: QList<QString>::isEmpty() const.
-func (q *QStringList) IsEmpty() bool { return bool(C.qstringlist_is_empty(q.p)) }
+func (q *QStringList) IsEmpty() bool { return bool(C.qstringlist_is_empty(q.handle())) }
 
 // ---- modifiers -----------------------------------------------------------
 
 // Clear removes all elements.
 // Qt: QList<QString>::clear().
-func (q *QStringList) Clear() { C.qstringlist_clear(q.p) }
+func (q *QStringList) Clear() { C.qstringlist_clear(q.handle()) }
 
 // Reserve pre-allocates storage for n elements.
 // Qt: QList<QString>::reserve(qsizetype).
-func (q *QStringList) Reserve(n int) { C.qstringlist_reserve(q.p, C.ptrdiff_t(n)) }
+func (q *QStringList) Reserve(n int) { C.qstringlist_reserve(q.handle(), C.ptrdiff_t(n)) }
 
 // Squeeze releases unused capacity.
 // Qt: QList<QString>::squeeze().
-func (q *QStringList) Squeeze() { C.qstringlist_squeeze(q.p) }
+func (q *QStringList) Squeeze() { C.qstringlist_squeeze(q.handle()) }
 
 // ---- element access -----------------------------------------------------
 
@@ -221,7 +261,7 @@ func (q *QStringList) At(i int) *QString {
 	if i < 0 || i >= q.Size() {
 		panic("qstringlist: At out of range")
 	}
-	r := wrapQString(unsafe.Pointer(C.qstringlist_at(q.p, C.ptrdiff_t(i))))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_at(q.handle(), C.ptrdiff_t(i))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -232,7 +272,7 @@ func (q *QStringList) SetAt(i int, s *QString) {
 	if i < 0 || i >= q.Size() {
 		panic("qstringlist: SetAt out of range")
 	}
-	C.qstringlist_set_at(q.p, C.ptrdiff_t(i), s.handle())
+	C.qstringlist_set_at(q.handle(), C.ptrdiff_t(i), s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -242,7 +282,7 @@ func (q *QStringList) Front() *QString {
 	if q.IsEmpty() {
 		panic("qstringlist: Front on empty QStringList")
 	}
-	r := wrapQString(unsafe.Pointer(C.qstringlist_first(q.p)))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_first(q.handle())))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -253,7 +293,7 @@ func (q *QStringList) Back() *QString {
 	if q.IsEmpty() {
 		panic("qstringlist: Back on empty QStringList")
 	}
-	r := wrapQString(unsafe.Pointer(C.qstringlist_last(q.p)))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_last(q.handle())))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -262,7 +302,7 @@ func (q *QStringList) Back() *QString {
 // Qt: QList<QString>::toVector() (or STL begin/end iteration).
 func (q *QStringList) ToSlice() []*QString {
 	var count C.ptrdiff_t
-	arr := C.qstringlist_to_array(q.p, &count)
+	arr := C.qstringlist_to_array(q.handle(), &count)
 	if arr == nil {
 		return nil
 	}
@@ -284,7 +324,7 @@ func (q *QStringList) ToSlice() []*QString {
 // Append adds s to the end of the list.
 // Qt: QStringList::operator<<(const QString&) / QList<QString>::append(const QString&).
 func (q *QStringList) Append(s *QString) {
-	C.qstringlist_append(q.p, s.handle())
+	C.qstringlist_append(q.handle(), s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -308,7 +348,7 @@ func (q *QStringList) AppendList(other *QStringList) {
 // Prepend inserts s at the beginning of the list.
 // Qt: QList<QString>::prepend(const QString&).
 func (q *QStringList) Prepend(s *QString) {
-	C.qstringlist_prepend(q.p, s.handle())
+	C.qstringlist_prepend(q.handle(), s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -318,7 +358,7 @@ func (q *QStringList) Insert(i int, s *QString) {
 	if i < 0 || i > q.Size() {
 		panic("qstringlist: Insert out of range")
 	}
-	C.qstringlist_insert(q.p, C.ptrdiff_t(i), s.handle())
+	C.qstringlist_insert(q.handle(), C.ptrdiff_t(i), s.handle())
 	runtime.KeepAlive(s)
 }
 
@@ -328,16 +368,16 @@ func (q *QStringList) RemoveAt(i int) {
 	if i < 0 || i >= q.Size() {
 		panic("qstringlist: RemoveAt out of range")
 	}
-	C.qstringlist_remove_at(q.p, C.ptrdiff_t(i))
+	C.qstringlist_remove_at(q.handle(), C.ptrdiff_t(i))
 }
 
 // RemoveFirst removes the first element (no-op if empty).
 // Qt: QList<QString>::removeFirst().
-func (q *QStringList) RemoveFirst() { C.qstringlist_remove_first(q.p) }
+func (q *QStringList) RemoveFirst() { C.qstringlist_remove_first(q.handle()) }
 
 // RemoveLast removes the last element (no-op if empty).
 // Qt: QList<QString>::removeLast().
-func (q *QStringList) RemoveLast() { C.qstringlist_remove_last(q.p) }
+func (q *QStringList) RemoveLast() { C.qstringlist_remove_last(q.handle()) }
 
 // TakeAt removes the element at position i and returns it. Panics if i is out of range.
 // Qt: QList<QString>::takeAt(qsizetype).
@@ -345,7 +385,7 @@ func (q *QStringList) TakeAt(i int) *QString {
 	if i < 0 || i >= q.Size() {
 		panic("qstringlist: TakeAt out of range")
 	}
-	r := wrapQString(unsafe.Pointer(C.qstringlist_take_at(q.p, C.ptrdiff_t(i))))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_take_at(q.handle(), C.ptrdiff_t(i))))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -356,7 +396,7 @@ func (q *QStringList) TakeFirst() *QString {
 	if q.IsEmpty() {
 		panic("qstringlist: TakeFirst on empty QStringList")
 	}
-	r := wrapQString(unsafe.Pointer(C.qstringlist_take_first(q.p)))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_take_first(q.handle())))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -367,7 +407,7 @@ func (q *QStringList) TakeLast() *QString {
 	if q.IsEmpty() {
 		panic("qstringlist: TakeLast on empty QStringList")
 	}
-	r := wrapQString(unsafe.Pointer(C.qstringlist_take_last(q.p)))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_take_last(q.handle())))
 	runtime.KeepAlive(q)
 	return r
 }
@@ -377,20 +417,20 @@ func (q *QStringList) TakeLast() *QString {
 // Sort sorts the list in ascending order.
 // Qt: QStringList::sort(Qt::CaseSensitivity) — with Qt::CaseSensitive / Qt::CaseInsensitive.
 func (q *QStringList) Sort(caseSensitive bool) {
-	C.qstringlist_sort(q.p, csInt(caseSensitive))
+	C.qstringlist_sort(q.handle(), csInt(caseSensitive))
 }
 
 // RemoveDuplicates removes duplicate entries and returns the number removed.
 // The list must be sorted first for all duplicates to be adjacent.
 // Qt: QStringList::removeDuplicates().
 func (q *QStringList) RemoveDuplicates() int {
-	return int(C.qstringlist_remove_duplicates(q.p))
+	return int(C.qstringlist_remove_duplicates(q.handle()))
 }
 
 // JoinString joins all elements with sep.
 // Qt: QStringList::join(const QString&).
 func (q *QStringList) JoinString(sep *QString) *QString {
-	r := wrapQString(unsafe.Pointer(C.qstringlist_join_qstring(q.p, sep.handle())))
+	r := wrapQString(unsafe.Pointer(C.qstringlist_join_qstring(q.handle(), sep.handle())))
 	runtime.KeepAlive(sep)
 	return r
 }
@@ -406,13 +446,13 @@ func (q *QStringList) JoinGoString(sep string) *QString {
 // JoinChar joins all elements with a single QChar.
 // Qt: QStringList::join(QChar).
 func (q *QStringList) JoinChar(sep QChar) *QString {
-	return wrapQString(unsafe.Pointer(C.qstringlist_join_qchar(q.p, C.uint16_t(sep.Unicode()))))
+	return wrapQString(unsafe.Pointer(C.qstringlist_join_qchar(q.handle(), C.uint16_t(sep.Unicode()))))
 }
 
 // FilterString returns a new list with elements containing needle.
 // Qt: QStringList::filter(const QString&, Qt::CaseSensitivity).
 func (q *QStringList) FilterString(needle *QString, caseSensitive bool) *QStringList {
-	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qstring(q.p, needle.handle(), csInt(caseSensitive))))
+	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qstring(q.handle(), needle.handle(), csInt(caseSensitive))))
 	runtime.KeepAlive(needle)
 	return r
 }
@@ -429,7 +469,7 @@ func (q *QStringList) FilterGoString(needle string, caseSensitive bool) *QString
 // Qt: QStringList::filter(const QRegularExpression&).
 func (q *QStringList) FilterQRegularExpression(re *QRegularExpression) *QStringList {
 	p := re.handle()
-	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qregexp(q.p, p)))
+	r := wrapQStringList(unsafe.Pointer(C.qstringlist_filter_qregexp(q.handle(), p)))
 	runtime.KeepAlive(re)
 	return r
 }
@@ -437,7 +477,7 @@ func (q *QStringList) FilterQRegularExpression(re *QRegularExpression) *QStringL
 // ReplaceInStringsString replaces every occurrence of before with after in each element.
 // Qt: QStringList::replaceInStrings(const QString&, const QString&, Qt::CaseSensitivity).
 func (q *QStringList) ReplaceInStringsString(before, after *QString, caseSensitive bool) {
-	C.qstringlist_replace_in_strings_qstring(q.p, before.handle(), after.handle(), csInt(caseSensitive))
+	C.qstringlist_replace_in_strings_qstring(q.handle(), before.handle(), after.handle(), csInt(caseSensitive))
 	runtime.KeepAlive(before)
 	runtime.KeepAlive(after)
 }
@@ -456,7 +496,7 @@ func (q *QStringList) ReplaceInStringsGoString(before, after string, caseSensiti
 // Qt: QStringList::replaceInStrings(const QRegularExpression&, const QString&).
 func (q *QStringList) ReplaceInStringsQRegularExpression(re *QRegularExpression, after *QString) {
 	p := re.handle()
-	C.qstringlist_replace_in_strings_qregexp(q.p, p, after.handle())
+	C.qstringlist_replace_in_strings_qregexp(q.handle(), p, after.handle())
 	runtime.KeepAlive(re)
 	runtime.KeepAlive(after)
 }
@@ -464,7 +504,7 @@ func (q *QStringList) ReplaceInStringsQRegularExpression(re *QRegularExpression,
 // ContainsQString reports whether the list contains s (comparing each element).
 // Qt: QStringList::contains(const QString&, Qt::CaseSensitivity).
 func (q *QStringList) ContainsQString(s *QString, caseSensitive bool) bool {
-	r := bool(C.qstringlist_contains_qstring(q.p, s.handle(), csInt(caseSensitive)))
+	r := bool(C.qstringlist_contains_qstring(q.handle(), s.handle(), csInt(caseSensitive)))
 	runtime.KeepAlive(s)
 	return r
 }
@@ -480,7 +520,7 @@ func (q *QStringList) ContainsGoString(s string, caseSensitive bool) bool {
 // IndexOfQString returns the index of the first element equal to s at or after from (or -1).
 // Qt: QStringList::indexOf(const QString&, qsizetype, Qt::CaseSensitivity).
 func (q *QStringList) IndexOfQString(s *QString, from int, caseSensitive bool) int {
-	r := C.qstringlist_index_of_qstring(q.p, s.handle(), C.ptrdiff_t(from), csInt(caseSensitive))
+	r := C.qstringlist_index_of_qstring(q.handle(), s.handle(), C.ptrdiff_t(from), csInt(caseSensitive))
 	runtime.KeepAlive(s)
 	return int(r)
 }
@@ -496,7 +536,7 @@ func (q *QStringList) IndexOfGoString(s string, from int, caseSensitive bool) in
 // IndexOfQRegularExpression returns the index of the first element matching re at or after from (or -1).
 // Qt: QStringList::indexOf(const QRegularExpression&, qsizetype).
 func (q *QStringList) IndexOfQRegularExpression(re *QRegularExpression, from int) int {
-	r := C.qstringlist_index_of_qregexp(q.p, re.handle(), C.ptrdiff_t(from))
+	r := C.qstringlist_index_of_qregexp(q.handle(), re.handle(), C.ptrdiff_t(from))
 	runtime.KeepAlive(re)
 	return int(r)
 }
@@ -504,7 +544,7 @@ func (q *QStringList) IndexOfQRegularExpression(re *QRegularExpression, from int
 // LastIndexOfQString returns the index of the last element equal to s at or before from (or -1).
 // Qt: QStringList::lastIndexOf(const QString&, qsizetype, Qt::CaseSensitivity).
 func (q *QStringList) LastIndexOfQString(s *QString, from int, caseSensitive bool) int {
-	r := C.qstringlist_last_index_of_qstring(q.p, s.handle(), C.ptrdiff_t(from), csInt(caseSensitive))
+	r := C.qstringlist_last_index_of_qstring(q.handle(), s.handle(), C.ptrdiff_t(from), csInt(caseSensitive))
 	runtime.KeepAlive(s)
 	return int(r)
 }
@@ -520,7 +560,7 @@ func (q *QStringList) LastIndexOfGoString(s string, from int, caseSensitive bool
 // LastIndexOfQRegularExpression returns the index of the last element matching re at or before from (or -1).
 // Qt: QStringList::lastIndexOf(const QRegularExpression&, qsizetype).
 func (q *QStringList) LastIndexOfQRegularExpression(re *QRegularExpression, from int) int {
-	r := C.qstringlist_last_index_of_qregexp(q.p, re.handle(), C.ptrdiff_t(from))
+	r := C.qstringlist_last_index_of_qregexp(q.handle(), re.handle(), C.ptrdiff_t(from))
 	runtime.KeepAlive(re)
 	return int(r)
 }

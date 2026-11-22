@@ -1,26 +1,61 @@
 package qtext
 
-// Package qbitarray: QBitArray — массив битов с COW-семантикой (handle-модель в Go).
-
 /*
- не реализовано:
-   - operator& / operator| / operator^ / operator~ в C++-форме — в Go используйте
-     пакетные функции And(a, b) / Or(a, b) / Xor(a, b) / Not(a).
-   - operator&= / operator|= / operator^= — используйте AndAssign / OrAssign / XorAssign.
-   - QBitArray::data_ptr() (DataPtr = QByteArray::DataPointer) — внутренняя деталь
-     реализации, не экспортируется. Для raw-доступа используйте Bits() / FromBits().
-   - QDataStream operators (operator<< / operator>>) — требует qdatastream (TODO).
-   - qHash(QBitArray) — требует qhash (TODO); в Go используйте хеширование среза из
-     Bits() (crypto/sha256, hash/fnv и т.п.).
-   - QBitArray(const QBitArray&) / QBitArray(QBitArray&&) — в Go используйте Clone()
-     для явной копии; присваивание указателя Go не копирует содержимое.
-   - QBitArray QDebug operator<< — неприменимо в Go.
-   - QBitArray::count() (deprecated alias size()) — используйте Size().
+QBitArray — handle над C++ QBitArray; владение через runtime.AddCleanup + Close().
+
+# Семантика
+
+Каждый *QBitArray — handle на C++ QBitArray (COW-массив битов).
+Копирование (Clone) дёшево (COW refcount++). Мутирующие методы detach-ят
+внутри Qt.
+
+# Владение
+
+C++ объект освобождается одним из двух способов:
+  - Close() — немедленно, детерминированно;
+  - runtime.AddCleanup — когда *QBitArray становится недостижим.
+
+Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
+гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
+двойного free нет.
+
+# Use after Close
+
+После Close() любой метод, кроме Close(), паникует
+("qbitarray: use after Close (or nil receiver)").
+
+# QBitRef
+
+QBitRef — Go-side прокси {array, index}, без отдельного C++ объекта.
+Он держит родительский *QBitArray живым, но не защищает от структурных
+изменений родителя. Не вызывайте Resize/Clear/Fill/FillSized/Close на
+родителе, пока QBitRef в работе. После Close родителя QBitRef паникует
+при любом обращении (через родительский handle()).
+
+# Соглашения по именам
+
+Все конструкторы QBitArray начинаются с NewQBitArray* (NewQBitArray,
+NewQBitArraySized, NewQBitArrayFromBits). Пакетные операторы And/Or/Xor/Not
+соответствуют C++-операторам &/|/^/~ и имени New не имеют — это не
+конструкторы, а операторные эквиваленты.
+
+# Что сознательно не вошло (TODO, не блокирует текущий API)
+
+  - QDataStream operator<< / operator>> — требует qdatastream (TODO).
+  - qHash(QBitArray) — требует qhash (TODO); в Go хешируйте срез из Bits()
+    (crypto/sha256, hash/fnv и т.п.).
+  - QDebug operator<< — неприменимо в Go.
+  - QBitArray::count() без аргумента (deprecated alias size()) — используйте Size().
+  - data_ptr() (DataPtr = QByteArray::DataPointer) — внутренняя деталь; для
+    raw-доступа используйте Bits()/NewQBitArrayFromBits.
+  - Перегрузки bitwise-операторов на rvalue (& &, |, ^ с moves) — не
+    экспортируются; AndAssign/OrAssign/XorAssign + Clone покрывают те же
+    сценарии.
 */
 
 /*
 #cgo pkg-config: Qt6Core
-#cgo CXXFLAGS: -std=c++17 -fPIC -Wno-sfinae-incomplete
+#cgo CXXFLAGS: -std=c++17 -fPIC
 #cgo LDFLAGS: -lstdc++
 #include <stdlib.h>
 #include <stdint.h>
@@ -32,44 +67,109 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
-// QBitArray mirrors Qt 6.11.2 QBitArray.
+// qbitarrayState holds the C++ QBitArray pointer in an atomic slot so that
+// Close() and the runtime cleanup can race safely: whoever swaps the slot
+// to nil owns the C++ object and is responsible for deleting it.
 //
-// It is a COW (copy-on-write) array of bits. Each *QBitArray owns a heap-allocated C++
-// QBitArray; the finalizer and Close() free it. Clone() is cheap (refcount++).
-type QBitArray struct {
-	p *C.go_qbitarray_t
+// Why *byte and not *C.go_qbitarray_t: cgo exposes the opaque struct
+// go_qbitarray_s as an incomplete Go type (forward-declared only under C
+// mode), and atomic.Pointer[T] requires T to be a complete type. The
+// pointer value is unchanged; only its Go-side static type differs. Cast
+// back to *C.go_qbitarray_t at C-call boundaries.
+//
+// State is a separate allocation (not embedded in QBitArray) because the
+// cleanup function must not capture *QBitArray — doing so would keep the
+// object reachable forever and the cleanup would never run.
+type qbitarrayState struct {
+	p atomic.Pointer[byte]
 }
 
+// cpp returns the underlying *C.go_qbitarray_t, or nil if the slot was
+// claimed (closed) already. Read-only, does not take ownership.
+func (s *qbitarrayState) cpp() *C.go_qbitarray_t {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.go_qbitarray_t)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+// claim atomically sets the slot to nil and returns the
+// *C.go_qbitarray_t that was there (if any). Exactly one caller gets a
+// non-nil result for a given stored pointer; subsequent claimers see nil.
+// This is what makes Close() vs cleanup safe against double free.
+func (s *qbitarrayState) claim() *C.go_qbitarray_t {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.go_qbitarray_t)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+// QBitArray mirrors Qt 6.11.2 QBitArray.
+//
+// It is a COW (copy-on-write) array of bits. Each *QBitArray owns a
+// heap-allocated C++ QBitArray; the runtime cleanup and Close() free it.
+// Clone() is cheap (refcount++).
+type QBitArray struct {
+	state   *qbitarrayState
+	cleanup runtime.Cleanup
+}
+
+// wrapQBitArray wraps an opaque *C.go_qbitarray_t into *QBitArray.
+// Takes ownership: cleanup (or Close) frees the C++ object.
 func wrapQBitArray(p *C.go_qbitarray_t) *QBitArray {
 	if p == nil {
 		return nil
 	}
-	a := &QBitArray{p: p}
-	runtime.SetFinalizer(a, finalizeQBitArray)
+	st := &qbitarrayState{}
+	st.p.Store((*byte)(unsafe.Pointer(p)))
+	a := &QBitArray{state: st}
+	a.cleanup = runtime.AddCleanup(a, func(st *qbitarrayState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qbitarray_delete(cpp)
+		}
+	}, st)
 	return a
 }
 
-func finalizeQBitArray(a *QBitArray) {
-	if a.p != nil {
-		C.qbitarray_delete(a.p)
-		a.p = nil
+// handle returns the underlying C++ pointer, panicking if a is nil or closed.
+func (a *QBitArray) handle() *C.go_qbitarray_t {
+	if cpp, ok := a.tryHandle(); ok {
+		return cpp
 	}
+	panic("qbitarray: use after Close (or nil receiver)")
+}
+
+// tryHandle is the non-panicking variant of handle. Returns nil, false if
+// a is nil, has no state, or has already been closed.
+func (a *QBitArray) tryHandle() (*C.go_qbitarray_t, bool) {
+	if a == nil || a.state == nil {
+		return nil, false
+	}
+	if cpp := a.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // ---- construction --------------------------------------------------------
 
+// NewQBitArray dispatches to the matching constructor based on the concrete
+// Go argument types. Qt: no single counterpart.
+//
+//	NewQBitArray()                → empty QBitArray (QBitArray())
+//	NewQBitArray(*QBitArray)      → Clone (QBitArray(const QBitArray&))
+//	NewQBitArray(int, bool)       → NewQBitArraySized(size, val)
 func NewQBitArray(arg ...any) *QBitArray {
 	if len(arg) == 0 || arg[0] == nil {
-		// New returns an empty (null and empty) QBitArray. Mirrors QBitArray().
 		return wrapQBitArray(C.qbitarray_new_empty())
 	}
 
 	if len(arg) == 1 {
-		b, ok := arg[0].(*QBitArray)
-		if ok {
+		if b, ok := arg[0].(*QBitArray); ok {
 			return b.Clone()
 		}
 	}
@@ -85,105 +185,157 @@ func NewQBitArray(arg ...any) *QBitArray {
 	panic("NewQBitArray invalid argument")
 }
 
-// NewSized returns a QBitArray of the given size, with all bits initialized to val.
-// Mirrors QBitArray(qsizetype size, bool val = false).
+// NewQBitArraySized returns a QBitArray of the given size, with all bits
+// initialized to val.
+// Qt: QBitArray(qsizetype size, bool val = false) — explicit constructor.
 func NewQBitArraySized(size int, val bool) *QBitArray {
 	return wrapQBitArray(C.qbitarray_new_sized(C.ptrdiff_t(size), C.bool(val)))
 }
 
+// NewQBitArrayFromBits constructs a QBitArray from bitLen valid bits of data.
+// data must contain at least (bitLen+7)/8 bytes. Bit layout is the same as
+// Bits(): bit i = (data[i/8] >> (i % 8)) & 1.
+// Qt: static QBitArray::fromBits(const char *data, qsizetype len).
+func NewQBitArrayFromBits(data []byte, bitLen int) *QBitArray {
+	if bitLen < 0 {
+		panic("qbitarray: NewQBitArrayFromBits negative bitLen")
+	}
+	need := (bitLen + 7) / 8
+	if len(data) < need {
+		panic("qbitarray: NewQBitArrayFromBits data too short")
+	}
+	var p *C.char
+	if need > 0 {
+		p = (*C.char)(unsafe.Pointer(&data[0]))
+	}
+	r := wrapQBitArray(C.qbitarray_from_bits(p, C.ptrdiff_t(bitLen)))
+	runtime.KeepAlive(data)
+	return r
+}
+
 // ---- lifecycle -----------------------------------------------------------
 
-// Close frees the underlying C++ object immediately and disables the finalizer.
-// After Close, all methods on a are UB. Invalidates any *QBitRef into a.
+// Close releases the underlying C++ object immediately and cancels the
+// runtime cleanup. Close is optional, idempotent, and nil-safe.
+//
+// If Close races with the runtime cleanup, exactly one of them claims the
+// C++ object and deletes it; the other sees nil and does nothing. No
+// double free.
+//
+// Invalidates any *QBitRef into a.
+// Qt: QBitArray::~QBitArray().
 func (a *QBitArray) Close() {
-	if a.p != nil {
-		C.qbitarray_delete(a.p)
-		a.p = nil
-		runtime.SetFinalizer(a, nil)
+	if a == nil || a.state == nil {
+		return
+	}
+	a.cleanup.Stop()
+	if cpp := a.state.claim(); cpp != nil {
+		C.qbitarray_delete(cpp)
 	}
 }
 
-// Clone returns a shallow COW copy (refcount++; cheap). Mirrors QBitArray(const QBitArray&).
+// Clone returns a shallow COW copy (refcount++; cheap).
+// Qt: QBitArray(const QBitArray&) — copy constructor.
 func (a *QBitArray) Clone() *QBitArray {
-	r := wrapQBitArray(C.qbitarray_new_copy(a.p))
+	r := wrapQBitArray(C.qbitarray_new_copy(a.handle()))
 	runtime.KeepAlive(a)
 	return r
 }
 
-// Assign copies the contents of other into a (COW; cheap). Mirrors operator=(const QBitArray&).
-// Invalidates any *QBitRef into a.
+// Assign copies the contents of other into a (COW; cheap). No-op if other
+// is nil or closed. Invalidates any *QBitRef into a.
+// Qt: QBitArray &operator=(const QBitArray&).
 func (a *QBitArray) Assign(other *QBitArray) {
-	if other == nil || other.p == nil {
+	op, ok := other.tryHandle()
+	if !ok {
 		return
 	}
-	C.qbitarray_assign(a.p, other.p)
+	C.qbitarray_assign(a.handle(), op)
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(other)
 }
 
-// Swap exchanges the contents of a and other (COW swap). Mirrors swap(QBitArray&).
-// Invalidates any *QBitRef into a or other.
+// Swap exchanges the contents of a and other (COW swap). No-op if other is
+// nil or closed. Invalidates any *QBitRef into a or other.
+// Qt: QBitArray::swap(QBitArray&).
 func (a *QBitArray) Swap(other *QBitArray) {
-	if other == nil || other.p == nil {
+	op, ok := other.tryHandle()
+	if !ok {
 		return
 	}
-	C.qbitarray_swap(a.p, other.p)
+	C.qbitarray_swap(a.handle(), op)
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(other)
 }
 
 // ---- size / status -------------------------------------------------------
 
-// Size returns the number of bits. Mirrors size().
+// Size returns the number of bits.
+// Qt: QBitArray::size() const.
 func (a *QBitArray) Size() int {
-	return int(C.qbitarray_size(a.p))
+	r := int(C.qbitarray_size(a.handle()))
+	runtime.KeepAlive(a)
+	return r
 }
 
-// Count returns the number of bits. Deprecated alias of Size() (as in Qt).
+// Count is an alias for Size (deprecated in Qt as a no-arg count()).
+// Qt: QBitArray::count() const (deprecated alias for size()).
 func (a *QBitArray) Count() int { return a.Size() }
 
-// CountSet returns the number of bits set to on. Mirrors count(bool on).
+// CountSet returns the number of bits set to on.
+// Qt: QBitArray::count(bool on) const.
 func (a *QBitArray) CountSet(on bool) int {
-	return int(C.qbitarray_count_set(a.p, C.bool(on)))
+	r := int(C.qbitarray_count_set(a.handle(), C.bool(on)))
+	runtime.KeepAlive(a)
+	return r
 }
 
-// IsEmpty reports whether Size() == 0. Mirrors isEmpty().
+// IsEmpty reports whether Size() == 0.
+// Qt: QBitArray::isEmpty() const.
 func (a *QBitArray) IsEmpty() bool {
-	return bool(C.qbitarray_is_empty(a.p))
+	r := bool(C.qbitarray_is_empty(a.handle()))
+	runtime.KeepAlive(a)
+	return r
 }
 
 // IsNull reports whether the array is null (no underlying storage allocated).
-// Mirrors isNull(). Note: null is a subset of empty.
+// Null is a subset of empty.
+// Qt: QBitArray::isNull() const.
 func (a *QBitArray) IsNull() bool {
-	return bool(C.qbitarray_is_null(a.p))
+	r := bool(C.qbitarray_is_null(a.handle()))
+	runtime.KeepAlive(a)
+	return r
 }
 
 // ---- modifiers -----------------------------------------------------------
 
-// Resize changes the number of bits to size. New bits are false; removed bits are dropped.
-// Mirrors resize(qsizetype size). Invalidates any *QBitRef into a.
+// Resize changes the number of bits to size. New bits are false; removed
+// bits are dropped. Invalidates any *QBitRef into a.
+// Qt: QBitArray::resize(qsizetype size).
 func (a *QBitArray) Resize(size int) {
-	C.qbitarray_resize(a.p, C.ptrdiff_t(size))
+	C.qbitarray_resize(a.handle(), C.ptrdiff_t(size))
 	runtime.KeepAlive(a)
 }
 
 // Detach ensures that the array has its own private storage (COW detach).
-// Mirrors detach().
+// Qt: QBitArray::detach().
 func (a *QBitArray) Detach() {
-	C.qbitarray_detach(a.p)
+	C.qbitarray_detach(a.handle())
 	runtime.KeepAlive(a)
 }
 
 // IsDetached reports whether the array has its own private storage.
-// Mirrors isDetached().
+// Qt: QBitArray::isDetached() const.
 func (a *QBitArray) IsDetached() bool {
-	return bool(C.qbitarray_is_detached(a.p))
+	r := bool(C.qbitarray_is_detached(a.handle()))
+	runtime.KeepAlive(a)
+	return r
 }
 
-// Clear resets the array to null and empty. Mirrors clear().
-// Invalidates any *QBitRef into a.
+// Clear resets the array to null and empty. Invalidates any *QBitRef into a.
+// Qt: QBitArray::clear().
 func (a *QBitArray) Clear() {
-	C.qbitarray_clear(a.p)
+	C.qbitarray_clear(a.handle())
 	runtime.KeepAlive(a)
 }
 
@@ -197,152 +349,192 @@ func (a *QBitArray) checkIndex(i int) {
 }
 
 // TestBit returns the value of bit i. Panics if i is out of range.
-// Mirrors testBit(qsizetype i).
+// Qt: QBitArray::testBit(qsizetype i) const.
 func (a *QBitArray) TestBit(i int) bool {
 	a.checkIndex(i)
-	return bool(C.qbitarray_test_bit(a.p, C.ptrdiff_t(i)))
+	r := bool(C.qbitarray_test_bit(a.handle(), C.ptrdiff_t(i)))
+	runtime.KeepAlive(a)
+	return r
 }
 
-// At is TestBit (read-only operator[]). Mirrors at(qsizetype i).
+// At is a read-only alias for TestBit (C++ operator[] const).
+// Qt: QBitArray::at(qsizetype i) const.
 func (a *QBitArray) At(i int) bool { return a.TestBit(i) }
 
-// SetBit sets bit i to true. Panics if i is out of range. Mirrors setBit(qsizetype i).
+// SetBit sets bit i to true. Panics if i is out of range.
+// Qt: QBitArray::setBit(qsizetype i).
 func (a *QBitArray) SetBit(i int) {
 	a.checkIndex(i)
-	C.qbitarray_set_bit(a.p, C.ptrdiff_t(i))
+	C.qbitarray_set_bit(a.handle(), C.ptrdiff_t(i))
 	runtime.KeepAlive(a)
 }
 
 // SetBitVal sets bit i to val. Panics if i is out of range.
-// Mirrors setBit(qsizetype i, bool val).
+// Qt: QBitArray::setBit(qsizetype i, bool val).
 func (a *QBitArray) SetBitVal(i int, val bool) {
 	a.checkIndex(i)
-	C.qbitarray_set_bit_val(a.p, C.ptrdiff_t(i), C.bool(val))
+	C.qbitarray_set_bit_val(a.handle(), C.ptrdiff_t(i), C.bool(val))
 	runtime.KeepAlive(a)
 }
 
-// ClearBit sets bit i to false. Panics if i is out of range. Mirrors clearBit(qsizetype i).
+// ClearBit sets bit i to false. Panics if i is out of range.
+// Qt: QBitArray::clearBit(qsizetype i).
 func (a *QBitArray) ClearBit(i int) {
 	a.checkIndex(i)
-	C.qbitarray_clear_bit(a.p, C.ptrdiff_t(i))
+	C.qbitarray_clear_bit(a.handle(), C.ptrdiff_t(i))
 	runtime.KeepAlive(a)
 }
 
-// ToggleBit flips bit i and returns its previous value. Panics if i is out of range.
-// Mirrors toggleBit(qsizetype i).
+// ToggleBit flips bit i and returns its previous value. Panics if i is out
+// of range.
+// Qt: QBitArray::toggleBit(qsizetype i).
 func (a *QBitArray) ToggleBit(i int) bool {
 	a.checkIndex(i)
-	return bool(C.qbitarray_toggle_bit(a.p, C.ptrdiff_t(i)))
+	r := bool(C.qbitarray_toggle_bit(a.handle(), C.ptrdiff_t(i)))
+	runtime.KeepAlive(a)
+	return r
 }
 
 // ---- bitwise assign ------------------------------------------------------
 
-// AndAssign performs a &= other. Sizes are extended to the longer of the two, with the
-// shorter array treated as zero-padded on the right. Invalidates *QBitRef into a.
-// Mirrors operator&=(const QBitArray&).
+// AndAssign performs a &= other. Sizes are extended to the longer of the
+// two, with the shorter array treated as zero-padded on the right. No-op if
+// other is nil or closed. Invalidates *QBitRef into a.
+// Qt: QBitArray &operator&=(const QBitArray&).
 func (a *QBitArray) AndAssign(other *QBitArray) {
-	if other == nil || other.p == nil {
+	op, ok := other.tryHandle()
+	if !ok {
 		return
 	}
-	C.qbitarray_and_assign(a.p, other.p)
+	C.qbitarray_and_assign(a.handle(), op)
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(other)
 }
 
-// OrAssign performs a |= other. Mirrors operator|=(const QBitArray&).
+// OrAssign performs a |= other. No-op if other is nil or closed.
+// Qt: QBitArray &operator|=(const QBitArray&).
 func (a *QBitArray) OrAssign(other *QBitArray) {
-	if other == nil || other.p == nil {
+	op, ok := other.tryHandle()
+	if !ok {
 		return
 	}
-	C.qbitarray_or_assign(a.p, other.p)
+	C.qbitarray_or_assign(a.handle(), op)
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(other)
 }
 
-// XorAssign performs a ^= other. Mirrors operator^=(const QBitArray&).
+// XorAssign performs a ^= other. No-op if other is nil or closed.
+// Qt: QBitArray &operator^=(const QBitArray&).
 func (a *QBitArray) XorAssign(other *QBitArray) {
-	if other == nil || other.p == nil {
+	op, ok := other.tryHandle()
+	if !ok {
 		return
 	}
-	C.qbitarray_xor_assign(a.p, other.p)
+	C.qbitarray_xor_assign(a.handle(), op)
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(other)
 }
 
 // ---- bitwise non-assign (package functions) -----------------------------
 
-// And returns a fresh QBitArray equal to a & b. Mirrors operator&(const QBitArray&, const QBitArray&).
+// And returns a fresh QBitArray equal to a & b. If b is nil or closed, the
+// result is a clone of a (Qt treats a null QBitArray as zero-length, and a
+// zero-length operand is zero-padded to the length of a — same as cloning).
+// Qt: QBitArray operator&(const QBitArray&, const QBitArray&).
 func And(a, b *QBitArray) *QBitArray {
-	r := wrapQBitArray(C.qbitarray_op_and(a.p, b.p))
+	ap := a.handle()
+	bp, ok := b.tryHandle()
+	if !ok {
+		return a.Clone()
+	}
+	r := wrapQBitArray(C.qbitarray_op_and(ap, bp))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(b)
 	return r
 }
 
-// Or returns a fresh QBitArray equal to a | b. Mirrors operator|(const QBitArray&, const QBitArray&).
+// Or returns a fresh QBitArray equal to a | b. If b is nil or closed, the
+// result is a clone of a.
+// Qt: QBitArray operator|(const QBitArray&, const QBitArray&).
 func Or(a, b *QBitArray) *QBitArray {
-	r := wrapQBitArray(C.qbitarray_op_or(a.p, b.p))
+	ap := a.handle()
+	bp, ok := b.tryHandle()
+	if !ok {
+		return a.Clone()
+	}
+	r := wrapQBitArray(C.qbitarray_op_or(ap, bp))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(b)
 	return r
 }
 
-// Xor returns a fresh QBitArray equal to a ^ b. Mirrors operator^(const QBitArray&, const QBitArray&).
+// Xor returns a fresh QBitArray equal to a ^ b. If b is nil or closed, the
+// result is a clone of a.
+// Qt: QBitArray operator^(const QBitArray&, const QBitArray&).
 func Xor(a, b *QBitArray) *QBitArray {
-	r := wrapQBitArray(C.qbitarray_op_xor(a.p, b.p))
+	ap := a.handle()
+	bp, ok := b.tryHandle()
+	if !ok {
+		return a.Clone()
+	}
+	r := wrapQBitArray(C.qbitarray_op_xor(ap, bp))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(b)
 	return r
 }
 
 // Not returns a fresh QBitArray equal to ~a (all bits inverted).
-// Mirrors operator~(QBitArray a).
+// Qt: QBitArray operator~(QBitArray a).
 func Not(a *QBitArray) *QBitArray {
-	r := wrapQBitArray(C.qbitarray_inverted(a.p))
+	r := wrapQBitArray(C.qbitarray_inverted(a.handle()))
 	runtime.KeepAlive(a)
 	return r
 }
 
 // ---- fill / truncate -----------------------------------------------------
 
-// Fill sets every bit of a to val (size unchanged). Mirrors fill(bool val) (with asize=-1).
+// Fill sets every bit of a to val (size unchanged).
+// Qt: QBitArray::fill(bool val, qsizetype asize = -1) with asize < 0.
 func (a *QBitArray) Fill(val bool) {
-	C.qbitarray_fill_all(a.p, C.bool(val))
+	C.qbitarray_fill_all(a.handle(), C.bool(val))
 	runtime.KeepAlive(a)
 }
 
 // FillSized resizes a to size and then fills every bit with val.
-// Mirrors fill(bool val, qsizetype size). Invalidates *QBitRef into a.
+// Invalidates *QBitRef into a.
+// Qt: QBitArray::fill(bool val, qsizetype size).
 func (a *QBitArray) FillSized(val bool, size int) {
-	C.qbitarray_fill_sized(a.p, C.bool(val), C.ptrdiff_t(size))
+	C.qbitarray_fill_sized(a.handle(), C.bool(val), C.ptrdiff_t(size))
 	runtime.KeepAlive(a)
 }
 
 // FillRange fills bits [first, last) with val. Panics if range is invalid.
-// Mirrors fill(bool val, qsizetype first, qsizetype last).
+// Qt: QBitArray::fill(bool val, qsizetype first, qsizetype last).
 func (a *QBitArray) FillRange(val bool, first, last int) {
 	if first < 0 || last < first || last > a.Size() {
 		panic("qbitarray: FillRange out of range")
 	}
-	C.qbitarray_fill_range(a.p, C.bool(val), C.ptrdiff_t(first), C.ptrdiff_t(last))
+	C.qbitarray_fill_range(a.handle(), C.bool(val), C.ptrdiff_t(first), C.ptrdiff_t(last))
 	runtime.KeepAlive(a)
 }
 
 // Truncate truncates the array at position pos (no-op if pos >= Size()).
-// Mirrors truncate(qsizetype pos). Invalidates *QBitRef into a.
+// Invalidates *QBitRef into a.
+// Qt: QBitArray::truncate(qsizetype pos).
 func (a *QBitArray) Truncate(pos int) {
-	C.qbitarray_truncate(a.p, C.ptrdiff_t(pos))
+	C.qbitarray_truncate(a.handle(), C.ptrdiff_t(pos))
 	runtime.KeepAlive(a)
 }
 
 // ---- raw bits (LSB-first within each byte) -----------------------------
 
 // Bits returns a copy of the raw bit buffer.
-// Format: bit i = (out[i/8] >> (i%8)) & 1, len(out) == (Size()+7)/8. For an empty array,
-// returns nil. Mirrors bits().
+// Format: bit i = (out[i/8] >> (i % 8)) & 1, len(out) == (Size()+7)/8.
+// For an empty array, returns nil.
+// Qt: QBitArray::bits() const.
 func (a *QBitArray) Bits() []byte {
 	var n C.ptrdiff_t
-	p := C.qbitarray_bits(a.p, &n)
+	p := C.qbitarray_bits(a.handle(), &n)
 	runtime.KeepAlive(a)
 	if p == nil || n == 0 {
 		return nil
@@ -350,46 +542,29 @@ func (a *QBitArray) Bits() []byte {
 	return C.GoBytes(unsafe.Pointer(p), C.int(n))
 }
 
-// FromBits constructs a new QBitArray from bitLen valid bits of data.
-// data must contain at least (bitLen+7)/8 bytes. Format is the same as Bits().
-// Mirrors static QBitArray::fromBits(const char*, qsizetype len).
-func FromBits(data []byte, bitLen int) *QBitArray {
-	if bitLen < 0 {
-		panic("qbitarray: FromBits negative bitLen")
-	}
-	need := (bitLen + 7) / 8
-	if len(data) < need {
-		panic("qbitarray: FromBits data too short")
-	}
-	var p *C.char
-	if need > 0 {
-		p = (*C.char)(unsafe.Pointer(&data[0]))
-	}
-	r := wrapQBitArray(C.qbitarray_from_bits(p, C.ptrdiff_t(bitLen)))
-	runtime.KeepAlive(data)
-	return r
-}
-
-// ToUInt32 interprets the first 32 bits of a as uint32 using the specified endianness.
-// Requires Size() >= 32; ok=false otherwise (result unspecified, matching Qt).
-// Mirrors toUInt32(QSysInfo::Endian endianness, bool *ok).
+// ToUInt32 interprets the first 32 bits of a as uint32 using the specified
+// endianness. Returns (value, false) if Size() < 32 (value is unspecified,
+// matching Qt).
+// Qt: QBitArray::toUInt32(QSysInfo::Endian endianness, bool *ok) const.
 func (a *QBitArray) ToUInt32(littleEndian bool) (uint32, bool) {
 	var ok C.bool
-	v := C.qbitarray_to_uint32(a.p, C.bool(littleEndian), &ok)
+	v := C.qbitarray_to_uint32(a.handle(), C.bool(littleEndian), &ok)
 	runtime.KeepAlive(a)
 	return uint32(v), bool(ok)
 }
 
 // ---- comparison ----------------------------------------------------------
 
-// Equal reports a == other (bit-by-bit, size and content).
-// Mirrors operator==(const QBitArray&).
+// Equal reports a == other (bit-by-bit, size and content). Returns false if
+// other is nil or closed.
+// Qt: QBitArray operator==(const QBitArray&).
 func (a *QBitArray) Equal(other *QBitArray) bool {
-	if other == nil || other.p == nil {
+	op, ok := other.tryHandle()
+	if !ok {
 		return false
 	}
-	r := C.qbitarray_equal(a.p, other.p)
+	r := bool(C.qbitarray_equal(a.handle(), op))
 	runtime.KeepAlive(a)
 	runtime.KeepAlive(other)
-	return bool(r)
+	return r
 }

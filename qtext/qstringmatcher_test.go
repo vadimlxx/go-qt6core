@@ -2,213 +2,290 @@ package qtext
 
 import (
 	"testing"
-	"unicode/utf16"
+
+	"github.com/vadimlxx/go-qt6core/qdata"
 )
 
 func TestQStringMatcherDefault(t *testing.T) {
 	m := NewQStringMatcher()
 	defer m.Close()
-	// No crash, no panic. PatternView of default (empty pattern) is fine.
-	v := m.PatternView()
-	if v.Size() != 0 {
-		t.Fatalf("default PatternView size: %d, want 0", v.Size())
+	if m.PatternString() != "" {
+		t.Fatalf("default pattern: %q", m.PatternString())
+	}
+	if m.CaseSensitivity() != qdata.CaseSensitive {
+		t.Fatalf("default cs: %v", m.CaseSensitivity())
 	}
 }
 
-func TestQStringMatcherFromQStringBasic(t *testing.T) {
-	pattern := NewQStringFromString("quick")
-	defer pattern.Close()
-	m := QStringMatcherFromQString(pattern, true)
+func TestQStringMatcherFromString(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
 	defer m.Close()
-
-	haystack := NewQStringFromString("the quick brown fox")
-	defer haystack.Close()
-
-	if got := m.IndexIn(haystack, 0); got != 4 {
-		t.Fatalf("IndexIn: %d, want 4", got)
+	if m.PatternString() != "world" {
+		t.Fatalf("pattern: %q", m.PatternString())
 	}
-	if got := m.IndexIn(haystack, 5); got != -1 {
-		t.Fatalf("IndexIn from 5: %d, want -1", got)
+}
+
+func TestQStringMatcherFromQString(t *testing.T) {
+	p := NewQStringFromString("hello")
+	defer p.Close()
+	m := NewQStringMatcherFromQString(p, qdata.CaseSensitive)
+	defer m.Close()
+	if m.PatternString() != "hello" {
+		t.Fatalf("pattern: %q", m.PatternString())
+	}
+}
+
+func TestQStringMatcherFromQChars(t *testing.T) {
+	units := []uint16{'a', 'b', 'c'}
+	m := NewQStringMatcherFromQChars(units, qdata.CaseSensitive)
+	defer m.Close()
+	if m.PatternString() != "abc" {
+		t.Fatalf("pattern: %q", m.PatternString())
 	}
 }
 
 func TestQStringMatcherFromQStringView(t *testing.T) {
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("quick")))
-	m := QStringMatcherFromQStringView(sv, true)
+	src := NewQStringFromString("view")
+	defer src.Close()
+	v := src.ToQStringView()
+	m := NewQStringMatcherFromQStringView(v, qdata.CaseSensitive)
 	defer m.Close()
-
-	haystack := QStringViewFromUtf16(utf16.Encode([]rune("the quick brown fox")))
-	if got := m.IndexInView(haystack, 0); got != 4 {
-		t.Fatalf("IndexInView: %d, want 4", got)
+	if m.PatternString() != "view" {
+		t.Fatalf("pattern: %q", m.PatternString())
 	}
 }
 
-func TestQStringMatcherFromUtf16(t *testing.T) {
-	m := QStringMatcherFromUtf16(utf16.Encode([]rune("quick")), true)
-	defer m.Close()
+func TestQStringMatcherDispatcher(t *testing.T) {
+	// string with default cs
+	m1 := NewQStringMatcher("hello")
+	defer m1.Close()
+	if m1.CaseSensitivity() != qdata.CaseSensitive {
+		t.Fatalf("expected CaseSensitive by default")
+	}
 
-	haystack := utf16.Encode([]rune("the quick brown fox"))
-	if got := m.IndexInUtf16(haystack, 0); got != 4 {
-		t.Fatalf("IndexInUtf16: %d, want 4", got)
+	// string + cs
+	m2 := NewQStringMatcher("hello", qdata.CaseInsensitive)
+	defer m2.Close()
+	if m2.CaseSensitivity() != qdata.CaseInsensitive {
+		t.Fatalf("expected CaseInsensitive")
+	}
+
+	// Clone
+	m3 := NewQStringMatcher(m2)
+	defer m3.Close()
+	if m3.PatternString() != "hello" {
+		t.Fatalf("clone pattern: %q", m3.PatternString())
 	}
 }
 
-func TestQStringMatcherCaseSensitivity(t *testing.T) {
-	pattern := NewQStringFromString("QUICK")
-	defer pattern.Close()
+func TestQStringMatcherIndexInString(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
+	defer m.Close()
 
-	// case-sensitive: no match
-	cs := QStringMatcherFromQString(pattern, true)
-	defer cs.Close()
-	haystack := NewQStringFromString("the quick brown fox")
-	defer haystack.Close()
-	if got := cs.IndexIn(haystack, 0); got != -1 {
-		t.Fatalf("case-sensitive IndexIn: %d, want -1", got)
-	}
+	subject := NewQStringFromString("hello world!")
+	defer subject.Close()
 
-	// case-insensitive: match at 4
-	ci := QStringMatcherFromQString(pattern, false)
-	defer ci.Close()
-	if got := ci.IndexIn(haystack, 0); got != 4 {
-		t.Fatalf("case-insensitive IndexIn: %d, want 4", got)
+	if got := m.IndexIn(subject, 0); got != 6 {
+		t.Fatalf("IndexIn: %d", got)
 	}
+	if got := m.IndexIn(subject, 7); got != -1 {
+		t.Fatalf("IndexIn from 7: %d", got)
+	}
+}
 
-	if !cs.CaseSensitivity() {
-		t.Fatal("CaseSensitivity must be true for cs matcher")
+func TestQStringMatcherIndexInGoString(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
+	defer m.Close()
+
+	if got := m.IndexInString("hello world", 0); got != 6 {
+		t.Fatalf("IndexInString: %d", got)
 	}
-	if ci.CaseSensitivity() {
-		t.Fatal("CaseSensitivity must be false for ci matcher")
+	if got := m.IndexInString("hello world", 7); got != -1 {
+		t.Fatalf("IndexInString from 7: %d", got)
+	}
+	if got := m.IndexInString("nope", 0); got != -1 {
+		t.Fatalf("IndexInString not found: %d", got)
+	}
+}
+
+func TestQStringMatcherIndexInQChars(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
+	defer m.Close()
+
+	subject := []uint16{'h', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd'}
+	if got := m.IndexInQChars(subject, 0); got != 6 {
+		t.Fatalf("IndexInQChars: %d", got)
+	}
+}
+
+func TestQStringMatcherIndexInView(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
+	defer m.Close()
+
+	src := NewQStringFromString("hello world")
+	defer src.Close()
+	v := src.ToQStringView()
+
+	if got := m.IndexInView(v, 0); got != 6 {
+		t.Fatalf("IndexInView: %d", got)
+	}
+}
+
+func TestQStringMatcherCaseInsensitive(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseInsensitive)
+	defer m.Close()
+
+	if got := m.IndexInString("Hello WORLD", 0); got != 6 {
+		t.Fatalf("IndexInString (CI): %d", got)
+	}
+}
+
+func TestQStringMatcherCaseSensitive(t *testing.T) {
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
+	defer m.Close()
+
+	if got := m.IndexInString("Hello WORLD", 0); got != -1 {
+		t.Fatalf("IndexInString (CS): %d", got)
 	}
 }
 
 func TestQStringMatcherSetPattern(t *testing.T) {
-	m := NewQStringMatcher()
+	m := NewQStringMatcherFromString("old", qdata.CaseSensitive)
 	defer m.Close()
 
-	haystack := NewQStringFromString("the quick brown fox")
-	defer haystack.Close()
-
-	m.SetPattern(NewQStringFromString("brown"))
-	if got := m.IndexIn(haystack, 0); got != 10 {
-		t.Fatalf("IndexIn(brown): %d, want 10", got)
+	m.SetPatternString("new")
+	if m.PatternString() != "new" {
+		t.Fatalf("after SetPatternString: %q", m.PatternString())
 	}
 
-	m.SetPattern(NewQStringFromString("zzz"))
-	if got := m.IndexIn(haystack, 0); got != -1 {
-		t.Fatalf("IndexIn(zzz): %d, want -1", got)
+	p := NewQStringFromString("third")
+	defer p.Close()
+	m.SetPattern(p)
+	if m.PatternString() != "third" {
+		t.Fatalf("after SetPattern: %q", m.PatternString())
 	}
 }
 
 func TestQStringMatcherSetCaseSensitivity(t *testing.T) {
-	pattern := NewQStringFromString("QUICK")
-	defer pattern.Close()
-	m := QStringMatcherFromQString(pattern, true)
+	m := NewQStringMatcherFromString("world", qdata.CaseSensitive)
 	defer m.Close()
 
-	haystack := NewQStringFromString("the quick brown fox")
-	defer haystack.Close()
-
-	if got := m.IndexIn(haystack, 0); got != -1 {
-		t.Fatalf("case-sensitive: %d, want -1", got)
+	if got := m.IndexInString("Hello WORLD", 0); got != -1 {
+		t.Fatalf("expected -1 for CS")
 	}
 
-	m.SetCaseSensitivity(false)
-	if got := m.IndexIn(haystack, 0); got != 4 {
-		t.Fatalf("after SetCaseSensitivity(false): %d, want 4", got)
+	m.SetCaseSensitivity(qdata.CaseInsensitive)
+	if m.CaseSensitivity() != qdata.CaseInsensitive {
+		t.Fatalf("SetCaseSensitivity failed")
+	}
+	if got := m.IndexInString("Hello WORLD", 0); got != 6 {
+		t.Fatalf("after CI: %d", got)
 	}
 }
 
 func TestQStringMatcherClone(t *testing.T) {
-	pattern := NewQStringFromString("fox")
-	defer pattern.Close()
-	orig := QStringMatcherFromQString(pattern, true)
-	defer orig.Close()
+	m1 := NewQStringMatcherFromString("abc", qdata.CaseSensitive)
+	defer m1.Close()
 
-	cpy := orig.Clone()
-	defer cpy.Close()
+	m2 := m1.Clone()
+	defer m2.Close()
 
-	haystack := NewQStringFromString("the quick brown fox")
-	defer haystack.Close()
-
-	if got := cpy.IndexIn(haystack, 0); got != 16 {
-		t.Fatalf("clone IndexIn: %d, want 16", got)
+	m2.SetPatternString("xyz")
+	if m1.PatternString() != "abc" {
+		t.Fatalf("original changed: %q", m1.PatternString())
 	}
-
-	// Mutating the clone does not affect the original.
-	cpy.SetCaseSensitivity(false)
-	if !orig.CaseSensitivity() {
-		t.Fatal("orig.CaseSensitivity must remain true after clone mutation")
+	if m2.PatternString() != "xyz" {
+		t.Fatalf("clone not modified: %q", m2.PatternString())
 	}
 }
 
 func TestQStringMatcherAssign(t *testing.T) {
-	src := QStringMatcherFromQString(NewQStringFromString("fox"), true)
-	defer src.Close()
-	dst := QStringMatcherFromQString(NewQStringFromString("zzz"), false)
-	defer dst.Close()
+	m1 := NewQStringMatcherFromString("abc", qdata.CaseSensitive)
+	defer m1.Close()
 
-	dst.Assign(src)
+	m2 := NewQStringMatcherFromString("xyz", qdata.CaseInsensitive)
+	defer m2.Close()
 
-	haystack := NewQStringFromString("the quick brown fox")
-	defer haystack.Close()
-
-	if got := dst.IndexIn(haystack, 0); got != 16 {
-		t.Fatalf("after Assign: %d, want 16", got)
+	m1.Assign(m2)
+	if m1.PatternString() != "xyz" {
+		t.Fatalf("after Assign pattern: %q", m1.PatternString())
 	}
-	if !dst.CaseSensitivity() {
-		t.Fatal("after Assign, CaseSensitivity must be true")
+	if m1.CaseSensitivity() != qdata.CaseInsensitive {
+		t.Fatalf("after Assign cs: %v", m1.CaseSensitivity())
 	}
 }
 
 func TestQStringMatcherPattern(t *testing.T) {
-	pattern := NewQStringFromString("hello")
-	defer pattern.Close()
-	m := QStringMatcherFromQString(pattern, true)
+	m := NewQStringMatcherFromString("hello", qdata.CaseSensitive)
 	defer m.Close()
 
-	got := m.Pattern()
-	defer got.Close()
-	if got.GoString() != "hello" {
-		t.Fatalf("Pattern: %q", got.GoString())
+	p := m.Pattern()
+	defer p.Close()
+	if p.GoString() != "hello" {
+		t.Fatalf("Pattern: %q", p.GoString())
 	}
-}
 
-func TestQStringMatcherPatternView(t *testing.T) {
-	pattern := NewQStringFromString("hello")
-	defer pattern.Close()
-	m := QStringMatcherFromQString(pattern, true)
-	defer m.Close()
+	if m.PatternString() != "hello" {
+		t.Fatalf("PatternString: %q", m.PatternString())
+	}
 
 	v := m.PatternView()
-	if v.GoString() != "hello" {
-		t.Fatalf("PatternView: %q", v.GoString())
+	if v.Size() != 5 {
+		t.Fatalf("PatternView size: %d", v.Size())
 	}
 }
 
-func TestQStringMatcherIndexInMultiByte(t *testing.T) {
-	// "😀" = U+1F600 = 2 UTF-16 code units
-	pattern := NewQStringFromString("😀")
-	defer pattern.Close()
-	m := QStringMatcherFromQString(pattern, true)
+func TestQStringMatcherNilSubject(t *testing.T) {
+	m := NewQStringMatcherFromString("abc", qdata.CaseSensitive)
 	defer m.Close()
 
-	haystack := NewQStringFromString("a😀b")
-	defer haystack.Close()
-
-	if got := m.IndexIn(haystack, 0); got != 1 {
-		t.Fatalf("IndexIn(😀): %d, want 1", got)
+	if got := m.IndexIn(nil, 0); got != -1 {
+		t.Fatalf("IndexIn(nil): %d", got)
 	}
 }
 
-func TestQStringMatcherEmptyPattern(t *testing.T) {
-	m := NewQStringMatcher()
+func TestQStringMatcherUseAfterClose(t *testing.T) {
+	m := NewQStringMatcherFromString("abc", qdata.CaseSensitive)
+	m.Close()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on use after Close")
+		}
+	}()
+	_ = m.PatternString()
+}
+
+func TestQStringMatcherCloseNilSafe(t *testing.T) {
+	var m *QStringMatcher
+	m.Close() // must not panic
+}
+
+func TestQStringMatcherCloseIdempotent(t *testing.T) {
+	m := NewQStringMatcherFromString("abc", qdata.CaseSensitive)
+	m.Close()
+	m.Close() // second Close must not panic
+}
+
+func TestQStringMatcherUnicodePattern(t *testing.T) {
+	// "мир" in Cyrillic, search in "привет мир".
+	m := NewQStringMatcherFromString("мир", qdata.CaseSensitive)
 	defer m.Close()
 
-	haystack := NewQStringFromString("hello")
-	defer haystack.Close()
+	got := m.IndexInString("привет мир", 0)
+	// "привет " is 7 UTF-16 code units (each Cyrillic letter is 1).
+	if got != 7 {
+		t.Fatalf("IndexInString cyrillic: %d, want 7", got)
+	}
+}
 
-	// Empty pattern matches at position 0.
-	if got := m.IndexIn(haystack, 0); got != 0 {
-		t.Fatalf("empty pattern IndexIn: %d, want 0", got)
+func TestQStringMatcherSurrogatePair(t *testing.T) {
+	// 😀 is U+1F600, 2 UTF-16 code units.
+	m := NewQStringMatcherFromString("😀", qdata.CaseSensitive)
+	defer m.Close()
+
+	got := m.IndexInString("a😀b", 0)
+	// "a" is 1 code unit, "😀" starts at index 1.
+	if got != 1 {
+		t.Fatalf("IndexInString emoji: %d, want 1", got)
 	}
 }

@@ -1,86 +1,110 @@
-/* Order: version check first, then real Qt headers. */
+/* C ABI for Qt 6.11 QtCore/QStringMatcher — implementation. */
 #include "../internal/qt6core/check_qt_version.h"
 
-/* qstringmatcher.h transitively includes qstring.h and qstringview.h. */
-#include <QtCore/qstringmatcher.h>
-#include <QtCore/qstringview.h>
-#include <QtCore/qstring.h>
+#include <QString>
+#include <QStringMatcher>
+#include <QStringView>
 
 #include "qstringmatcher_c.h"
 
 namespace {
 
-inline QStringMatcher       *M(go_qsm_t       *p) { return reinterpret_cast<QStringMatcher       *>(p); }
-inline const QStringMatcher *M(const go_qsm_t *p) { return reinterpret_cast<const QStringMatcher *>(p); }
-inline go_qsm_t *toM(QStringMatcher *p)           { return reinterpret_cast<go_qsm_t *>(p); }
-
-inline Qt::CaseSensitivity CS(int cs) noexcept {
-    return cs == 0 ? Qt::CaseInsensitive : Qt::CaseSensitive;
-}
-inline int csToInt(Qt::CaseSensitivity cs) noexcept {
-    return cs == Qt::CaseSensitive ? 1 : 0;
+// Qt::CaseSensitivity raw values: CaseInsensitive = 0, CaseSensitive = 1.
+// qdata.CaseSensitivity mirrors these values, so a direct static_cast is
+// correct (no inversion like the one used in qstring_c.cpp for bool-based
+// APIs).
+inline Qt::CaseSensitivity CS(int cs) {
+    return static_cast<Qt::CaseSensitivity>(cs);
 }
 
 } // namespace
 
 extern "C" {
 
-/* ---- Constructors ---- */
-go_qsm_t *qstringmatcher_new_default(void) {
-    return toM(new QStringMatcher());
-}
-go_qsm_t *qstringmatcher_new_from_qstring(const void *qstr, int cs) {
-    const QString &s = qstr ? *static_cast<const QString *>(qstr) : QString();
-    return toM(new QStringMatcher(s, CS(cs)));
-}
-go_qsm_t *qstringmatcher_new_from_utf16(const uint16_t *data, ptrdiff_t size, int cs) {
-    QStringView v(reinterpret_cast<const char16_t *>(data), static_cast<qsizetype>(size));
-    return toM(new QStringMatcher(v, CS(cs)));
-}
-go_qsm_t *qstringmatcher_new_copy(const go_qsm_t *other) {
-    return toM(new QStringMatcher(*M(other)));
+/* Constructors */
+
+QStringMatcher* qstringmatcher_new() {
+    return new QStringMatcher();
 }
 
-/* ---- Lifecycle ---- */
-void qstringmatcher_delete(go_qsm_t *self) {
-    if (self) delete M(self);
-}
-void qstringmatcher_assign(go_qsm_t *self, const go_qsm_t *other) {
-    if (self && other) *M(self) = *M(other);
+QStringMatcher* qstringmatcher_new_from_qstring(const QString* pattern, int cs) {
+    if (!pattern) return new QStringMatcher();
+    return new QStringMatcher(*pattern, CS(cs));
 }
 
-/* ---- Pattern / sensitivity ---- */
-void qstringmatcher_set_pattern(go_qsm_t *self, const void *qstr) {
+QStringMatcher* qstringmatcher_new_from_view(const uint16_t* uc, ptrdiff_t len, int cs) {
+    if (!uc || len <= 0) return new QStringMatcher();
+    QStringView v(reinterpret_cast<const char16_t*>(uc), static_cast<qsizetype>(len));
+    return new QStringMatcher(v, CS(cs));
+}
+
+QStringMatcher* qstringmatcher_new_copy(const QStringMatcher* other) {
+    if (!other) return new QStringMatcher();
+    return new QStringMatcher(*other);
+}
+
+/* Destructor */
+
+void qstringmatcher_delete(QStringMatcher* self) {
+    delete self;
+}
+
+/* Setters */
+
+void qstringmatcher_set_pattern(QStringMatcher* self, const QString* pattern) {
+    if (!self || !pattern) return;
+    self->setPattern(*pattern);
+}
+
+void qstringmatcher_set_case_sensitivity(QStringMatcher* self, int cs) {
     if (!self) return;
-    if (qstr) {
-        M(self)->setPattern(*static_cast<const QString *>(qstr));
-    } else {
-        M(self)->setPattern(QString());
+    self->setCaseSensitivity(CS(cs));
+}
+
+void qstringmatcher_assign(QStringMatcher* self, const QStringMatcher* other) {
+    if (!self || !other) return;
+    *self = *other;
+}
+
+/* indexIn */
+
+ptrdiff_t qstringmatcher_index_in_qstring(const QStringMatcher* self,
+                                          const QString* str, ptrdiff_t from) {
+    if (!self || !str) return -1;
+    return static_cast<ptrdiff_t>(self->indexIn(*str, static_cast<qsizetype>(from)));
+}
+
+ptrdiff_t qstringmatcher_index_in_view(const QStringMatcher* self,
+                                       const uint16_t* uc, ptrdiff_t len,
+                                       ptrdiff_t from) {
+    if (!self) return -1;
+    if (!uc || len <= 0) {
+        return static_cast<ptrdiff_t>(
+            self->indexIn(QStringView(), static_cast<qsizetype>(from)));
     }
-}
-void qstringmatcher_set_case_sensitivity(go_qsm_t *self, int cs) {
-    if (self) M(self)->setCaseSensitivity(CS(cs));
-}
-int qstringmatcher_case_sensitivity(const go_qsm_t *self) {
-    return self ? csToInt(M(self)->caseSensitivity()) : 1;
+    QStringView v(reinterpret_cast<const char16_t*>(uc), static_cast<qsizetype>(len));
+    return static_cast<ptrdiff_t>(self->indexIn(v, static_cast<qsizetype>(from)));
 }
 
-/* ---- Search ---- */
-ptrdiff_t qstringmatcher_index_in_utf16(const go_qsm_t *self,
-    const uint16_t *data, ptrdiff_t size, ptrdiff_t from) {
-    QStringView v(reinterpret_cast<const char16_t *>(data), static_cast<qsizetype>(size));
-    return static_cast<ptrdiff_t>(M(self)->indexIn(v, static_cast<qsizetype>(from)));
+/* Getters */
+
+QString* qstringmatcher_pattern(const QStringMatcher* self) {
+    if (!self) return new QString();
+    return new QString(self->pattern());
 }
 
-/* ---- Pattern accessors ---- */
-void qstringmatcher_pattern(const go_qsm_t *self, void **out_qstring) {
-    *out_qstring = static_cast<void *>(new QString(M(self)->pattern()));
-}
-void qstringmatcher_pattern_view(const go_qsm_t *self,
-    const uint16_t **out_data, ptrdiff_t *out_size) {
-    QStringView v = M(self)->patternView();
-    *out_data = reinterpret_cast<const uint16_t *>(v.utf16());
-    *out_size = static_cast<ptrdiff_t>(v.size());
+const uint16_t* qstringmatcher_pattern_view(const QStringMatcher* self,
+                                            ptrdiff_t* out_len) {
+    if (out_len) *out_len = 0;
+    if (!self) return nullptr;
+    QStringView v = self->patternView();
+    if (out_len) *out_len = static_cast<ptrdiff_t>(v.size());
+    return reinterpret_cast<const uint16_t*>(v.utf16());
 }
 
-} // extern "C"
+int qstringmatcher_case_sensitivity(const QStringMatcher* self) {
+    if (!self) return 0;
+    return static_cast<int>(self->caseSensitivity());
+}
+
+} /* extern "C" */

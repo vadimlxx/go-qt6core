@@ -131,28 +131,24 @@ func TestQBitArrayAndOrXorNot(t *testing.T) {
 	b.SetBit(1)
 	b.SetBit(2)
 
-	// a & b = {1}
 	and := And(a, b)
 	defer and.Close()
 	if and.Size() != 8 || and.CountSet(true) != 1 || !and.TestBit(1) {
 		t.Fatalf("And: %v", and.Bits())
 	}
 
-	// a | b = {0,1,2}
 	or := Or(a, b)
 	defer or.Close()
 	if or.CountSet(true) != 3 {
 		t.Fatalf("Or count: %d, want 3", or.CountSet(true))
 	}
 
-	// a ^ b = {0,2}
 	xor := Xor(a, b)
 	defer xor.Close()
 	if xor.CountSet(true) != 2 || !xor.TestBit(0) || !xor.TestBit(2) {
 		t.Fatalf("Xor: %v", xor.Bits())
 	}
 
-	// ~a = all bits except 0,1
 	not := Not(a)
 	defer not.Close()
 	if not.CountSet(true) != 6 || not.TestBit(0) || not.TestBit(1) {
@@ -185,13 +181,13 @@ func TestQBitArrayBitsRoundTrip(t *testing.T) {
 		t.Fatalf("Bits length: %d, want 2", len(raw))
 	}
 
-	b := FromBits(raw, 12)
+	b := NewQBitArrayFromBits(raw, 12)
 	defer b.Close()
 	if b.Size() != 12 {
-		t.Fatalf("FromBits size: %d, want 12", b.Size())
+		t.Fatalf("NewQBitArrayFromBits size: %d, want 12", b.Size())
 	}
 	if !b.Equal(a) {
-		t.Fatal("FromBits round-trip mismatch")
+		t.Fatal("NewQBitArrayFromBits round-trip mismatch")
 	}
 }
 
@@ -211,7 +207,6 @@ func TestQBitArrayBitsFormat(t *testing.T) {
 func TestQBitArrayToUInt32(t *testing.T) {
 	a := NewQBitArraySized(32, false)
 	defer a.Close()
-	// Bits 0..7 set => byte 0 = 0xFF, rest 0.
 	for i := 0; i < 8; i++ {
 		a.SetBit(i)
 	}
@@ -282,13 +277,13 @@ func TestBitRef(t *testing.T) {
 	if !a.TestBit(3) {
 		t.Fatal("Set via BitRef must be visible in parent")
 	}
-	r.Assign(&QBitRef{array: a, index: 5})
-	if a.TestBit(5) {
-		t.Fatal("bit 5 must be false after assigning from bit 5's value (false)")
+	r.Assign(a.BitRef(5)) // bit 5 is false
+	if a.TestBit(3) {
+		t.Fatal("after Assign from bit 5 (false), bit 3 must be false")
 	}
 
 	a.SetBit(5)
-	r.Assign(a.BitRef(5))
+	r.Assign(a.BitRef(5)) // bit 5 is now true
 	if !a.TestBit(3) {
 		t.Fatal("after Assign from bit 5 (true), bit 3 must be true")
 	}
@@ -300,7 +295,6 @@ func TestCloneIsIndependent(t *testing.T) {
 	c := a.Clone()
 	defer c.Close()
 
-	// COW: mutating the clone must not affect the original.
 	c.ClearBit(0)
 	if !a.TestBit(0) {
 		t.Fatal("original must remain true after clone mutation")
@@ -331,5 +325,69 @@ func TestPanicsOnOutOfRange(t *testing.T) {
 			}()
 			fn()
 		}()
+	}
+}
+
+func TestQBitArrayUseAfterClosePanics(t *testing.T) {
+	a := NewQBitArraySized(4, false)
+	a.Close()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Size() after Close() must panic")
+		}
+	}()
+	_ = a.Size()
+}
+
+func TestQBitArrayCloseNilSafe(t *testing.T) {
+	var a *QBitArray
+	a.Close() // must not panic
+}
+
+func TestQBitArrayCloseIdempotent(t *testing.T) {
+	a := NewQBitArraySized(4, false)
+	a.Close()
+	a.Close() // second Close must not panic
+}
+
+func TestQBitArrayNilOperands(t *testing.T) {
+	a := NewQBitArraySized(8, false)
+	defer a.Close()
+	a.SetBit(1)
+
+	// And/Or/Xor with nil return a clone of a (null operand = zero-length).
+	andNil := And(a, nil)
+	defer andNil.Close()
+	if !andNil.Equal(a) {
+		t.Fatal("And(a, nil) must equal clone of a")
+	}
+
+	orNil := Or(a, nil)
+	defer orNil.Close()
+	if !orNil.Equal(a) {
+		t.Fatal("Or(a, nil) must equal clone of a")
+	}
+
+	xorNil := Xor(a, nil)
+	defer xorNil.Close()
+	if !xorNil.Equal(a) {
+		t.Fatal("Xor(a, nil) must equal clone of a")
+	}
+
+	// Assign/Swap with nil are no-ops.
+	b := a.Clone()
+	defer b.Close()
+	b.Assign(nil)
+	if !b.Equal(a) {
+		t.Fatal("Assign(nil) must be a no-op")
+	}
+	b.Swap(nil)
+	if !b.Equal(a) {
+		t.Fatal("Swap(nil) must be a no-op")
+	}
+
+	// Equal(nil) is false.
+	if a.Equal(nil) {
+		t.Fatal("Equal(nil) must be false")
 	}
 }

@@ -39,38 +39,79 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
+
+type qbytearraylistState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qbytearraylistState) cpp() *C.QByteArrayList {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QByteArrayList)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qbytearraylistState) claim() *C.QByteArrayList {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QByteArrayList)(unsafe.Pointer(bp))
+	}
+	return nil
+}
 
 // QByteArrayList wraps a Qt6 QList<QByteArray> (a.k.a. QByteArrayList).
 // The zero value is not usable; use New / FromQByteArrays / FromStrings.
 type QByteArrayList struct {
-	p *C.QByteArrayList
+	// p *C.QByteArrayList
+	state   *qbytearraylistState
+	cleanup runtime.Cleanup
 }
 
-func wrapQByteArrayList(p *C.QByteArrayList) *QByteArrayList {
-	if p == nil {
+func wrapQByteArrayList(l *C.QByteArrayList) *QByteArrayList {
+	if l == nil {
 		return nil
 	}
-	l := &QByteArrayList{p: p}
-	runtime.SetFinalizer(l, finalizeQByteArrayList)
-	return l
+	p := unsafe.Pointer(l)
+
+	st := &qbytearraylistState{}
+	st.p.Store((*byte)(p))
+	q := &QByteArrayList{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *qbytearraylistState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qbytearraylist_delete(cpp)
+		}
+	}, st)
+	return q
 }
 
-func finalizeQByteArrayList(l *QByteArrayList) {
-	if l.p != nil {
-		C.qbytearraylist_delete(l.p)
-		l.p = nil
+func (q *QByteArrayList) handle() *C.QByteArrayList {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("qbytearraylist: use after Close (or nil receiver)")
+}
+
+func (q *QByteArrayList) tryHandle() (*C.QByteArrayList, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
 // Do not call Close concurrently with other methods.
-func (l *QByteArrayList) Close() {
-	if l.p != nil {
-		C.qbytearraylist_delete(l.p)
-		l.p = nil
-		runtime.SetFinalizer(l, nil)
+func (q *QByteArrayList) Close() {
+	if q == nil || q.state == nil {
+		return
+	}
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.qbytearraylist_delete(cpp)
 	}
 }
 
@@ -123,7 +164,7 @@ func NewQByteArrayList(arg ...any) *QByteArrayList {
 
 // Clone returns a shallow COW copy (Qt refcount++; cheap).
 func (l *QByteArrayList) Clone() *QByteArrayList {
-	r := wrapQByteArrayList(C.qbytearraylist_new_copy(l.p))
+	r := wrapQByteArrayList(C.qbytearraylist_new_copy(l.handle()))
 	runtime.KeepAlive(l)
 	return r
 }
@@ -131,7 +172,7 @@ func (l *QByteArrayList) Clone() *QByteArrayList {
 // ---- size / capacity -----------------------------------------------------
 
 func (l *QByteArrayList) Size() int {
-	n := C.qbytearraylist_size(l.p)
+	n := C.qbytearraylist_size(l.handle())
 	runtime.KeepAlive(l)
 	return int(n)
 }
@@ -139,31 +180,31 @@ func (l *QByteArrayList) Size() int {
 func (l *QByteArrayList) Len() int { return l.Size() }
 
 func (l *QByteArrayList) IsEmpty() bool {
-	v := C.qbytearraylist_is_empty(l.p)
+	v := C.qbytearraylist_is_empty(l.handle())
 	runtime.KeepAlive(l)
 	return bool(v)
 }
 
 func (l *QByteArrayList) Capacity() int {
-	v := C.qbytearraylist_capacity(l.p)
+	v := C.qbytearraylist_capacity(l.handle())
 	runtime.KeepAlive(l)
 	return int(v)
 }
 
-func (l *QByteArrayList) Clear()   { C.qbytearraylist_clear(l.p); runtime.KeepAlive(l) }
-func (l *QByteArrayList) Reserve(n int) { C.qbytearraylist_reserve(l.p, C.ptrdiff_t(n)); runtime.KeepAlive(l) }
-func (l *QByteArrayList) Squeeze() { C.qbytearraylist_squeeze(l.p); runtime.KeepAlive(l) }
+func (l *QByteArrayList) Clear()   { C.qbytearraylist_clear(l.handle()); runtime.KeepAlive(l) }
+func (l *QByteArrayList) Reserve(n int) { C.qbytearraylist_reserve(l.handle(), C.ptrdiff_t(n)); runtime.KeepAlive(l) }
+func (l *QByteArrayList) Squeeze() { C.qbytearraylist_squeeze(l.handle()); runtime.KeepAlive(l) }
 
 // ---- append / prepend / insert ------------------------------------------
 
 func (l *QByteArrayList) Append(ba *QByteArray) {
-	C.qbytearraylist_append(l.p, ba.handle())
+	C.qbytearraylist_append(l.handle(), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
 
 func (l *QByteArrayList) Prepend(ba *QByteArray) {
-	C.qbytearraylist_prepend(l.p, ba.handle())
+	C.qbytearraylist_prepend(l.handle(), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -172,7 +213,7 @@ func (l *QByteArrayList) Insert(i int, ba *QByteArray) {
 	if i < 0 || i > l.Size() {
 		panic("qbytearraylist: Insert out of range")
 	}
-	C.qbytearraylist_insert(l.p, C.ptrdiff_t(i), ba.handle())
+	C.qbytearraylist_insert(l.handle(), C.ptrdiff_t(i), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -186,7 +227,7 @@ func (l *QByteArrayList) At(i int) *QByteArray {
 		panic("qbytearraylist: At out of range")
 	}
 	var out *C.QByteArray
-	C.qbytearraylist_at_new(l.p, C.ptrdiff_t(i), &out)
+	C.qbytearraylist_at_new(l.handle(), C.ptrdiff_t(i), &out)
 	runtime.KeepAlive(l)
 	return wrapQByteArray(unsafe.Pointer(out))
 }
@@ -195,7 +236,7 @@ func (l *QByteArrayList) Set(i int, ba *QByteArray) {
 	if i < 0 || i >= l.Size() {
 		panic("qbytearraylist: Set out of range")
 	}
-	C.qbytearraylist_set(l.p, C.ptrdiff_t(i), ba.handle())
+	C.qbytearraylist_set(l.handle(), C.ptrdiff_t(i), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 }
@@ -206,38 +247,38 @@ func (l *QByteArrayList) RemoveAt(i int) {
 	if i < 0 || i >= l.Size() {
 		panic("qbytearraylist: RemoveAt out of range")
 	}
-	C.qbytearraylist_remove_at(l.p, C.ptrdiff_t(i))
+	C.qbytearraylist_remove_at(l.handle(), C.ptrdiff_t(i))
 	runtime.KeepAlive(l)
 }
 
 func (l *QByteArrayList) RemoveFirst() {
-	C.qbytearraylist_remove_first(l.p)
+	C.qbytearraylist_remove_first(l.handle())
 	runtime.KeepAlive(l)
 }
 
 func (l *QByteArrayList) RemoveLast() {
-	C.qbytearraylist_remove_last(l.p)
+	C.qbytearraylist_remove_last(l.handle())
 	runtime.KeepAlive(l)
 }
 
 // ---- search --------------------------------------------------------------
 
 func (l *QByteArrayList) IndexOf(ba *QByteArray) int {
-	v := C.qbytearraylist_index_of(l.p, ba.handle())
+	v := C.qbytearraylist_index_of(l.handle(), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return int(v)
 }
 
 func (l *QByteArrayList) LastIndexOf(ba *QByteArray) int {
-	v := C.qbytearraylist_last_index_of(l.p, ba.handle())
+	v := C.qbytearraylist_last_index_of(l.handle(), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return int(v)
 }
 
 func (l *QByteArrayList) Contains(ba *QByteArray) bool {
-	v := C.qbytearraylist_contains(l.p, ba.handle())
+	v := C.qbytearraylist_contains(l.handle(), ba.handle())
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(ba)
 	return bool(v)
@@ -253,7 +294,7 @@ func (l *QByteArrayList) Join(sep []byte) *QByteArray {
 		p = (*C.char)(unsafe.Pointer(&sep[0]))
 	}
 	var out *C.QByteArray
-	C.qbytearraylist_join(l.p, p, C.ptrdiff_t(len(sep)), &out)
+	C.qbytearraylist_join(l.handle(), p, C.ptrdiff_t(len(sep)), &out)
 	runtime.KeepAlive(l)
 	runtime.KeepAlive(sep)
 	return wrapQByteArray(unsafe.Pointer(out))
@@ -276,7 +317,7 @@ func (l *QByteArrayList) JoinByte(sep byte) *QByteArray {
 func (l *QByteArrayList) ToSlice() []*QByteArray {
 	var arr **C.QByteArray
 	var n C.ptrdiff_t
-	C.qbytearraylist_to_array_new(l.p, &arr, &n)
+	C.qbytearraylist_to_array_new(l.handle(), &arr, &n)
 	runtime.KeepAlive(l)
 	if arr == nil || n == 0 {
 		return nil

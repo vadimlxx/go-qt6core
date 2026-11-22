@@ -1,81 +1,83 @@
-// Package qstringmatcher provides a Go binding for Qt 6.11.2 QtCore's QStringMatcher.
+// QStringMatcher is a Go binding for Qt 6.11 QtCore's QStringMatcher.
 //
-// QStringMatcher is a utility that preprocesses a pattern string to allow fast repeated
-// substring searches. It is NOT a QObject — it is a plain C++ value class with a private
-// implementation (d_ptr), a public copy constructor, and a public destructor.
+// QStringMatcher is a fast substring matcher using the Boyer-Moore-Horspool
+// algorithm with a skip table. It is efficient when the same pattern is
+// searched many times across different subject strings.
 //
-// In Go, each *QStringMatcher is a handle to a heap-allocated C++ QStringMatcher. The
-// wrapper owns the C++ object; runtime.SetFinalizer + explicit Close() free it.
+// # Type semantics
 //
-// # Type mapping
+// QStringMatcher is a handle to a C++ QStringMatcher. Each *QStringMatcher
+// owns the underlying C++ object.
 //
-//	Qt                             Go
-//	QStringMatcher                 *qstringmatcher.QStringMatcher
-//	Qt::CaseSensitivity            bool (caseSensitive: true = CaseSensitive)
-//	QString                        *qstring.QString
-//	QStringView                    qstringview.QStringView
-//	QChar*/char16_t*               []uint16
-//	qsizetype (return of indexIn)  int  (-1 for "not found")
+// # Ownership
 //
-// # Interop with sibling packages
+// The C++ QStringMatcher is released by one of:
+//   - Close(): eager, deterministic release;
+//   - runtime.AddCleanup: safety net when *QStringMatcher becomes unreachable.
 //
-// qstringmatcher imports only qstring and qstringview. No import cycles: neither of
-// those packages imports qstringmatcher.
+// Close is optional, idempotent, and nil-safe. Using a QStringMatcher after
+// Close panics with "qstringmatcher: use after Close (or nil receiver)".
 //
-// Construction:
-//   - New()                         → default-constructed matcher (empty pattern)
-//   - FromQString(pattern, cs)      → QStringMatcher(const QString&, cs)
-//   - FromQStringView(v, cs)        → QStringMatcher(QStringView, cs)
-//   - FromUtf16(units, cs)          → QStringMatcher(const QChar*, len, cs)
+// # Construction
 //
-// Copy / assign:
-//   - Clone()                       → QStringMatcher(const QStringMatcher&)
-//   - Assign(other)                 → operator=(const QStringMatcher&)
+//   - NewQStringMatcher()                                  — QStringMatcher()
+//   - NewQStringMatcherFromQString(p *QString, cs)         — QStringMatcher(const QString&, cs)
+//   - NewQStringMatcherFromString(s string, cs)            — same, UTF-8 decoded
+//   - NewQStringMatcherFromQStringView(v QStringView, cs)  — QStringMatcher(QStringView, cs)
+//   - NewQStringMatcherFromQChars(units []uint16, cs)      — QStringMatcher(const QChar*, qsizetype, cs)
+//   - (m).Clone()                                          — QStringMatcher(const QStringMatcher&)
+//   - (m).Assign(other)                                    — QStringMatcher::operator=
+//   - NewQStringMatcher(...)                               — dispatcher on argument type
 //
-// Pattern / sensitivity:
-//   - SetPattern(q)                 → setPattern(const QString&)
-//   - SetCaseSensitivity(bool)      → setCaseSensitivity(Qt::CaseSensitivity)
-//   - CaseSensitivity() bool        → caseSensitivity()
-//   - Pattern() *qstring.QString    → pattern()
-//   - PatternView() qstringview.QStringView → patternView()
+// # Searching
 //
-// Search:
-//   - IndexIn(q, from)              → indexIn(const QString&, from)
-//   - IndexInView(v, from)          → indexIn(QStringView, from)
-//   - IndexInUtf16(units, from)     → indexIn(const QChar*, len, from)
+//   - IndexIn(str *QString, from int) int          — indexIn(const QString&, qsizetype)
+//   - IndexInString(s string, from int) int        — same, UTF-8 decoded
+//   - IndexInView(v QStringView, from int) int     — indexIn(QStringView, qsizetype)
+//   - IndexInQChars(units []uint16, from int) int  — indexIn(const QChar*, qsizetype, qsizetype)
 //
-// # Protected members
+// Returns -1 if the pattern is not found. The `from` offset is in UTF-16
+// code units (matching Qt's QString semantics, not byte offset).
 //
-// QStringMatcher has NO protected members in Qt 6.11.2. Its only non-public member,
-// updateSkipTable(), is a private helper — not part of the API and not exposed.
+// # Setters / getters
+//
+//   - SetPattern(pattern *QString)                — setPattern(const QString&)
+//   - SetPatternString(s string)                  — same, UTF-8 decoded
+//   - SetPatternView(v QStringView)               — convenience (via QString)
+//   - SetCaseSensitivity(cs qdata.CaseSensitivity) — setCaseSensitivity(Qt::CaseSensitivity)
+//   - Pattern() *QString                          — pattern() const
+//   - PatternString() string                      — same, encoded as UTF-8
+//   - PatternView() QStringView                   — patternView() const noexcept
+//   - CaseSensitivity() qdata.CaseSensitivity     — caseSensitivity() const
+//
+// # Case sensitivity
+//
+// The cs argument uses qdata.CaseSensitivity:
+//   - qdata.CaseInsensitive — case-insensitive matching
+//   - qdata.CaseSensitive   — case-sensitive matching (default for Qt)
+//
+// Note: this is the qdata-typed constant set. Some other classes in this
+// package (notably QString) use a `caseSensitive bool` parameter instead;
+// the two conventions coexist for historical reasons.
 //
 // # PatternView lifetime
 //
-// PatternView() returns a zero-copy qstringview.QStringView into the matcher's internal
-// pattern buffer. The view keeps the *QStringMatcher alive. Do NOT call SetPattern or
-// Close on the matcher while the view (or any of its slices) is in use — the buffer may
-// reallocate or be freed. Use Pattern() if you need an independent copy.
+// PatternView returns a non-owning QStringView over the matcher's internal
+// pattern storage. The view is invalidated by any subsequent SetPattern /
+// SetPatternString / SetPatternView / Assign call, or by Close. If you need
+// a stable copy of the pattern, use Pattern() or PatternString().
 //
-// # TODO (not yet bound, or API differences vs Qt 6.11.2)
+// # Not yet bound
 //
-//   - QStringMatcher(const QChar *uc, qsizetype len, Qt::CaseSensitivity cs) is an
-//     inline forwarding constructor equivalent to QStringMatcher(QStringView(uc, len), cs).
-//     Exposed only as FromUtf16; FromQStringView covers the QStringView overload.
-//
-//   - updateSkipTable() (private helper): not exposed (not part of the public API).
-//
-//   - Qt::CaseSensitivity is not a separate Go type: pass `caseSensitive bool`
-//     (true = CaseSensitive, false = CaseInsensitive), matching the style used by the
-//     qstring / qstringview / qbytearray bindings.
-//
-//   - QStringMatcher is copyable in C++ (no deleted copy ctor, no move-only). This
-//     binding exposes Clone() and Assign(other) — both safe because QString is COW and
-//     QStringView inside the matcher points into the matcher's own q_pattern buffer.
-//
-// # Requirements
-//
-// Qt >= 6.11.2, C++17, pkg-config Qt6Core. Version check is performed at compile time in
-// qstringmatcher_c.cpp via internal/qt6core/check_qt_version.h.
+//   - updateSkipTable() — protected in Qt, called automatically by setPattern;
+//     not exposed separately.
+//   - Copy-assignment via Go syntax — use Assign method instead.
+//   - QStringMatcher(const QChar*, qsizetype, cs) — covered by
+//     NewQStringMatcherFromQChars (functionally identical to the QStringView
+//     constructor, since Qt's implementation forwards to it).
+//   - indexIn(const QChar*, qsizetype, from) — covered by IndexInQChars
+//     (also forwards to the QStringView overload in Qt).
 //
 // This package is a subpackage of github.com/vadimlxx/go-qt6core.
+// Requires Qt >= 6.11 and a C++17 compiler; links via pkg-config Qt6Core.
 package qtext

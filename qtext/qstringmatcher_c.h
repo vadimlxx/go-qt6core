@@ -1,45 +1,48 @@
-/* C ABI for Qt 6.11.2 QtCore/QStringMatcher. */
+/* C ABI for Qt 6.11 QtCore/QStringMatcher. */
 #ifndef GO_QT6CORE_QSTRINGMATCHER_C_H
 #define GO_QT6CORE_QSTRINGMATCHER_C_H
 
-#include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "qstring_c.h"  /* QString forward decl */
 
 #ifdef __cplusplus
+class QStringMatcher;
 extern "C" {
+#else
+typedef struct QStringMatcher QStringMatcher;
 #endif
 
-typedef struct go_qsm_s go_qsm_t; /* QStringMatcher* */
+/* Constructors */
+QStringMatcher* qstringmatcher_new(void);
+QStringMatcher* qstringmatcher_new_from_qstring(const QString* pattern, int cs);
+QStringMatcher* qstringmatcher_new_from_view(const uint16_t* uc, ptrdiff_t len, int cs);
+QStringMatcher* qstringmatcher_new_copy(const QStringMatcher* other);
 
-/* ---- Constructors (cs: 0 = CaseInsensitive, 1 = CaseSensitive) ---- */
-go_qsm_t *qstringmatcher_new_default(void);
-go_qsm_t *qstringmatcher_new_from_qstring(const void *qstr, int cs);
-go_qsm_t *qstringmatcher_new_from_utf16(const uint16_t *data, ptrdiff_t size, int cs);
-go_qsm_t *qstringmatcher_new_copy(const go_qsm_t *other);
+/* Destructor */
+void qstringmatcher_delete(QStringMatcher* self);
 
-/* ---- Lifecycle ---- */
-void qstringmatcher_delete(go_qsm_t *self);
-void qstringmatcher_assign(go_qsm_t *self, const go_qsm_t *other);
+/* Setters */
+void qstringmatcher_set_pattern(QStringMatcher* self, const QString* pattern);
+void qstringmatcher_set_case_sensitivity(QStringMatcher* self, int cs);
+void qstringmatcher_assign(QStringMatcher* self, const QStringMatcher* other);
 
-/* ---- Pattern / sensitivity ---- */
-void qstringmatcher_set_pattern(go_qsm_t *self, const void *qstr);
-void qstringmatcher_set_case_sensitivity(go_qsm_t *self, int cs);
-int  qstringmatcher_case_sensitivity(const go_qsm_t *self);
+/* indexIn */
+ptrdiff_t qstringmatcher_index_in_qstring(const QStringMatcher* self,
+                                          const QString* str, ptrdiff_t from);
+ptrdiff_t qstringmatcher_index_in_view(const QStringMatcher* self,
+                                       const uint16_t* uc, ptrdiff_t len,
+                                       ptrdiff_t from);
 
-/* ---- Search (returns qsizetype as ptrdiff_t; -1 = not found) ---- */
-ptrdiff_t qstringmatcher_index_in_utf16(const go_qsm_t *self,
-    const uint16_t *data, ptrdiff_t size, ptrdiff_t from);
-
-/* ---- Pattern accessors ---- */
-/* qstringmatcher_pattern allocates a new QString* (owning) via *out_qstring. */
-void qstringmatcher_pattern(const go_qsm_t *self, void **out_qstring);
-/* qstringmatcher_pattern_view returns a borrowed pointer into the matcher's internal
- * buffer. Valid until the matcher is modified or deleted. */
-void qstringmatcher_pattern_view(const go_qsm_t *self,
-    const uint16_t **out_data, ptrdiff_t *out_size);
+/* Getters */
+QString*         qstringmatcher_pattern(const QStringMatcher* self);
+const uint16_t*  qstringmatcher_pattern_view(const QStringMatcher* self,
+                                             ptrdiff_t* out_len);
+int              qstringmatcher_case_sensitivity(const QStringMatcher* self);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* GO_QT6CORE_QSTRINGMATCHER_C_H */

@@ -275,3 +275,237 @@ func TestUtf8(t *testing.T) {
         t.Fatal("invalid utf8 expected")
     }
 }
+
+func TestAssignAndSwap(t *testing.T) {
+    a := NewQByteArray("left")
+    defer a.Close()
+    b := NewQByteArray("right")
+    defer b.Close()
+
+    a.Swap(b)
+    if a.String() != "right" || b.String() != "left" {
+        t.Fatalf("Swap: a=%q b=%q", a.String(), b.String())
+    }
+
+    a.AssignBytes([]byte("abc"))
+    if a.String() != "abc" {
+        t.Fatalf("AssignBytes: %q", a.String())
+    }
+    a.AssignString("xyz")
+    if a.String() != "xyz" {
+        t.Fatalf("AssignString: %q", a.String())
+    }
+    a.AssignFill(3, 'q')
+    if a.String() != "qqq" {
+        t.Fatalf("AssignFill: %q", a.String())
+    }
+    src := NewQByteArray("copy")
+    defer src.Close()
+    a.AssignQByteArray(src)
+    if a.String() != "copy" {
+        t.Fatalf("AssignQByteArray: %q", a.String())
+    }
+}
+
+func TestNullEmptySemantics(t *testing.T) {
+    n := NewQByteArrayFromBytes(nil)
+    defer n.Close()
+    if !n.IsNull() || !n.IsEmpty() {
+        t.Fatalf("nil bytes: null=%v empty=%v", n.IsNull(), n.IsEmpty())
+    }
+
+    e := NewQByteArrayFromBytes([]byte{})
+    defer e.Close()
+    if e.IsNull() || !e.IsEmpty() {
+        t.Fatalf("empty bytes: null=%v empty=%v", e.IsNull(), e.IsEmpty())
+    }
+
+    e.AssignBytes([]byte("x"))
+    e.AssignBytes([]byte{})
+    if e.IsNull() || !e.IsEmpty() {
+        t.Fatalf("AssignBytes(empty): null=%v empty=%v", e.IsNull(), e.IsEmpty())
+    }
+    e.AssignBytes(nil)
+    if !e.IsNull() {
+        t.Fatal("AssignBytes(nil) should make the array null")
+    }
+}
+
+func TestSlice(t *testing.T) {
+    q := NewQByteArray("abcdef")
+    defer q.Close()
+    q.Slice(2)
+    if q.String() != "cdef" {
+        t.Fatalf("Slice: %q", q.String())
+    }
+
+    q2 := NewQByteArray("abcdef")
+    defer q2.Close()
+    q2.SliceN(1, 3)
+    if q2.String() != "bcd" {
+        t.Fatalf("SliceN: %q", q2.String())
+    }
+}
+
+func TestInsertReplaceVariants(t *testing.T) {
+    q := NewQByteArray("ac")
+    defer q.Close()
+    ins := NewQByteArray("b")
+    defer ins.Close()
+    q.InsertQByteArray(1, ins)
+    if q.String() != "abc" {
+        t.Fatalf("InsertQByteArray: %q", q.String())
+    }
+
+    q.ReplaceCharBytes('b', []byte("XY"))
+    if q.String() != "aXYc" {
+        t.Fatalf("ReplaceCharBytes: %q", q.String())
+    }
+    q.ReplaceAllString("XY", "b")
+    if q.String() != "abc" {
+        t.Fatalf("ReplaceAllString: %q", q.String())
+    }
+}
+
+func TestPercentDecoded(t *testing.T) {
+    q := NewQByteArray("a%20b%2Fc")
+    defer q.Close()
+
+    d := q.PercentDecoded('%')
+    defer d.Close()
+    if d.String() != "a b/c" {
+        t.Fatalf("PercentDecoded: %q", d.String())
+    }
+    if got := string(q.PercentDecodedBytes('%')); got != "a b/c" {
+        t.Fatalf("PercentDecodedBytes: %q", got)
+    }
+}
+
+func TestNumericVariants(t *testing.T) {
+    q := NewQByteArray("123")
+    defer q.Close()
+    if v, ok := q.ToLong(10); !ok || v != 123 {
+        t.Fatalf("ToLong: %d %v", v, ok)
+    }
+    if v, ok := q.ToULong(10); !ok || v != 123 {
+        t.Fatalf("ToULong: %d %v", v, ok)
+    }
+
+    n := NewQByteArrayNumberInt(-42, 10)
+    defer n.Close()
+    if n.String() != "-42" {
+        t.Fatalf("NumberInt: %q", n.String())
+    }
+    u := NewQByteArrayNumberUInt(42, 10)
+    defer u.Close()
+    if u.String() != "42" {
+        t.Fatalf("NumberUInt: %q", u.String())
+    }
+
+    q.SetNumInt(-7, 10)
+    if q.String() != "-7" {
+        t.Fatalf("SetNumInt: %q", q.String())
+    }
+    q.SetNumUInt(7, 10)
+    if q.String() != "7" {
+        t.Fatalf("SetNumUInt: %q", q.String())
+    }
+    q.SetNumFloat(1.5, 'f', 2)
+    if q.String() != "1.50" {
+        t.Fatalf("SetNumFloat: %q", q.String())
+    }
+}
+
+func TestSetFrontBack(t *testing.T) {
+    q := NewQByteArray("abc")
+    defer q.Close()
+    q.SetFront('X')
+    q.SetBack('Z')
+    if q.String() != "XbZ" {
+        t.Fatalf("SetFront/SetBack: %q", q.String())
+    }
+}
+
+func TestRemoveIf(t *testing.T) {
+    q := NewQByteArray("a1b2c3")
+    defer q.Close()
+    removed := q.RemoveIf(func(b byte) bool { return b >= '0' && b <= '9' })
+    if removed != 3 || q.String() != "abc" {
+        t.Fatalf("RemoveIf: removed=%d got=%q", removed, q.String())
+    }
+}
+
+func TestConcat(t *testing.T) {
+    a := NewQByteArray("foo")
+    defer a.Close()
+    b := NewQByteArray("bar")
+    defer b.Close()
+
+    c := a.Concat(b)
+    defer c.Close()
+    if c.String() != "foobar" || a.String() != "foo" {
+        t.Fatalf("Concat: %q (a=%q)", c.String(), a.String())
+    }
+    if got := string(a.ConcatBytes([]byte("!"))); got != "foo!" {
+        t.Fatalf("ConcatBytes: %q", got)
+    }
+}
+
+func TestBytesVariants(t *testing.T) {
+    q := NewQByteArray("  Hi  ")
+    defer q.Close()
+
+    if got := string(q.LeftBytes(4)); got != "  Hi" {
+        t.Fatalf("LeftBytes: %q", got)
+    }
+    if got := string(q.ToUpperBytes()); got != "  HI  " {
+        t.Fatalf("ToUpperBytes: %q", got)
+    }
+    if got := string(q.TrimmedBytes()); got != "Hi" {
+        t.Fatalf("TrimmedBytes: %q", got)
+    }
+    if got := string(q.CloneBytes()); got != "  Hi  " {
+        t.Fatalf("CloneBytes: %q", got)
+    }
+
+    hexSrc := NewQByteArray([]byte{0xAB, 0xCD})
+    defer hexSrc.Close()
+    if got := string(hexSrc.ToHexBytes(0)); got != "abcd" {
+        t.Fatalf("ToHexBytes: %q", got)
+    }
+    if got := string(hexSrc.ToBase64Bytes(0)); got != "q80=" {
+        t.Fatalf("ToBase64Bytes: %q", got)
+    }
+
+    nt := NewQByteArray("x")
+    defer nt.Close()
+    if got := nt.NullTerminatedBytes(); len(got) != 1 || got[0] != 'x' {
+        t.Fatalf("NullTerminatedBytes: %v", got)
+    }
+}
+
+func TestSplitBytes(t *testing.T) {
+    q := NewQByteArray("a,b,,c")
+    defer q.Close()
+    parts := q.SplitBytes(',')
+    if len(parts) != 4 {
+        t.Fatalf("SplitBytes: %d parts", len(parts))
+    }
+    want := []string{"a", "b", "", "c"}
+    for i, p := range parts {
+        if string(p) != want[i] {
+            t.Fatalf("part[%d] = %q, want %q", i, p, want[i])
+        }
+    }
+}
+
+func TestNewFromString(t *testing.T) {
+    q := NewQByteArrayFromString("héllo\x00world")
+    defer q.Close()
+    if q.Size() != 12 {
+        t.Fatalf("NewQByteArrayFromString: size=%d", q.Size())
+    }
+    if q.At(1) != 0xC3 || q.At(2) != 0xA9 {
+        t.Fatalf("UTF-8 bytes expected, got %x %x", q.At(1), q.At(2))
+    }
+}

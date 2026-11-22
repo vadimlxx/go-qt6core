@@ -1,8 +1,8 @@
 // Class QByteArray provides a Go binding for Qt 6.11 QtCore's QByteArray.
 //
-// QByteArray is a COW (copy-on-write) byte container. In Go, each *QByteArray is a handle to a
-// C++ QByteArray object; cloning is cheap (refcount++), and mutating methods trigger detach as in
-// Qt.
+// QByteArray is a COW (copy-on-write) byte container. In Go, each *QByteArray is
+// a handle to a C++ QByteArray object; cloning is cheap (refcount++), and
+// mutating methods trigger detach as in Qt.
 //
 // # Type mapping
 //
@@ -10,189 +10,189 @@
 //	QByteArray                          *qtext.QByteArray
 //	QByteArray::Base64Option            qtext.Base64Option / Base64Options
 //	QByteArray::Base64DecodingStatus    qtext.Base64DecodingStatus
-//	const char* / char16_t*             []byte / string
+//	const char *                        string (UTF-8 bytes) / []byte
+//	QByteArrayView                      []byte
 //	qsizetype                           int
 //
-// Latin-1 and Local8Bit variants follow the same pattern: ToQStringLatin1 /
-// FromQStringLatin1UnsafePtr / ToQStringLocal8Bit / FromQStringLocal8BitUnsafePtr.
+// # Two variants per operation
 //
-// # QChar decomposition interop
+// Every member operation whose Qt signature takes or returns QByteArray or
+// QByteArrayView has two entry points (the only exceptions are IsSharedWith and
+// Swap, for which []byte counterparts would be meaningless):
 //
-// qchar.QChar exposes the Unicode decomposition as unsafe.Pointer (mirroring
-// QChar::decomposition() which returns QString). This package provides convenience wrappers that
-// decode that QString as UTF-8 / Latin-1:
+//   - a handle variant operating on *QByteArray (ownership, COW, no copy);
+//   - a Go variant operating on []byte. Methods returning a new QByteArray have
+//     a ...Bytes twin that returns a copy, and methods taking *QByteArray have a
+//     []byte twin (AppendBytes, PrependBytes, InsertBytes, ...).
 //
-//	c := qtext.NewQChar(0x00C0)                    // À
-//	d := qtext.FromQCharDecomposition(c)           // UTF-8 bytes of "A\u0300"
-//	defer d.Close()
-//	l := qtext.FromQCharDecompositionLatin1(c)     // Latin-1 bytes
-//	defer l.Close()
+// Parameters typed const char * in Qt additionally have ...String conveniences:
+// NewQByteArrayFromString, AppendString, PrependString, InsertString,
+// AssignString and ReplaceAllString.
 //
-// # QArrayData / COW inspection
+// QByteArray's Qt 6.11 API takes no QString, QStringView, QLatin1StringView or
+// QStringList parameters or return values (the QString comparison operators were
+// removed in Qt 6.8), so no string/[]string overloads are required for them.
 //
-// QByteArray::DataPointer (QArrayDataPointer<char>) is not exposed as a separate Go package. The
-// COW lifecycle is managed transparently by *QByteArray's finalizer and Close(). If you need to
-// inspect sharing:
+// # Construction
 //
-//	q.IsDetached()                         // true if refcount == 1
-//	q.IsSharedWith(other)                  // same internal buffer (ptr + size)
+//	NewQByteArray(v ...any)             // dispatch by Go type
+//	NewQByteArrayFromBytes([]byte)      // nil -> null, non-nil empty -> empty
+//	NewQByteArrayFromString(string)     // UTF-8, embedded NULs preserved
+//	NewQByteArrayFromFill(n, c)         // n bytes filled with c
+//	NewQByteArrayNumberLL/ULL/Int/UInt/Double
+//	NewQByteArrayFromBase64 / FromBase64Encoding / FromHex / FromPercentEncoding
+//	NewQByteArrayFromQCharDecomposition / ...Latin1
 //
-// Advanced QArrayData inspection (ref counts, capacity vs size) is not currently exposed.
+// # Lifecycle
 //
-// # Bound API (summary)
+//	Close, Clone, CloneBytes, Swap
+//	AssignBytes, AssignString, AssignFill, AssignQByteArray
 //
-// Constructors:
+// A *QByteArray is freed by Close() (immediate, idempotent, nil-safe) or by a
+// runtime cleanup attached when the wrapper becomes unreachable. Close and the
+// cleanup race safely: exactly one of them claims the C++ object, so there is no
+// double free.
 //
-//	New, FromBytes, FromString, FromFill,
-//	FromBase64, FromBase64Encoding, FromHex, FromPercentEncoding,
-//	FromQStringUnsafePtr, FromQStringLatin1UnsafePtr, FromQStringLocal8BitUnsafePtr,
-//	FromQCharDecomposition, FromQCharDecompositionLatin1,
-//	NumberLL, NumberULL, NumberDouble
+// # Size / capacity
 //
-// Size / capacity:
+//	Size, Len, Capacity, QByteArrayMaxSize,
+//	IsEmpty, IsNull, IsDetached, Detach, IsSharedWith
 //
-//	Size, Len, Capacity, MaxSize, IsEmpty, IsNull, IsDetached, Detach, IsSharedWith
+// # Modifiers
 //
-// Modifiers:
+//	Resize, ResizeFill, ResizeForOverwrite, Fill, Clear, Reserve, Squeeze,
+//	Truncate, Chop, NullTerminate, NullTerminated(+Bytes)
 //
-//	Resize, ResizeFill, ResizeForOverwrite, Fill, Clear, Reserve, Squeeze, Truncate, Chop,
-//	NullTerminate
+// # Element access
 //
-// Element access:
+//	At, SetAt, Front, SetFront, Back, SetBack
 //
-//	At, SetAt, Front, Back, Cell/Row (not applicable to QByteArray; use At/SetAt)
+// # Search
 //
-// Slicing (return new owned QByteArray):
+//	IndexOf, IndexOfBytes, LastIndexOf, LastIndexOfBytes,
+//	Count, CountBytes, Contains, ContainsBytes, Compare,
+//	StartsWith, StartsWithBytes, EndsWith, EndsWithBytes
 //
-//	Left, Right, Mid, First, Last, Sliced, SlicedN, Chopped, NullTerminated
+// # Slicing
 //
-// Transforms:
+//	Left(+Bytes), Right(+Bytes), Mid(+Bytes), First(+Bytes), Last(+Bytes),
+//	Sliced(+Bytes), SlicedN(+Bytes), Chopped(+Bytes)  // return a new array
+//	Slice, SliceN                                    // modify in place
 //
-//	ToLower, ToUpper, Trimmed, Simplified, Repeated, LeftJustified, RightJustified
+// # Transforms
 //
-// Mutation:
+//	ToLower(+Bytes), ToUpper(+Bytes), Trimmed(+Bytes), Simplified(+Bytes),
+//	LeftJustified(+Bytes), RightJustified(+Bytes), Repeated(+Bytes),
+//	Concat(+Bytes)
 //
-//	Append*, Prepend*, Insert*, Remove*, Replace* (multiple overload variants)
+// # Mutation
 //
-// Search:
+//	Append(char), AppendBytes, AppendString, AppendCount, AppendQByteArray
+//	Prepend(char), PrependBytes, PrependString, PrependCount, PrependQByteArray
+//	InsertBytes, InsertString, InsertByte, InsertCount, InsertQByteArray
+//	Remove, RemoveAt, RemoveFirst, RemoveLast, RemoveIf
+//	ReplaceChar, ReplaceCharBytes, ReplaceRange, ReplaceAll, ReplaceAllString
 //
-//	IndexOf*, LastIndexOf*, Contains*, Count*, Compare, StartsWith*, EndsWith*
-//
-// Numeric:
-//
-//	ToShort, ToUShort, ToInt, ToUInt, ToLong, ToULong, ToLongLong, ToULongLong,
-//	ToFloat, ToDouble, SetNumLL, SetNumULL, SetNumDouble
-//
-// Encoding:
-//
-//	ToBase64, ToHex, ToPercentEncoding
-//
-// Compression:
-//
-//	Compress, Uncompress
-//
-// Split:
-//
-//	Split(char)
-//
-// Predicates:
+// # Predicates
 //
 //	IsUpper, IsLower, IsValidUtf8
 //
-// QString bridge (return unsafe.Pointer to QString*; wrap via qstring.AdoptUnsafePtr):
+// # Numeric
 //
-//	(*QByteArray).ToQString, (*QByteArray).ToQStringLatin1, (*QByteArray).ToQStringLocal8Bit
+//	ToShort, ToUShort, ToInt, ToUInt, ToLong, ToULong,
+//	ToLongLong, ToULongLong, ToFloat, ToDouble
+//	SetNumLL, SetNumULL, SetNumInt, SetNumUInt, SetNumFloat, SetNumDouble
 //
-// Lifecycle / views:
+// # Encoding
 //
-//	Clone, Close, Bytes, String, UnsafePtr, AdoptUnsafePtr, ConstDataUnsafe
+//	ToBase64(+Bytes), ToHex(+Bytes), ToPercentEncoding(+Bytes),
+//	PercentDecoded(+Bytes)
 //
-// # not yet bound, or exposed differently vs Qt 6.11
+// # Compression and splitting
 //
-//   - fromRawData / setRawData — requires runtime.Pinner + careful lifetime management; not
-//     idiomatic in Go. Use FromBytes (copies) instead.
+//	Compress(+Bytes), Uncompress(+Bytes)
+//	Split(char) []*QByteArray, SplitBytes(char) [][]byte
 //
-//   - Iterators (begin/end/rbegin/rend, const_iterator). Use Bytes() / At / Go indexing.
+// # Interop
 //
-//   - operator[] mutable reference. Use SetAt. Go has no operator overloading.
+//	UnsafePtr, ConstDataUnsafe, QByteArrayFromUnsafePtr (interop.go)
 //
-//   - operator std::string_view / operator std::string. Use Bytes() / String().
+// These exchange borrowed/owned handles with sibling packages without exposing
+// cgo types.
 //
-//   - QByteArrayView cross-package helpers. Use []byte at the boundary, or
-//     qbytearrayview.FromQByteArray (lives in qbytearrayview to avoid an import cycle).
+// # Not bound, or exposed differently than in Qt 6.11
 //
-//   - QString cross-package direct returns (*qstring.QString from this package). Handled via
-//     unsafe.Pointer adapters + qstring.AdoptUnsafePtr.
+//   - fromRawData / setRawData: would require runtime.Pinner and manual lifetime
+//     management. Use NewQByteArrayFromBytes, which copies.
 //
-//   - assign(InputIterator, InputIterator). Use Clear + AppendBytes, or FromBytes.
+//   - Iterators (begin/end/rbegin/rend), mutable data(), operator[] references:
+//     replaced by At/SetAt/Bytes. Qt's operator[] is a reference; Go has no
+//     operator overloading.
 //
-//   - push_back / push_front. Covered by Append / Prepend.
+//   - operator const char * / operator const void * / operator std::string_view:
+//     use Bytes(), String() or ConstDataUnsafe().
 //
-//   - erase / erase_if / removeIf. Not exposed — use Bytes() + Go filtering + FromBytes, or
-//     Replace for common patterns.
+//   - QByteArray::FromBase64Result: replaced by the two-value return of
+//     NewQByteArrayFromBase64Encoding.
 //
-//   - fromStdString / toStdString. Covered by FromString / String().
+//   - QByteArray::DataPointer (QArrayDataPointer<char>): internal; only
+//     IsDetached/IsSharedWith/Capacity are exposed.
 //
-//   - nullTerminated() as a Qt-style member returning a copy. Provided as NullTerminated()
-//     (returns a new QByteArray) and NullTerminate() (in place).
+//   - QDataStream operators and qHash(QByteArray): the qdatastream/qhash parts
+//     are not implemented yet.
 //
-//   - QByteArray::FromBase64Result as a struct. Replaced by the two-value return of
-//     FromBase64Encoding: (*QByteArray, Base64DecodingStatus).
+//   - removeIf / erase_if / erase: RemoveIf(pred) implements the predicate-based
+//     removal in Go and returns the number of removed bytes.
 //
-//   - QByteArray::DataPointer (QArrayDataPointer<char>) exposure. Handled internally; advanced
-//     inspection (ref counts, alloc vs size) not exposed. See "QArrayData" above.
+//   - push_back / push_front: covered by Append / Prepend.
 //
-//   - operator + (concatenation). Use Clone().Append*() or build a fresh QByteArray.
+//   - assign(InputIterator, InputIterator): use AssignBytes or
+//     NewQByteArrayFromBytes.
 //
-//   - Comparison operators (==, <, …). Use Compare() or Bytes() + bytes.Equal.
+//   - setNum(short/ushort/long/ulong) and number(short/ushort/long/ulong):
+//     Qt delegates these overloads to the qlonglong/qulonglong versions. Use
+//     SetNumLL/SetNumULL (or SetNumInt/SetNumUInt) and
+//     NewQByteArrayNumberLL/ULL/Int/UInt.
 //
-//   - qCompress / qUncompress free functions. Provided as methods: Compress(level),
-//     Uncompress().
+//   - fromStdString / toStdString: covered by NewQByteArrayFromString / String.
 //
-//   - QDataStream operators (operator<<, operator>>). TODO — qdatastream package not yet
-//     implemented.
+//   - operator+ : Concat / ConcatBytes. operator+=: Append / Prepend.
 //
-//   - QByteArrayLiteral / ""_ba / ""_qba user-defined literals. Use FromString("...").
+//   - Comparison operators (==, !=, <, ...): Compare returns the Qt-style
+//     three-way result.
 //
-//   - Implicit operator const char*() / operator const void*(). Use Bytes() / String(), or
-//     ConstDataUnsafe() (interop.go) for zero-copy access.
+//   - QByteArrayLiteral and the ""_ba / ""_qba literals: use
+//     NewQByteArrayFromString.
 //
-//   - QByteArray::operator== with QString. Use qstring.FromQByteArray(q) and .CompareString(s).
+//   - QByteArray(qsizetype, Qt::Initialization): use ResizeForOverwrite on a
+//     fresh array.
 //
-//   - Darwin-specific fromCFData / toCFData / fromNSData / toNSData / fromRawCFData / toRawCFData.
-//     Skip — not portable.
+//   - Platform-specific CFData/NSData (Darwin) and emscripten::val (WASM)
+//     conversions: not portable, skipped.
 //
-//   - WASM-specific fromEcmaUint8Array / toEcmaUint8Array. Skip — not portable.
-//
-//   - Container STL compat (size_type, const_iterator, push_back, …). Not exposed — use
-//     Bytes(), Len(), At().
-//
-//   - Deprecated count() (no-arg, returns size). Use Size() / Len().
-//
-//   - Deprecated percentDecoded() as a member. Use FromPercentEncoding().
+//   - Deprecated no-argument count(): use Size or Len.
 //
 // # Design notes
 //
-//   - QByteArray is a COW container. Clone() is O(1) (refcount++). Mutating a clone triggers
-//     detach on first mutation (O(n) copy).
+//   - COW: Clone is O(1); the first mutation of a shared clone detaches (O(n)).
 //
-//   - Go-panic on out-of-range for At/SetAt/First/Last/Sliced/SlicedN/Chopped/Remove/Insert/
-//     Replace-range. Qt release builds disable Q_ASSERT → undefined behavior; a Go panic with a
-//     clear message is safer than silent UB.
+//   - Out-of-range indices panic (At/SetAt/First/Last/Sliced/SlicedN/Chopped/
+//     Slice/SliceN/Remove/Insert/ReplaceRange). Qt only asserts, which is
+//     undefined behaviour in release builds; a Go panic is safer.
 //
-//   - Left/Right/Mid follow Qt's clamping semantics (no panic).
+//   - Left/Right/Mid keep Qt's clamping semantics and do not panic.
 //
-//   - Null vs empty: QByteArray distinguishes isNull (data==nullptr) from isEmpty (size==0).
-//     Both preserved. FromBytes(nil) returns a null QByteArray; FromBytes([]byte{}) returns an
-//     empty (non-null) one.
+//   - Null vs empty: a null QByteArray has no data; an empty one has size 0 but
+//     is not null. NewQByteArrayFromBytes(nil) and AssignBytes(nil) produce a
+//     null array; non-nil empty slices produce an empty, non-null array.
 //
-//   - Thread safety: QByteArray is NOT thread-safe for concurrent mutation, same as Qt.
-//     Clone-and-share across goroutines is safe (COW).
+//   - Thread safety: QByteArray is not safe for concurrent mutation, same as Qt.
+//     Sharing a clone across goroutines is safe (COW).
 //
 // # Requirements
 //
-// Qt >= 6.11, C++17, pkg-config Qt6Core. Version check is performed at compile time in
-// qbytearray_c.cpp via internal/qt6core/check_qt_version.h.
+// Qt >= 6.11, C++17, pkg-config Qt6Core. The version check is performed at
+// compile time in qbytearray_c.cpp via internal/qt6core/check_qt_version.h.
 //
 // This package is a subpackage of github.com/vadimlxx/go-qt6core.
 package qtext

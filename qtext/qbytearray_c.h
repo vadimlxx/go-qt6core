@@ -15,10 +15,18 @@ typedef struct QByteArray QByteArray;
 
 /* --- lifecycle --- */
 QByteArray* qbytearray_new_empty(void);
+QByteArray* qbytearray_new_empty_nonnull(void);
 QByteArray* qbytearray_new_from_data(const char *data, ptrdiff_t size);
 QByteArray* qbytearray_new_fill(ptrdiff_t size, char c);
 QByteArray* qbytearray_new_copy(const QByteArray *other);
 void        qbytearray_delete(QByteArray *self);
+
+/* --- assignment / swap (QByteArray::operator=, QByteArray::swap) --- */
+void qbytearray_swap(QByteArray *self, QByteArray *other);
+void qbytearray_assign_data(QByteArray *self, const char *data, ptrdiff_t size);
+void qbytearray_assign_empty(QByteArray *self);
+void qbytearray_assign_fill(QByteArray *self, ptrdiff_t size, char c);
+void qbytearray_assign_ba(QByteArray *self, const QByteArray *other);
 
 /* --- basic accessors --- */
 ptrdiff_t   qbytearray_size(const QByteArray *self);
@@ -46,6 +54,8 @@ char qbytearray_at(const QByteArray *self, ptrdiff_t i);
 void qbytearray_set_at(QByteArray *self, ptrdiff_t i, char c);
 char qbytearray_front(const QByteArray *self);
 char qbytearray_back(const QByteArray *self);
+void qbytearray_set_front(QByteArray *self, char c);
+void qbytearray_set_back(QByteArray *self, char c);
 
 /* --- search --- */
 ptrdiff_t qbytearray_index_of_char(const QByteArray *self, char c, ptrdiff_t from);
@@ -67,6 +77,10 @@ QByteArray* qbytearray_last(const QByteArray *self, ptrdiff_t n);
 QByteArray* qbytearray_sliced(const QByteArray *self, ptrdiff_t pos);
 QByteArray* qbytearray_sliced_n(const QByteArray *self, ptrdiff_t pos, ptrdiff_t n);
 QByteArray* qbytearray_chopped(const QByteArray *self, ptrdiff_t n);
+
+/* --- in-place slicing (QByteArray::slice) --- */
+void qbytearray_slice(QByteArray *self, ptrdiff_t pos);
+void qbytearray_slice_n(QByteArray *self, ptrdiff_t pos, ptrdiff_t n);
 
 /* --- predicates --- */
 bool qbytearray_starts_with_char(const QByteArray *self, char c);
@@ -96,6 +110,7 @@ void qbytearray_prepend_data(QByteArray *self, const char *data, ptrdiff_t size)
 void qbytearray_prepend_count(QByteArray *self, ptrdiff_t count, char c);
 void qbytearray_prepend_ba(QByteArray *self, const QByteArray *other);
 void qbytearray_insert_data(QByteArray *self, ptrdiff_t i, const char *data, ptrdiff_t size);
+void qbytearray_insert_ba(QByteArray *self, ptrdiff_t i, const QByteArray *data);
 void qbytearray_insert_char(QByteArray *self, ptrdiff_t i, char c);
 void qbytearray_insert_count(QByteArray *self, ptrdiff_t i, ptrdiff_t count, char c);
 
@@ -105,6 +120,7 @@ void qbytearray_remove_at(QByteArray *self, ptrdiff_t pos);
 void qbytearray_remove_first(QByteArray *self);
 void qbytearray_remove_last(QByteArray *self);
 void qbytearray_replace_char_char(QByteArray *self, char before, char after);
+void qbytearray_replace_char_data(QByteArray *self, char before, const char *after, ptrdiff_t asize);
 void qbytearray_replace_range(QByteArray *self, ptrdiff_t i, ptrdiff_t len,
                               const char *data, ptrdiff_t dsize);
 void qbytearray_replace_data_data(QByteArray *self,
@@ -115,6 +131,8 @@ int16_t  qbytearray_to_short(const QByteArray *self, bool *ok, int base);
 uint16_t qbytearray_to_ushort(const QByteArray *self, bool *ok, int base);
 int32_t  qbytearray_to_int(const QByteArray *self, bool *ok, int base);
 uint32_t qbytearray_to_uint(const QByteArray *self, bool *ok, int base);
+int64_t  qbytearray_to_long(const QByteArray *self, bool *ok, int base);
+uint64_t qbytearray_to_ulong(const QByteArray *self, bool *ok, int base);
 int64_t  qbytearray_to_longlong(const QByteArray *self, bool *ok, int base);
 uint64_t qbytearray_to_ulonglong(const QByteArray *self, bool *ok, int base);
 float    qbytearray_to_float(const QByteArray *self, bool *ok);
@@ -123,9 +141,14 @@ double   qbytearray_to_double(const QByteArray *self, bool *ok);
 /* --- static number constructors --- */
 QByteArray* qbytearray_number_ll(int64_t n, int base);
 QByteArray* qbytearray_number_ull(uint64_t n, int base);
+QByteArray* qbytearray_number_int(int32_t n, int base);
+QByteArray* qbytearray_number_uint(uint32_t n, int base);
 QByteArray* qbytearray_number_double(double n, char format, int precision);
 void        qbytearray_set_num_ll(QByteArray *self, int64_t n, int base);
 void        qbytearray_set_num_ull(QByteArray *self, uint64_t n, int base);
+void        qbytearray_set_num_int(QByteArray *self, int32_t n, int base);
+void        qbytearray_set_num_uint(QByteArray *self, uint32_t n, int base);
+void        qbytearray_set_num_float(QByteArray *self, float n, char format, int precision);
 void        qbytearray_set_num_double(QByteArray *self, double n, char format, int precision);
 
 /* --- encoding / decoding --- */
@@ -139,6 +162,11 @@ QByteArray* qbytearray_from_hex(const QByteArray *self);
 QByteArray* qbytearray_to_percent(const QByteArray *self,
     const QByteArray *exclude, const QByteArray *include, char percent);
 QByteArray* qbytearray_from_percent(const QByteArray *self, char percent);
+QByteArray* qbytearray_percent_decoded(const QByteArray *self, char percent);
+
+/* --- concatenation (QByteArray operator+) --- */
+QByteArray* qbytearray_concat(const QByteArray *self, const QByteArray *other);
+QByteArray* qbytearray_concat_data(const QByteArray *self, const char *data, ptrdiff_t size);
 
 /* --- compression (free functions) --- */
 QByteArray* qbytearray_compress(const QByteArray *self, int level);

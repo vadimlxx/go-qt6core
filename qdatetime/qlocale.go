@@ -68,10 +68,15 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
+
+type qlocateState struct {
+	p atomic.Pointer[byte]
+}
 
 // QLocale wraps a heap-allocated Qt6 QLocale.
 type QLocale struct {

@@ -150,6 +150,8 @@ Free operator+(QRect, QMargins) / operator+(QMargins, QRect) — covered by Marg
 
 Free operator-(QRect, QMargins) — covered by MarginsRemoved.
 
+- skiped QStringTokenizer*
+
 
 #### All date, time & locate classes are assigned to qdatetime:
 

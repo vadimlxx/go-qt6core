@@ -34,6 +34,7 @@ extern "C" {
 
 /* --- lifecycle --- */
 QByteArray* qbytearray_new_empty() { return new QByteArray(); }
+QByteArray* qbytearray_new_empty_nonnull() { return new QByteArray(""); }
 QByteArray* qbytearray_new_from_data(const char *data, ptrdiff_t size) {
     return new QByteArray(data, static_cast<qsizetype>(size));
 }
@@ -44,6 +45,23 @@ QByteArray* qbytearray_new_copy(const QByteArray *other) {
     return new QByteArray(*other);
 }
 void qbytearray_delete(QByteArray *self) { delete self; }
+
+/* --- assignment / swap --- */
+void qbytearray_swap(QByteArray *self, QByteArray *other) {
+    self->swap(*other);
+}
+void qbytearray_assign_data(QByteArray *self, const char *data, ptrdiff_t size) {
+    self->assign(V(data, size));
+}
+void qbytearray_assign_empty(QByteArray *self) {
+    *self = QByteArray("");
+}
+void qbytearray_assign_fill(QByteArray *self, ptrdiff_t size, char c) {
+    self->assign(static_cast<qsizetype>(size), c);
+}
+void qbytearray_assign_ba(QByteArray *self, const QByteArray *other) {
+    *self = *other;
+}
 
 /* --- accessors --- */
 ptrdiff_t qbytearray_size(const QByteArray *self)     { return static_cast<ptrdiff_t>(self->size()); }
@@ -89,6 +107,8 @@ void qbytearray_set_at(QByteArray *self, ptrdiff_t i, char c) {
 }
 char qbytearray_front(const QByteArray *self) { return self->front(); }
 char qbytearray_back(const QByteArray *self)  { return self->back(); }
+void qbytearray_set_front(QByteArray *self, char c) { self->front() = c; }
+void qbytearray_set_back(QByteArray *self, char c)  { self->back() = c; }
 
 /* --- search --- */
 ptrdiff_t qbytearray_index_of_char(const QByteArray *self, char c, ptrdiff_t from) {
@@ -146,6 +166,14 @@ QByteArray* qbytearray_chopped(const QByteArray *self, ptrdiff_t n) {
     return new QByteArray(self->chopped(static_cast<qsizetype>(n)));
 }
 
+/* --- in-place slicing --- */
+void qbytearray_slice(QByteArray *self, ptrdiff_t pos) {
+    self->slice(static_cast<qsizetype>(pos));
+}
+void qbytearray_slice_n(QByteArray *self, ptrdiff_t pos, ptrdiff_t n) {
+    self->slice(static_cast<qsizetype>(pos), static_cast<qsizetype>(n));
+}
+
 /* --- predicates --- */
 bool qbytearray_starts_with_char(const QByteArray *self, char c) { return self->startsWith(c); }
 bool qbytearray_starts_with_data(const QByteArray *self, const char *data, ptrdiff_t size) {
@@ -196,6 +224,9 @@ void qbytearray_prepend_ba(QByteArray *self, const QByteArray *other) { self->pr
 void qbytearray_insert_data(QByteArray *self, ptrdiff_t i, const char *data, ptrdiff_t size) {
     self->insert(static_cast<qsizetype>(i), V(data, size));
 }
+void qbytearray_insert_ba(QByteArray *self, ptrdiff_t i, const QByteArray *data) {
+    self->insert(static_cast<qsizetype>(i), *data);
+}
 void qbytearray_insert_char(QByteArray *self, ptrdiff_t i, char c) {
     self->insert(static_cast<qsizetype>(i), c);
 }
@@ -214,6 +245,9 @@ void qbytearray_remove_first(QByteArray *self) { self->removeFirst(); }
 void qbytearray_remove_last(QByteArray *self)  { self->removeLast(); }
 void qbytearray_replace_char_char(QByteArray *self, char before, char after) {
     self->replace(before, after);
+}
+void qbytearray_replace_char_data(QByteArray *self, char before, const char *after, ptrdiff_t asize) {
+    self->replace(before, V(after, asize));
 }
 void qbytearray_replace_range(QByteArray *self, ptrdiff_t i, ptrdiff_t len,
                               const char *data, ptrdiff_t dsize) {
@@ -239,6 +273,12 @@ int32_t qbytearray_to_int(const QByteArray *self, bool *ok, int base) {
 uint32_t qbytearray_to_uint(const QByteArray *self, bool *ok, int base) {
     return static_cast<uint32_t>(self->toUInt(ok, base));
 }
+int64_t qbytearray_to_long(const QByteArray *self, bool *ok, int base) {
+    return static_cast<int64_t>(self->toLong(ok, base));
+}
+uint64_t qbytearray_to_ulong(const QByteArray *self, bool *ok, int base) {
+    return static_cast<uint64_t>(self->toULong(ok, base));
+}
 int64_t qbytearray_to_longlong(const QByteArray *self, bool *ok, int base) {
     return static_cast<int64_t>(self->toLongLong(ok, base));
 }
@@ -259,6 +299,12 @@ QByteArray* qbytearray_number_ll(int64_t n, int base) {
 QByteArray* qbytearray_number_ull(uint64_t n, int base) {
     return new QByteArray(QByteArray::number(static_cast<qulonglong>(n), base));
 }
+QByteArray* qbytearray_number_int(int32_t n, int base) {
+    return new QByteArray(QByteArray::number(static_cast<int>(n), base));
+}
+QByteArray* qbytearray_number_uint(uint32_t n, int base) {
+    return new QByteArray(QByteArray::number(static_cast<uint>(n), base));
+}
 QByteArray* qbytearray_number_double(double n, char format, int precision) {
     return new QByteArray(QByteArray::number(n, format, precision));
 }
@@ -267,6 +313,15 @@ void qbytearray_set_num_ll(QByteArray *self, int64_t n, int base) {
 }
 void qbytearray_set_num_ull(QByteArray *self, uint64_t n, int base) {
     self->setNum(static_cast<qulonglong>(n), base);
+}
+void qbytearray_set_num_int(QByteArray *self, int32_t n, int base) {
+    self->setNum(static_cast<int>(n), base);
+}
+void qbytearray_set_num_uint(QByteArray *self, uint32_t n, int base) {
+    self->setNum(static_cast<uint>(n), base);
+}
+void qbytearray_set_num_float(QByteArray *self, float n, char format, int precision) {
+    self->setNum(n, format, precision);
 }
 void qbytearray_set_num_double(QByteArray *self, double n, char format, int precision) {
     self->setNum(n, format, precision);
@@ -301,6 +356,21 @@ QByteArray* qbytearray_to_percent(const QByteArray *self,
 }
 QByteArray* qbytearray_from_percent(const QByteArray *self, char percent) {
     return new QByteArray(QByteArray::fromPercentEncoding(*self, percent));
+}
+QByteArray* qbytearray_percent_decoded(const QByteArray *self, char percent) {
+    return new QByteArray(self->percentDecoded(percent));
+}
+
+/* --- concatenation --- */
+QByteArray* qbytearray_concat(const QByteArray *self, const QByteArray *other) {
+    QByteArray *r = new QByteArray(*self);
+    r->append(*other);
+    return r;
+}
+QByteArray* qbytearray_concat_data(const QByteArray *self, const char *data, ptrdiff_t size) {
+    QByteArray *r = new QByteArray(*self);
+    r->append(V(data, size));
+    return r;
 }
 
 /* --- compression --- */
