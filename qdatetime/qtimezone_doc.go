@@ -32,7 +32,7 @@
 //	TimeSpec() TimeSpec
 //	FixedSecondsAheadOfUtc() int
 //	IsUTCOrFixedOffset() bool
-//	Territory() Country
+//	Territory() Territory
 //
 // # Offset queries (take *QDateTime)
 //

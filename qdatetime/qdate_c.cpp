@@ -20,21 +20,26 @@ inline QString U8(const char* data, ptrdiff_t len) {
 
 extern "C" {
 
-go_qdate_t qdate_default(void)                              { return toGo(QDate()); }
-go_qdate_t qdate_from_ymd(int y, int m, int d)              { return toGo(QDate(y, m, d)); }
+go_qdate_t qdate_new_null(void)                             { return toGo(QDate()); }
+go_qdate_t qdate_new_from_ymd(int y, int m, int d)          { return toGo(QDate(y, m, d)); }
 go_qdate_t qdate_from_ymd_cal(int y, int m, int d, go_qcalendar_t cal) {
     return toGo(QDate(y, m, d, cal));
 }
 go_qdate_t qdate_from_julian_day(int64_t jd)                { return toGo(QDate::fromJulianDay(jd)); }
 go_qdate_t qdate_current_date(void)                         { return toGo(QDate::currentDate()); }
 
-go_qdate_t qdate_from_string_utf8(const char* str, ptrdiff_t str_len, int format) {
+go_qdate_t qdate_from_string(const char* str, ptrdiff_t str_len, int format) {
     return toGo(QDate::fromString(U8(str, str_len),
                                   static_cast<Qt::DateFormat>(format)));
 }
-go_qdate_t qdate_from_string_format_utf8(const char* str, ptrdiff_t str_len,
-                                         const char* format, ptrdiff_t format_len) {
+go_qdate_t qdate_from_string_format(const char* str, ptrdiff_t str_len,
+                                    const char* format, ptrdiff_t format_len) {
     return toGo(QDate::fromString(U8(str, str_len), U8(format, format_len)));
+}
+go_qdate_t qdate_from_string_format_cal(const char* str, ptrdiff_t str_len,
+                                        const char* format, ptrdiff_t format_len,
+                                        go_qcalendar_t cal) {
+    return toGo(QDate::fromString(U8(str, str_len), U8(format, format_len), cal));
 }
 
 bool qdate_is_null(go_qdate_t d)              { return D(d).isNull(); }

@@ -43,7 +43,7 @@
 //
 //   - ToShort/ToUShort/ToInt/ToUInt/ToLong/ToULong/ToLongLong/
 //     ToULongLong/ToFloat/ToDouble(s string) (T, bool)
-//   Each maps to the corresponding QLocale::toXxx(QStringView, bool*) const.
+//     Each maps to the corresponding QLocale::toXxx(QStringView, bool*) const.
 //
 // # Number formatting
 //
@@ -53,7 +53,7 @@
 //   - ToStringULLW(v, fieldWidth, fillChar rune) *qtext.QString
 //   - ToStringDouble(v float64, format byte, precision int) *qtext.QString
 //   - ToStringFloat(v float32, format byte, precision int) *qtext.QString
-//   Each XxxString() variant returns a Go string (closes the intermediate QString).
+//     Each XxxString() variant returns a Go string (closes the intermediate QString).
 //
 // # Locale-specific strings
 //
@@ -61,13 +61,13 @@
 //   - NegativeSign / PositiveSign / Exponential
 //   - AmText / PmText
 //   - MonthName / StandaloneMonthName / DayName / StandaloneDayName
-//   Each returns *qtext.QString; XxxString() variants return Go strings.
+//     Each returns *qtext.QString; XxxString() variants return Go strings.
 //
 // # Case conversion
 //
 //   - ToUpper(s string) / ToLower(s string) *qtext.QString
 //   - XxxString variants
-//   Matches QLocale::toUpper/toLower(const QString&) const.
+//     Matches QLocale::toUpper/toLower(const QString&) const.
 //
 // # Currency
 //
@@ -75,34 +75,34 @@
 //   - ToCurrencyStringLL(v int64, symbol *qtext.QString) *qtext.QString
 //   - ToCurrencyStringULL(v uint64, symbol *qtext.QString) *qtext.QString
 //   - ToCurrencyStringDouble(v float64, symbol *qtext.QString, precision int)
-//   Each maps to QLocale::currencySymbol / toCurrencyString.
+//     Each maps to QLocale::currencySymbol / toCurrencyString.
 //
 // # Data size
 //
 //   - FormattedDataSize(bytes int64, precision int, format DataSizeFormats) *qtext.QString
-//   Matches QLocale::formattedDataSize(qint64, int, DataSizeFormats).
+//     Matches QLocale::formattedDataSize(qint64, int, DataSizeFormats).
 //
 // # Quotation
 //
 //   - QuoteString(s string, style QuotationStyle) *qtext.QString
-//   Matches QLocale::quoteString(QStringView, QuotationStyle) const.
+//     Matches QLocale::quoteString(QStringView, QuotationStyle) const.
 //
 // # Separated list
 //
 //   - CreateSeparatedList(strings []string) *qtext.QString
 //   - CreateSeparatedListQStrings(qs []*qtext.QString) *qtext.QString
-//   Matches QLocale::createSeparatedList(const QStringList&).
+//     Matches QLocale::createSeparatedList(const QStringList&).
 //
 // # Collation
 //
 //   - Collation() *QLocale
-//   Matches QLocale::collation() const.
+//     Matches QLocale::collation() const.
 //
 // # UI languages
 //
 //   - UILanguages(sep TagSeparator) []*qtext.QString
 //   - UILanguagesStrings(sep TagSeparator) []string
-//   Matches QLocale::uiLanguages(TagSeparator).
+//     Matches QLocale::uiLanguages(TagSeparator).
 //
 // # Date/time formatting
 //
@@ -116,38 +116,47 @@
 //   - ToStringDateTimeString(dt *QDateTime, format string) *qtext.QString
 //   - ToStringDateTimeFormatCal(dt *QDateTime, format FormatType, cal *QCalendar) *qtext.QString
 //   - ToStringDateTimeStringCal(dt *QDateTime, format string, cal *QCalendar) *qtext.QString
-//   Each maps to the corresponding QLocale::toString overload. XxxString()
-//   variants return Go strings and close the intermediate QString.
+//     Each maps to the corresponding QLocale::toString overload. XxxString()
+//     variants return Go strings and close the intermediate QString.
 //
 // # Date/time patterns
 //
 //   - DateFormat(format FormatType) *qtext.QString
 //   - TimeFormat(format FormatType) *qtext.QString
 //   - DateTimeFormat(format FormatType) *qtext.QString
-//   Matches QLocale::dateFormat / timeFormat / dateTimeFormat.
+//     Matches QLocale::dateFormat / timeFormat / dateTimeFormat.
 //
 // # Parsing dates and times
 //
 //   - ToDateFormat(s string, format FormatType, baseYear int) QDate
-//   - ToDateString(s string, format string, baseYear int) QDate
-//   - ToDateFormatCal(s string, format FormatType, cal *QCalendar, baseYear int) QDate
-//   - ToDateStringCal(s string, format string, cal *QCalendar, baseYear int) QDate
-//   - ToTimeFormat(s string, format FormatType) QTime
-//   - ToTimeString(s string, format string) QTime
-//   - ToDateTimeFormat(s string, format FormatType, baseYear int) *QDateTime
-//   - ToDateTimeString(s string, format string, baseYear int) *QDateTime
-//   - ToDateTimeFormatCal(s string, format FormatType, cal *QCalendar, baseYear int) *QDateTime
-//   - ToDateTimeStringCal(s string, format string, cal *QCalendar, baseYear int) *QDateTime
-//   These map to QLocale::toDate / toTime / toDateTime overloads.
 //
-//   IMPORTANT: Qt's toDate/toDateTime return a NULL QDate/QDateTime when
-//   parsing fails (no `bool *ok` out-parameter). Check IsValid() on the
-//   result:
+//   - ToDateString(s string, format string, baseYear int) QDate
+//
+//   - ToDateFormatCal(s string, format FormatType, cal *QCalendar, baseYear int) QDate
+//
+//   - ToDateStringCal(s string, format string, cal *QCalendar, baseYear int) QDate
+//
+//   - ToTimeFormat(s string, format FormatType) QTime
+//
+//   - ToTimeString(s string, format string) QTime
+//
+//   - ToDateTimeFormat(s string, format FormatType, baseYear int) *QDateTime
+//
+//   - ToDateTimeString(s string, format string, baseYear int) *QDateTime
+//
+//   - ToDateTimeFormatCal(s string, format FormatType, cal *QCalendar, baseYear int) *QDateTime
+//
+//   - ToDateTimeStringCal(s string, format string, cal *QCalendar, baseYear int) *QDateTime
+//     These map to QLocale::toDate / toTime / toDateTime overloads.
+//
+//     IMPORTANT: Qt's toDate/toDateTime return a NULL QDate/QDateTime when
+//     parsing fails (no `bool *ok` out-parameter). Check IsValid() on the
+//     result:
 //
 //     d := loc.ToDateFormat("not a date", LongFormat, DefaultTwoDigitBaseYear)
 //     if !d.IsValid() { /* parse failed */ }
 //
-//   For ToTime*, the returned QTime is also null on failure (IsValid() == false).
+//     For ToTime*, the returned QTime is also null on failure (IsValid() == false).
 //
 // # baseYear
 //
@@ -167,7 +176,7 @@
 // QLocale enums are exposed as Go types in separate files:
 //   - language.go          — type Language int
 //   - script.go            — type Script int
-//   - country.go           — type Country int (= Territory)
+//   - country.go           — type Territory int
 //   - formattype.go        — type FormatType int
 //   - measurement_system.go— type MeasurementSystem int
 //   - number_option.go     — type NumberOption int + type NumberOptions (bitmask)
@@ -181,12 +190,12 @@
 //
 //   - QDataStream / QDebug operators.
 //   - qHash(QLocale).
-//   - Deprecated Qt 6.6 members: country(), countryToString(),
-//     countryToCode(), codeToCountry(), countriesForLanguage()
-//     (the latter is exposed under its deprecated name for compatibility,
-//     but prefer MatchingLocales).
-//   - Deprecated Qt 6.7 members: name() / bcp47Name() without a TagSeparator
-//     argument (use Name(Bcp47Name)(sep) with explicit separator).
+//   - Deprecated Qt 6.6 members (country(), countryToString(), countryToCode(),
+//     codeToCountry(), countriesForLanguage()) are intentionally not exposed;
+//     use Territory(), TerritoryToCode(), CodeToTerritory() and
+//     MatchingLocales() instead.
+//   - Deprecated Qt 6.7 members (name() / bcp47Name() without a TagSeparator)
+//     are not exposed; use Name(sep) / Bcp47Name(sep).
 //
 // # Requirements
 //

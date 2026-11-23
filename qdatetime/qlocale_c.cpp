@@ -415,18 +415,4 @@ go_qlocale_t* qlocale_matching_locales(int language, int script, int territory, 
 }
 void qlocale_free_locale_array(go_qlocale_t* arr) { delete[] arr; }
 
-int* qlocale_countries_for_language(int language, ptrdiff_t* out_count) {
-#if QT_DEPRECATED_SINCE(6, 6)
-    QList<QLocale::Country> list = QLocale::countriesForLanguage(Lang(language));
-    const qsizetype n = list.size();
-    *out_count = static_cast<ptrdiff_t>(n);
-    int* arr = new int[n > 0 ? static_cast<size_t>(n) : 1];
-    for (qsizetype i = 0; i < n; ++i) arr[i] = static_cast<int>(list[i]);
-    return arr;
-#else
-    *out_count = 0;
-    return nullptr;
-#endif
-}
-
 } // extern "C"

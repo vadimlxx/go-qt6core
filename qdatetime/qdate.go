@@ -14,7 +14,8 @@ package qdatetime
 
  Соглашения:
    - Конструкторы: NewQDate(), NewQDateFromYMD, NewQDateFromYMDCal, NewQDateFromJulianDay,
-     NewQDateCurrentDate, NewQDateFromString (qdata.DateFormat), NewQDateFromStringFormat.
+     NewQDateCurrentDate, NewQDateFromString (qdata.DateFormat), NewQDateFromStringFormat,
+     NewQDateFromStringFormatCal.
    - Геттеры: Year, Month, Day, DayOfWeek, DayOfYear, DaysInMonth, DaysInYear, WeekNumber,
      IsNull, IsValid.
    - С QCalendar: YearCal, MonthCal, DayCal.
@@ -52,11 +53,11 @@ import (
 type QDate int64
 
 // NewQDate returns a null QDate (mirrors Qt QDate()).
-func NewQDate() QDate { return QDate(C.qdate_default()) }
+func NewQDate() QDate { return QDate(C.qdate_new_null()) }
 
 // NewQDateFromYMD returns QDate(y, m, d).
 func NewQDateFromYMD(y, m, d int) QDate {
-	return QDate(C.qdate_from_ymd(C.int(y), C.int(m), C.int(d)))
+	return QDate(C.qdate_new_from_ymd(C.int(y), C.int(m), C.int(d)))
 }
 
 // NewQDateFromYMDCal returns QDate(y, m, d, cal).
@@ -78,7 +79,7 @@ func NewQDateFromString(str string, format qdata.DateFormat) QDate {
 	if len(str) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
 	}
-	d := QDate(C.qdate_from_string_utf8(p, C.ptrdiff_t(len(str)), C.int(format)))
+	d := QDate(C.qdate_from_string(p, C.ptrdiff_t(len(str)), C.int(format)))
 	runtime.KeepAlive(str)
 	return d
 }
@@ -92,9 +93,28 @@ func NewQDateFromStringFormat(str, format string) QDate {
 	if len(format) > 0 {
 		pf = (*C.char)(unsafe.Pointer(unsafe.StringData(format)))
 	}
-	d := QDate(C.qdate_from_string_format_utf8(
+	d := QDate(C.qdate_from_string_format(
 		ps, C.ptrdiff_t(len(str)),
 		pf, C.ptrdiff_t(len(format)),
+	))
+	runtime.KeepAlive(str)
+	runtime.KeepAlive(format)
+	return d
+}
+
+// NewQDateFromStringFormatCal returns QDate::fromString(str, format, cal).
+func NewQDateFromStringFormatCal(str, format string, cal QCalendar) QDate {
+	var ps, pf *C.char
+	if len(str) > 0 {
+		ps = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
+	}
+	if len(format) > 0 {
+		pf = (*C.char)(unsafe.Pointer(unsafe.StringData(format)))
+	}
+	d := QDate(C.qdate_from_string_format_cal(
+		ps, C.ptrdiff_t(len(str)),
+		pf, C.ptrdiff_t(len(format)),
+		cal.v,
 	))
 	runtime.KeepAlive(str)
 	runtime.KeepAlive(format)

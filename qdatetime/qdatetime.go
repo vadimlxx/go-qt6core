@@ -138,11 +138,11 @@ func (dt *QDateTime) Close() {
 }
 
 // qdateToJD / qdateFromJD bridge value-typed QDate and int64 julian day.
-func qdateToJD(d QDate) int64     { return d.ToJulianDay() }
-func qdateFromJD(jd int64) QDate  { return NewQDateFromJulianDay(jd) }
+func qdateToJD(d QDate) int64    { return d.ToJulianDay() }
+func qdateFromJD(jd int64) QDate { return NewQDateFromJulianDay(jd) }
 
 // qtimeToMSecs / qtimeFromMSecs bridge value-typed QTime and int32 msecs.
-func qtimeToMSecs(t QTime) int32  { return int32(t.MSecsSinceStartOfDay()) }
+func qtimeToMSecs(t QTime) int32    { return int32(t.MsecsSinceStartOfDay()) }
 func qtimeFromMSecs(ms int32) QTime { return NewQTimeFromMSecsSinceStartOfDay(int(ms)) }
 
 // cstr returns the internal data pointer of s (nil for empty string).

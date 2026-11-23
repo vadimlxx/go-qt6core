@@ -50,7 +50,7 @@ func TestQLocaleFromName(t *testing.T) {
 			t.Fatalf("NewQLocaleFromName(%q) = nil", name)
 		}
 		// Name() must round-trip for well-known locales.
-		got := mustQString(t, l.Name())
+		got := mustQString(t, l.Name(TagSeparatorUnderscore))
 		if got == "" {
 			t.Errorf("locale %q: Name() is empty", name)
 		}
@@ -58,14 +58,14 @@ func TestQLocaleFromName(t *testing.T) {
 }
 
 func TestQLocaleFromLanguageCountry(t *testing.T) {
-	l := NewQLocaleFromLanguageCountry(English, UnitedStates)
+	l := NewQLocaleFromLanguageTerritory(English, UnitedStates)
 	t.Cleanup(l.Close)
 
 	if l.Language() != English {
 		t.Fatalf("Language() = %v, want English", l.Language())
 	}
-	if l.Country() != UnitedStates {
-		t.Fatalf("Country() = %v, want UnitedStates", l.Country())
+	if l.Territory() != UnitedStates {
+		t.Fatalf("Territory() = %v, want UnitedStates", l.Territory())
 	}
 }
 
@@ -77,13 +77,13 @@ func TestQLocaleClone(t *testing.T) {
 	if clone.Language() != orig.Language() {
 		t.Fatalf("clone.Language() = %v, want %v", clone.Language(), orig.Language())
 	}
-	if clone.Country() != orig.Country() {
-		t.Fatalf("clone.Country() = %v, want %v", clone.Country(), orig.Country())
+	if clone.Territory() != orig.Territory() {
+		t.Fatalf("clone.Territory() = %v, want %v", clone.Territory(), orig.Territory())
 	}
 	// Both handles point to different C++ objects — closing clone must not
 	// affect orig (orig.Close() is called by cleanup).
-	if mustQString(t, orig.Name()) == "" {
-		t.Fatal("orig.Name() empty after clone creation")
+	if mustQString(t, orig.Name(TagSeparatorUnderscore)) == "" {
+		t.Fatal("orig.Name(TagSeparatorUnderscore) empty after clone creation")
 	}
 }
 
@@ -98,8 +98,8 @@ func TestQLocaleAccessors(t *testing.T) {
 	if got := l.Script(); got != LatinScript {
 		t.Errorf("Script() = %v, want LatinScript", got)
 	}
-	if got := l.Country(); got != UnitedStates {
-		t.Errorf("Country() = %v, want UnitedStates", got)
+	if got := l.Territory(); got != UnitedStates {
+		t.Errorf("Territory() = %v, want UnitedStates", got)
 	}
 	// en_US uses imperial (US) measurement system.
 	if got := l.MeasurementSystem(); got != ImperialUSSystem {
@@ -117,8 +117,8 @@ func TestQLocaleAccessorsRussian(t *testing.T) {
 	if got := l.Language(); got != Russian {
 		t.Errorf("Language() = %v, want Russian", got)
 	}
-	if got := l.Country(); got != Russia {
-		t.Errorf("Country() = %v, want Russia", got)
+	if got := l.Territory(); got != Russia {
+		t.Errorf("Territory() = %v, want Russia", got)
 	}
 	if got := l.MeasurementSystem(); got != MetricSystem {
 		t.Errorf("MeasurementSystem() = %v, want MetricSystem", got)
@@ -129,7 +129,7 @@ func TestQLocaleAccessorsRussian(t *testing.T) {
 
 func TestQLocaleName(t *testing.T) {
 	l := mkLocale(t, "en_US")
-	got := mustQString(t, l.Name())
+	got := mustQString(t, l.Name(TagSeparatorUnderscore))
 	if got != "en_US" {
 		t.Fatalf("Name() = %q, want %q", got, "en_US")
 	}
@@ -141,12 +141,12 @@ func TestQLocaleBcp47Name(t *testing.T) {
 	// Verify the locale was fully parsed (territory = US). On minimal Qt
 	// builds without complete CLDR territory data, "en_US" silently falls
 	// back to language-only "en" + AnyTerritory.
-	if l.Country() != UnitedStates {
+	if l.Territory() != UnitedStates {
 		t.Skipf("en_US not fully loaded on this system (country = %v); "+
-		"skipping BCP-47 name test", l.Country())
+			"skipping BCP-47 name test", l.Territory())
 	}
 
-	got := mustQString(t, l.Bcp47Name())
+	got := mustQString(t, l.Bcp47Name(TagSeparatorDash))
 
 	// Both "en-US" (full BCP-47 tag) and "en" (US is the CLDR likely-subtags
 	// default region for English) are valid representations of US English.
@@ -175,27 +175,27 @@ func TestQLocaleNativeTerritoryName(t *testing.T) {
 
 // ---- Number formatting ---------------------------------------------------
 
-func TestQLocaleToStringInt64(t *testing.T) {
+func TestQLocaleToStringLL(t *testing.T) {
 	en := mkLocale(t, "en_US")
-	if got := mustQString(t, en.ToStringInt64(1234567)); got != "1,234,567" {
-		t.Fatalf("en_US.ToStringInt64(1234567) = %q, want %q", got, "1,234,567")
+	if got := mustQString(t, en.ToStringLL(1234567)); got != "1,234,567" {
+		t.Fatalf("en_US.ToStringLL(1234567) = %q, want %q", got, "1,234,567")
 	}
 
 	de := mkLocale(t, "de_DE")
-	if got := mustQString(t, de.ToStringInt64(1234567)); got != "1.234.567" {
-		t.Fatalf("de_DE.ToStringInt64(1234567) = %q, want %q", got, "1.234.567")
+	if got := mustQString(t, de.ToStringLL(1234567)); got != "1.234.567" {
+		t.Fatalf("de_DE.ToStringLL(1234567) = %q, want %q", got, "1.234.567")
 	}
 
 	// Negative numbers.
-	if got := mustQString(t, en.ToStringInt64(-42)); got != "-42" {
-		t.Fatalf("en_US.ToStringInt64(-42) = %q, want %q", got, "-42")
+	if got := mustQString(t, en.ToStringLL(-42)); got != "-42" {
+		t.Fatalf("en_US.ToStringLL(-42) = %q, want %q", got, "-42")
 	}
 }
 
-func TestQLocaleToStringUInt64(t *testing.T) {
+func TestQLocaleToStringULL(t *testing.T) {
 	en := mkLocale(t, "en_US")
-	if got := mustQString(t, en.ToStringUInt64(9876543210)); got != "9,876,543,210" {
-		t.Fatalf("en_US.ToStringUInt64(...) = %q, want %q", got, "9,876,543,210")
+	if got := mustQString(t, en.ToStringULL(9876543210)); got != "9,876,543,210" {
+		t.Fatalf("en_US.ToStringULL(...) = %q, want %q", got, "9,876,543,210")
 	}
 }
 
@@ -226,24 +226,24 @@ func TestQLocaleToStringDouble(t *testing.T) {
 
 // ---- Number parsing ------------------------------------------------------
 
-func TestQLocaleToInt64(t *testing.T) {
+func TestQLocaleToLongLong(t *testing.T) {
 	en := mkLocale(t, "en_US")
 
-	v, ok := en.ToInt64("1234")
+	v, ok := en.ToLongLong("1234")
 	if !ok || v != 1234 {
-		t.Fatalf("ToInt64(\"1234\") = (%d, %v), want (1234, true)", v, ok)
+		t.Fatalf("ToLongLong(\"1234\") = (%d, %v), want (1234, true)", v, ok)
 	}
 
-	v, ok = en.ToInt64("not a number")
+	v, ok = en.ToLongLong("not a number")
 	if ok {
-		t.Fatalf("ToInt64(\"not a number\") ok=true, want false")
+		t.Fatalf("ToLongLong(\"not a number\") ok=true, want false")
 	}
 	_ = v
 
 	// Empty string.
-	_, ok = en.ToInt64("")
+	_, ok = en.ToLongLong("")
 	if ok {
-		t.Fatal("ToInt64(\"\") ok=true, want false")
+		t.Fatal("ToLongLong(\"\") ok=true, want false")
 	}
 }
 
@@ -400,13 +400,13 @@ func TestQLocaleToUpper(t *testing.T) {
 	tr := mkLocale(t, "tr_TR")
 	if tr.Language() != Turkish {
 		t.Skipf("tr_TR not available on this system (loaded language = %v); "+
-		"skipping Turkish-specific casing test", tr.Language())
+			"skipping Turkish-specific casing test", tr.Language())
 	}
 
 	got := mustQString(t, tr.ToUpper("i"))
 	if got != "İ" {
 		t.Fatalf("tr_TR.ToUpper(\"i\") = %q (first rune U+%04X), want %q (U+0130)",
-				 got, firstRune(got), "İ")
+			got, firstRune(got), "İ")
 	}
 }
 

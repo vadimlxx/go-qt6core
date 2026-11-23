@@ -107,3 +107,10 @@ func TestQDateJulianRoundTrip(t *testing.T) {
 		t.Fatalf("julian round-trip: %v != %v", d2, d)
 	}
 }
+
+func TestQDateFromStringFormatCal(t *testing.T) {
+	d := NewQDateFromStringFormatCal("15.01.2024", "dd.MM.yyyy", NewQCalendar())
+	if d.Year() != 2024 || d.Month() != 1 || d.Day() != 15 {
+		t.Fatalf("NewQDateFromStringFormatCal: %d-%d-%d", d.Year(), d.Month(), d.Day())
+	}
+}

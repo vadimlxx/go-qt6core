@@ -32,7 +32,7 @@ inline QCalendar invalidCalendar() {
     return QCalendar(QAnyStringView());
 }
 
-inline QCalendar::FormatType Fmt(int v) {
+inline QLocale::FormatType Fmt(int v) {
     return static_cast<QLocale::FormatType>(v);
 }
 

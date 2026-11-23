@@ -145,16 +145,16 @@ func (z *QTimeZone) IsUTCOrFixedOffset() bool {
 // ---- Offset queries ------------------------------------------------------
 
 func (z *QTimeZone) OffsetFromUtc(at *QDateTime) int {
-	return int(C.qtimezone_offset_from_utc(z.p, at.p))
+	return int(C.qtimezone_offset_from_utc(z.p, at.handle()))
 }
 func (z *QTimeZone) StandardTimeOffset(at *QDateTime) int {
-	return int(C.qtimezone_standard_time_offset(z.p, at.p))
+	return int(C.qtimezone_standard_time_offset(z.p, at.handle()))
 }
 func (z *QTimeZone) DaylightTimeOffset(at *QDateTime) int {
-	return int(C.qtimezone_daylight_time_offset(z.p, at.p))
+	return int(C.qtimezone_daylight_time_offset(z.p, at.handle()))
 }
 func (z *QTimeZone) IsDaylightTime(at *QDateTime) bool {
-	return bool(C.qtimezone_is_daylight_time(z.p, at.p))
+	return bool(C.qtimezone_is_daylight_time(z.p, at.handle()))
 }
 func (z *QTimeZone) HasDaylightTime() bool { return bool(C.qtimezone_has_daylight_time(z.p)) }
 func (z *QTimeZone) HasTransitions() bool  { return bool(C.qtimezone_has_transitions(z.p)) }
@@ -167,10 +167,10 @@ func (z *QTimeZone) HasTransitions() bool  { return bool(C.qtimezone_has_transit
 func (z *QTimeZone) DisplayNameAt(at *QDateTime, nameType NameType, locale *QLocale) *qtext.QString {
 	var loc unsafe.Pointer
 	if locale != nil {
-		loc = unsafe.Pointer(locale.p)
+		loc = unsafe.Pointer(locale.handle())
 	}
 	var out unsafe.Pointer
-	C.qtimezone_display_name_at(z.p, at.p, C.int(nameType), loc, &out)
+	C.qtimezone_display_name_at(z.p, at.handle(), C.int(nameType), loc, &out)
 	return qtext.QStringFromUnsafePtr(out)
 }
 
@@ -180,7 +180,7 @@ func (z *QTimeZone) DisplayNameType(timeType TimeType, nameType NameType,
 	locale *QLocale) *qtext.QString {
 	var loc unsafe.Pointer
 	if locale != nil {
-		loc = unsafe.Pointer(locale.p)
+		loc = unsafe.Pointer(locale.handle())
 	}
 	var out unsafe.Pointer
 	C.qtimezone_display_name_type(z.p, C.int(timeType), C.int(nameType), loc, &out)
@@ -190,7 +190,7 @@ func (z *QTimeZone) DisplayNameType(timeType TimeType, nameType NameType,
 // Abbreviation returns a fresh *qtext.QString with the zone's abbreviation at the given time.
 func (z *QTimeZone) Abbreviation(at *QDateTime) *qtext.QString {
 	var out unsafe.Pointer
-	C.qtimezone_abbreviation(z.p, at.p, &out)
+	C.qtimezone_abbreviation(z.p, at.handle(), &out)
 	return qtext.QStringFromUnsafePtr(out)
 }
 
@@ -201,7 +201,7 @@ func (z *QTimeZone) Abbreviation(at *QDateTime) *qtext.QString {
 func (z *QTimeZone) NextTransition(after *QDateTime) (int64, int64, int64, *QDateTime, *qtext.QString) {
 	var offset, stdOffset, dstOffset C.int64_t
 	var atUtc, abbr unsafe.Pointer
-	C.qtimezone_next_transition(z.p, after.p, &offset, &stdOffset, &dstOffset, &atUtc, &abbr)
+	C.qtimezone_next_transition(z.p, after.handle(), &offset, &stdOffset, &dstOffset, &atUtc, &abbr)
 	return int64(offset), int64(stdOffset), int64(dstOffset),
 		wrapQDateTime((*C.go_qdatetime_t)(atUtc)), qtext.QStringFromUnsafePtr(abbr)
 }
@@ -211,7 +211,7 @@ func (z *QTimeZone) NextTransition(after *QDateTime) (int64, int64, int64, *QDat
 func (z *QTimeZone) PreviousTransition(before *QDateTime) (int64, int64, int64, *QDateTime, *qtext.QString) {
 	var offset, stdOffset, dstOffset C.int64_t
 	var atUtc, abbr unsafe.Pointer
-	C.qtimezone_previous_transition(z.p, before.p, &offset, &stdOffset, &dstOffset, &atUtc, &abbr)
+	C.qtimezone_previous_transition(z.p, before.handle(), &offset, &stdOffset, &dstOffset, &atUtc, &abbr)
 	return int64(offset), int64(stdOffset), int64(dstOffset),
 		wrapQDateTime((*C.go_qdatetime_t)(atUtc)), qtext.QStringFromUnsafePtr(abbr)
 }

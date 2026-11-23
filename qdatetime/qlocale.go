@@ -61,9 +61,9 @@ QLocale::DefaultTwoDigitBaseYear в Qt. Влияет только на разб�
 
   - QDataStream / QDebug операторы.
   - qHash(QLocale).
-  - Deprecated country() / countryToString() / countryToCode() /
-    codeToCountry() / name()/bcp47Name() без TagSeparator — используйте
-    territory-варианты и Name/Bcp47Name с явным TagSeparator.
+  - Deprecated-члены Qt (country(), countriesForLanguage(), name()/bcp47Name()
+    без TagSeparator) намеренно не экспонируются: используйте Territory(),
+    MatchingLocales() и Name/Bcp47Name с явным TagSeparator.
 */
 
 /*
@@ -90,26 +90,6 @@ import (
 const DefaultTwoDigitBaseYear = 1900
 
 // ---- helpers -------------------------------------------------------------
-
-// qdateToJD / qdateFromJD bridge value-typed QDate and int64 julian day.
-// Assumes: QDate has ToJulianDay() int64 and NewQDateFromJulianDay(int64) QDate.
-// Adjust here if your QDate uses different accessors.
-func qdateToJD(d QDate) int64 { return d.ToJulianDay() }
-func qdateFromJD(jd int64) QDate { return NewQDateFromJulianDay(jd) }
-
-// qtimeToMSecs / qtimeFromMSecs bridge value-typed QTime and int32 msecs.
-// Assumes: QTime has MSecsSinceStartOfDay() int and
-// NewQTimeFromMSecsSinceStartOfDay(int) QTime.
-func qtimeToMSecs(t QTime) int32 { return int32(t.MSecsSinceStartOfDay()) }
-func qtimeFromMSecs(ms int32) QTime { return NewQTimeFromMSecsSinceStartOfDay(int(ms)) }
-
-// cstr returns the internal data pointer of s (nil for empty string).
-func cstr(s string) *C.char {
-	if len(s) == 0 {
-		return nil
-	}
-	return (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
-}
 
 // wrapQStr wraps a raw *C.QString into *qtext.QString (ownership: caller).
 func wrapQStr(p unsafe.Pointer) *qtext.QString {
@@ -604,7 +584,9 @@ func (q *QLocale) Weekdays() []int {
 	}
 	src := unsafe.Slice((*C.int)(unsafe.Pointer(arr)), n)
 	out := make([]int, n)
-	for i := 0; i < n; i++ { out[i] = int(src[i]) }
+	for i := 0; i < n; i++ {
+		out[i] = int(src[i])
+	}
 	return out
 }
 
@@ -661,7 +643,11 @@ func (q *QLocale) CurrencySymbolString(format CurrencySymbolFormat) string {
 // ToCurrencyStringLL — Qt: QLocale::toCurrencyString(qlonglong, const QString&) const.
 func (q *QLocale) ToCurrencyStringLL(v int64, symbol *qtext.QString) *qtext.QString {
 	var sp *C.QString
-	if symbol != nil { sp, _ = symbol.TryHandle() }
+	if symbol != nil {
+		if p := symbol.UnsafePtr(); p != nil {
+			sp = (*C.QString)(p)
+		}
+	}
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_currency_string_ll(q.handle(), C.int64_t(v), sp)))
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(symbol)
@@ -671,7 +657,11 @@ func (q *QLocale) ToCurrencyStringLL(v int64, symbol *qtext.QString) *qtext.QStr
 // ToCurrencyStringULL — Qt: QLocale::toCurrencyString(qulonglong, const QString&) const.
 func (q *QLocale) ToCurrencyStringULL(v uint64, symbol *qtext.QString) *qtext.QString {
 	var sp *C.QString
-	if symbol != nil { sp, _ = symbol.TryHandle() }
+	if symbol != nil {
+		if p := symbol.UnsafePtr(); p != nil {
+			sp = (*C.QString)(p)
+		}
+	}
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_currency_string_ull(q.handle(), C.uint64_t(v), sp)))
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(symbol)
@@ -681,7 +671,11 @@ func (q *QLocale) ToCurrencyStringULL(v uint64, symbol *qtext.QString) *qtext.QS
 // ToCurrencyStringDouble — Qt: QLocale::toCurrencyString(double, const QString&, int) const.
 func (q *QLocale) ToCurrencyStringDouble(v float64, symbol *qtext.QString, precision int) *qtext.QString {
 	var sp *C.QString
-	if symbol != nil { sp, _ = symbol.TryHandle() }
+	if symbol != nil {
+		if p := symbol.UnsafePtr(); p != nil {
+			sp = (*C.QString)(p)
+		}
+	}
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_currency_string_double(
 		q.handle(), C.double(v), sp, C.int(precision))))
 	runtime.KeepAlive(q)
@@ -723,9 +717,15 @@ func (q *QLocale) CreateSeparatedList(strings []string) *qtext.QString {
 	n := len(strings)
 	qs := make([]*qtext.QString, n)
 	defer func() {
-		for _, s := range qs { if s != nil { s.Close() } }
+		for _, s := range qs {
+			if s != nil {
+				s.Close()
+			}
+		}
 	}()
-	for i, s := range strings { qs[i] = qtext.NewQStringFromString(s) }
+	for i, s := range strings {
+		qs[i] = qtext.NewQStringFromString(s)
+	}
 	return q.CreateSeparatedListQStrings(qs)
 }
 func (q *QLocale) CreateSeparatedListString(strings []string) string {
@@ -738,13 +738,17 @@ func (q *QLocale) CreateSeparatedListQStrings(qstrs []*qtext.QString) *qtext.QSt
 	carr := make([]*C.QString, n)
 	for i, s := range qstrs {
 		if s != nil {
-			if h, ok := s.TryHandle(); ok { carr[i] = h }
+			if p := s.UnsafePtr(); p != nil {
+				carr[i] = (*C.QString)(p)
+			}
 		}
 	}
 	var arrPtr **C.QString
-	if n > 0 { arrPtr = (**C.QString)(unsafe.Pointer(&carr[0])) }
+	if n > 0 {
+		arrPtr = (**C.QString)(unsafe.Pointer(&carr[0]))
+	}
 	r := wrapQStr(unsafe.Pointer(C.qlocale_create_separated_list(
-		q.handle(), (*_constQString)(unsafe.Pointer(arrPtr)), C.ptrdiff_t(n))))
+		q.handle(), arrPtr, C.ptrdiff_t(n))))
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(qstrs)
 	runtime.KeepAlive(carr)
@@ -767,13 +771,19 @@ func (q *QLocale) UILanguages(sep TagSeparator) []*qtext.QString {
 	var count C.ptrdiff_t
 	arr := C.qlocale_ui_languages(q.handle(), C.int(sep), &count)
 	runtime.KeepAlive(q)
-	if arr == nil { return nil }
+	if arr == nil {
+		return nil
+	}
 	defer C.qlocale_free_string_array(arr)
 	n := int(count)
-	if n == 0 { return nil }
+	if n == 0 {
+		return nil
+	}
 	src := unsafe.Slice((**C.QString)(unsafe.Pointer(arr)), n)
 	out := make([]*qtext.QString, n)
-	for i := 0; i < n; i++ { out[i] = wrapQStr(unsafe.Pointer(src[i])) }
+	for i := 0; i < n; i++ {
+		out[i] = wrapQStr(unsafe.Pointer(src[i]))
+	}
 	return out
 }
 
@@ -781,7 +791,9 @@ func (q *QLocale) UILanguages(sep TagSeparator) []*qtext.QString {
 func (q *QLocale) UILanguagesStrings(sep TagSeparator) []string {
 	qs := q.UILanguages(sep)
 	out := make([]string, len(qs))
-	for i, s := range qs { out[i] = qstrToGo(s) }
+	for i, s := range qs {
+		out[i] = qstrToGo(s)
+	}
 	return out
 }
 
@@ -815,7 +827,9 @@ func (q *QLocale) ToStringDateStringString(d QDate, format string) string {
 // ToStringDateFormatCal — Qt: QLocale::toString(QDate, FormatType, QCalendar) const.
 func (q *QLocale) ToStringDateFormatCal(d QDate, format FormatType, cal *QCalendar) *qtext.QString {
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_string_date_fmt_cal(
 		q.handle(), C.int64_t(qdateToJD(d)), C.int(format), cp)))
 	runtime.KeepAlive(q)
@@ -829,7 +843,9 @@ func (q *QLocale) ToStringDateFormatCalString(d QDate, format FormatType, cal *Q
 // ToStringDateStringCal — Qt: QLocale::toString(QDate, QStringView, QCalendar) const.
 func (q *QLocale) ToStringDateStringCal(d QDate, format string, cal *QCalendar) *qtext.QString {
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_string_date_str_cal(
 		q.handle(), C.int64_t(qdateToJD(d)), cstr(format), C.ptrdiff_t(len(format)), cp)))
 	runtime.KeepAlive(q)
@@ -866,7 +882,9 @@ func (q *QLocale) ToStringTimeStringString(t QTime, format string) string {
 
 // ToStringDateTimeFormat — Qt: QLocale::toString(const QDateTime&, FormatType) const.
 func (q *QLocale) ToStringDateTimeFormat(dt *QDateTime, format FormatType) *qtext.QString {
-	if dt == nil { return nil }
+	if dt == nil {
+		return nil
+	}
 	dp := dt.handle()
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_string_datetime_fmt(
 		q.handle(), dp, C.int(format))))
@@ -880,7 +898,9 @@ func (q *QLocale) ToStringDateTimeFormatString(dt *QDateTime, format FormatType)
 
 // ToStringDateTimeString — Qt: QLocale::toString(const QDateTime&, QStringView) const.
 func (q *QLocale) ToStringDateTimeString(dt *QDateTime, format string) *qtext.QString {
-	if dt == nil { return nil }
+	if dt == nil {
+		return nil
+	}
 	dp := dt.handle()
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_string_datetime_str(
 		q.handle(), dp, cstr(format), C.ptrdiff_t(len(format)))))
@@ -895,9 +915,13 @@ func (q *QLocale) ToStringDateTimeStringString(dt *QDateTime, format string) str
 
 // ToStringDateTimeFormatCal — Qt: QLocale::toString(const QDateTime&, FormatType, QCalendar) const.
 func (q *QLocale) ToStringDateTimeFormatCal(dt *QDateTime, format FormatType, cal *QCalendar) *qtext.QString {
-	if dt == nil { return nil }
+	if dt == nil {
+		return nil
+	}
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	dp := dt.handle()
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_string_datetime_fmt_cal(
 		q.handle(), dp, C.int(format), cp)))
@@ -912,9 +936,13 @@ func (q *QLocale) ToStringDateTimeFormatCalString(dt *QDateTime, format FormatTy
 
 // ToStringDateTimeStringCal — Qt: QLocale::toString(const QDateTime&, QStringView, QCalendar) const.
 func (q *QLocale) ToStringDateTimeStringCal(dt *QDateTime, format string, cal *QCalendar) *qtext.QString {
-	if dt == nil { return nil }
+	if dt == nil {
+		return nil
+	}
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	dp := dt.handle()
 	r := wrapQStr(unsafe.Pointer(C.qlocale_to_string_datetime_str_cal(
 		q.handle(), dp, cstr(format), C.ptrdiff_t(len(format)), cp)))
@@ -977,7 +1005,9 @@ func (q *QLocale) ToDateString(s string, format string, baseYear int) QDate {
 // ToDateFormatCal — Qt: QLocale::toDate(const QString&, FormatType, QCalendar, int baseYear) const.
 func (q *QLocale) ToDateFormatCal(s string, format FormatType, cal *QCalendar, baseYear int) QDate {
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	jd := int64(C.qlocale_to_date_fmt_cal(q.handle(), cstr(s), C.ptrdiff_t(len(s)),
 		C.int(format), cp, C.int(baseYear)))
 	runtime.KeepAlive(q)
@@ -989,7 +1019,9 @@ func (q *QLocale) ToDateFormatCal(s string, format FormatType, cal *QCalendar, b
 // ToDateStringCal — Qt: QLocale::toDate(const QString&, const QString&, QCalendar, int baseYear) const.
 func (q *QLocale) ToDateStringCal(s string, format string, cal *QCalendar, baseYear int) QDate {
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	jd := int64(C.qlocale_to_date_str_cal(q.handle(), cstr(s), C.ptrdiff_t(len(s)),
 		cstr(format), C.ptrdiff_t(len(format)), cp, C.int(baseYear)))
 	runtime.KeepAlive(q)
@@ -1025,7 +1057,7 @@ func (q *QLocale) ToDateTimeFormat(s string, format FormatType, baseYear int) *Q
 		C.int(format), C.int(baseYear))
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(s)
-	return wrapQDateTime(unsafe.Pointer(p))
+	return wrapQDateTime(p)
 }
 
 // ToDateTimeString — Qt: QLocale::toDateTime(const QString&, const QString&, int baseYear) const.
@@ -1035,32 +1067,36 @@ func (q *QLocale) ToDateTimeString(s string, format string, baseYear int) *QDate
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(s)
 	runtime.KeepAlive(format)
-	return wrapQDateTime(unsafe.Pointer(p))
+	return wrapQDateTime(p)
 }
 
 // ToDateTimeFormatCal — Qt: QLocale::toDateTime(const QString&, FormatType, QCalendar, int baseYear) const.
 func (q *QLocale) ToDateTimeFormatCal(s string, format FormatType, cal *QCalendar, baseYear int) *QDateTime {
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	p := C.qlocale_to_datetime_fmt_cal(q.handle(), cstr(s), C.ptrdiff_t(len(s)),
 		C.int(format), cp, C.int(baseYear))
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(s)
 	runtime.KeepAlive(cal)
-	return wrapQDateTime(unsafe.Pointer(p))
+	return wrapQDateTime(p)
 }
 
 // ToDateTimeStringCal — Qt: QLocale::toDateTime(const QString&, const QString&, QCalendar, int baseYear) const.
 func (q *QLocale) ToDateTimeStringCal(s string, format string, cal *QCalendar, baseYear int) *QDateTime {
 	var cp C.go_qcalendar_t
-	if cal != nil { cp = cal.handle() }
+	if cal != nil {
+		cp = cal.handle()
+	}
 	p := C.qlocale_to_datetime_str_cal(q.handle(), cstr(s), C.ptrdiff_t(len(s)),
 		cstr(format), C.ptrdiff_t(len(format)), cp, C.int(baseYear))
 	runtime.KeepAlive(q)
 	runtime.KeepAlive(s)
 	runtime.KeepAlive(format)
 	runtime.KeepAlive(cal)
-	return wrapQDateTime(unsafe.Pointer(p))
+	return wrapQDateTime(p)
 }
 
 // ---- static conversion methods ------------------------------------------
@@ -1130,7 +1166,9 @@ func ScriptToStringString(script Script) string { return qstrToGo(ScriptToString
 
 // SetDefaultLocale — Qt: static QLocale::setDefault(const QLocale&).
 func SetDefaultLocale(locale *QLocale) {
-	if p, ok := locale.tryHandle(); ok { C.qlocale_set_default(p) }
+	if p, ok := locale.tryHandle(); ok {
+		C.qlocale_set_default(p)
+	}
 }
 
 // CLocale — Qt: static QLocale::c().
@@ -1145,30 +1183,18 @@ func SystemLocale() *QLocale { return wrapQLocale(C.qlocale_system()) }
 func MatchingLocales(lang Language, script Script, territory Territory) []*QLocale {
 	var count C.ptrdiff_t
 	arr := C.qlocale_matching_locales(C.int(lang), C.int(script), C.int(territory), &count)
-	if arr == nil { return nil }
+	if arr == nil {
+		return nil
+	}
 	defer C.qlocale_free_locale_array(arr)
 	n := int(count)
-	if n == 0 { return nil }
+	if n == 0 {
+		return nil
+	}
 	src := unsafe.Slice((*C.go_qlocale_t)(unsafe.Pointer(arr)), n)
 	out := make([]*QLocale, n)
-	for i := 0; i < n; i++ { out[i] = wrapQLocale(src[i]) }
+	for i := 0; i < n; i++ {
+		out[i] = wrapQLocale(src[i])
+	}
 	return out
 }
-
-// CountriesForLanguage — Qt: static QLocale::countriesForLanguage(Language).
-// Deprecated in Qt 6.6; use MatchingLocales().Territory() on each result instead.
-func CountriesForLanguage(lang Language) []Country {
-	var count C.ptrdiff_t
-	arr := C.qlocale_countries_for_language(C.int(lang), &count)
-	if arr == nil { return nil }
-	defer C.qlocale_free_int_array(arr)
-	n := int(count)
-	if n == 0 { return nil }
-	src := unsafe.Slice((*C.int)(unsafe.Pointer(arr)), n)
-	out := make([]Country, n)
-	for i := 0; i < n; i++ { out[i] = Country(src[i]) }
-	return out
-}
-
-// _constQString — internal alias to keep cgo type checks happy.
-type _constQString C.QString

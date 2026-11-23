@@ -226,9 +226,6 @@ go_qlocale_t qlocale_system(void);
 go_qlocale_t* qlocale_matching_locales(int language, int script, int territory, ptrdiff_t* out_count);
 void          qlocale_free_locale_array(go_qlocale_t* arr);
 
-/* ---- CountriesForLanguage (heap int*; free with qlocale_free_int_array) ---- */
-int* qlocale_countries_for_language(int language, ptrdiff_t* out_count);
-
 #ifdef __cplusplus
 }
 #endif
