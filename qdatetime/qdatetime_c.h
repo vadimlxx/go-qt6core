@@ -4,38 +4,64 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+/* FIX: we removed qtimezone_fwd.h. We now include qtimezone_c.h directly,
+ * which brings go_qtimezone_t AND forward-declares go_qdatetime_t.
+ *
+ * The order is: qdate_c.h (defines go_qdate_t, go_qcalendar_t, go_qymd_t),
+ * then qtime_c.h (defines go_qtime_t), then qcalendar_c.h (returns
+ * go_qdate_t, takes go_qcalendar_t), then qtimezone_c.h (returns/uses
+ * go_qtimezone_t, uses const go_qdatetime_t* via forward decl). */
 #include "qdate_c.h"
 #include "qtime_c.h"
 #include "qcalendar_c.h"
-#include "qtimezone_fwd.h"
+#include "qtimezone_c.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct QDateTime go_qdatetime_t;
+/* go_qdatetime_t and go_qtimezone_t are already declared by qtimezone_c.h.
+ * We DO NOT re-typedef them here to avoid -Wpedantic noise; if your
+ * compiler insists on the local typedef, uncomment the block below
+ * (identical re-declaration of the same type is legal):
+ *
+ * #ifdef __cplusplus
+ * typedef QDateTime go_qdatetime_t;
+ * #else
+ * typedef struct QDateTime go_qdatetime_t;
+ * #endif
+ */
 
+/* ---- Construction ---- */
 go_qdatetime_t* qdatetime_new_default(void);
 go_qdatetime_t* qdatetime_new_from_date_time(go_qdate_t date, go_qtime_t time);
 go_qdatetime_t* qdatetime_new_copy(const go_qdatetime_t* other);
 go_qdatetime_t* qdatetime_clone(const go_qdatetime_t* other);
 void            qdatetime_delete(go_qdatetime_t* dt);
+void            qdatetime_swap(go_qdatetime_t* self, go_qdatetime_t* other);
 
+/* ---- Status ---- */
 bool qdatetime_is_null(const go_qdatetime_t* dt);
 bool qdatetime_is_valid(const go_qdatetime_t* dt);
+bool qdatetime_is_daylight_time(const go_qdatetime_t* dt);
 
+/* ---- Accessors ---- */
 go_qdate_t qdatetime_date(const go_qdatetime_t* dt);
 go_qtime_t qdatetime_time(const go_qdatetime_t* dt);
 int        qdatetime_time_spec(const go_qdatetime_t* dt);
 int        qdatetime_offset_from_utc(const go_qdatetime_t* dt);
 int64_t    qdatetime_to_msecs_since_epoch(const go_qdatetime_t* dt);
 int64_t    qdatetime_to_secs_since_epoch(const go_qdatetime_t* dt);
+void       qdatetime_time_zone_abbreviation(const go_qdatetime_t* dt, void** out_qstr);
 
+/* ---- Setters ---- */
 void qdatetime_set_date(go_qdatetime_t* dt, go_qdate_t date);
 void qdatetime_set_time(go_qdatetime_t* dt, go_qtime_t time);
 void qdatetime_set_msecs_since_epoch(go_qdatetime_t* dt, int64_t msecs);
 void qdatetime_set_secs_since_epoch(go_qdatetime_t* dt, int64_t secs);
 
+/* ---- Arithmetic ---- */
 go_qdatetime_t* qdatetime_add_days(const go_qdatetime_t* dt, int64_t days);
 go_qdatetime_t* qdatetime_add_months(const go_qdatetime_t* dt, int months);
 go_qdatetime_t* qdatetime_add_years(const go_qdatetime_t* dt, int years);
@@ -46,6 +72,7 @@ int64_t qdatetime_days_to(const go_qdatetime_t* dt, const go_qdatetime_t* other)
 int64_t qdatetime_secs_to(const go_qdatetime_t* dt, const go_qdatetime_t* other);
 int64_t qdatetime_msecs_to(const go_qdatetime_t* dt, const go_qdatetime_t* other);
 
+/* ---- Static constructors ---- */
 go_qdatetime_t* qdatetime_current_date_time(void);
 go_qdatetime_t* qdatetime_current_date_time_utc(void);
 go_qdatetime_t* qdatetime_from_msecs_since_epoch(int64_t msecs);
@@ -53,6 +80,7 @@ go_qdatetime_t* qdatetime_from_secs_since_epoch(int64_t secs);
 int64_t         qdatetime_current_msecs_since_epoch(void);
 int64_t         qdatetime_current_secs_since_epoch(void);
 
+/* ---- String conversion ---- */
 void qdatetime_to_string(const go_qdatetime_t* dt, int format, void** out_qstr);
 void qdatetime_to_string_format(const go_qdatetime_t* dt, const char* format,
                                 ptrdiff_t format_len, void** out_qstr);
@@ -60,17 +88,29 @@ void qdatetime_to_string_format_cal(const go_qdatetime_t* dt, const char* format
                                     ptrdiff_t format_len, go_qcalendar_t cal,
                                     void** out_qstr);
 
+/* ---- fromString ---- */
 go_qdatetime_t* qdatetime_from_string_utf8(const char* str, ptrdiff_t str_len, int format);
 go_qdatetime_t* qdatetime_from_string_format_utf8(const char* str, ptrdiff_t str_len,
                                                   const char* format, ptrdiff_t format_len);
+go_qdatetime_t* qdatetime_from_string_format_cal(const char* str, ptrdiff_t str_len,
+                                                 const char* format, ptrdiff_t format_len,
+                                                 go_qcalendar_t cal);
+go_qdatetime_t* qdatetime_from_string_format_base_year(const char* str, ptrdiff_t str_len,
+                                                       const char* format, ptrdiff_t format_len,
+                                                       int base_year);
+go_qdatetime_t* qdatetime_from_string_format_base_year_cal(const char* str, ptrdiff_t str_len,
+                                                           const char* format, ptrdiff_t format_len,
+                                                           int base_year, go_qcalendar_t cal);
 
+/* ---- Comparison ---- */
 bool qdatetime_equals(const go_qdatetime_t* dt, const go_qdatetime_t* other);
 
+/* ---- Conversions ---- */
 go_qdatetime_t* qdatetime_to_local_time(const go_qdatetime_t* dt);
 go_qdatetime_t* qdatetime_to_utc(const go_qdatetime_t* dt);
 go_qdatetime_t* qdatetime_to_offset_from_utc(const go_qdatetime_t* dt, int offset_seconds);
 
-/* --- QTimeZone integration --- */
+/* ---- QTimeZone integration ---- */
 go_qtimezone_t  qdatetime_time_zone(const go_qdatetime_t* dt);
 void            qdatetime_set_time_zone(go_qdatetime_t* dt, const go_qtimezone_t tz);
 go_qdatetime_t* qdatetime_to_time_zone(const go_qdatetime_t* dt, const go_qtimezone_t tz);
@@ -78,7 +118,13 @@ go_qdatetime_t* qdatetime_current_date_time_zone(const go_qtimezone_t tz);
 go_qdatetime_t* qdatetime_from_msecs_since_epoch_zone(int64_t msecs, const go_qtimezone_t tz);
 go_qdatetime_t* qdatetime_from_secs_since_epoch_zone(int64_t secs, const go_qtimezone_t tz);
 
+/* ---- QDate::startOfDay / endOfDay ---- */
+go_qdatetime_t* qdate_start_of_day(go_qdate_t date);
+go_qdatetime_t* qdate_end_of_day(go_qdate_t date);
+go_qdatetime_t* qdate_start_of_day_zone(go_qdate_t date, const go_qtimezone_t tz);
+go_qdatetime_t* qdate_end_of_day_zone(go_qdate_t date, const go_qtimezone_t tz);
+
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif /* GO_QT6CORE_QDATETIME_QDATETIME_C_H */

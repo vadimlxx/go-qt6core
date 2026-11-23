@@ -1,86 +1,111 @@
-// Package qstringencoder provides a Go binding for Qt 6.11.2 QtCore's QStringEncoder.
+// Package qstringencoder provides a Go binding for Qt 6.11 QtCore's
+// QStringEncoder.
 //
-// QStringEncoder is a concrete QStringConverter that encodes UTF-16 (QString / QStringView)
-// into a byte sequence using a selected encoding (UTF-8, UTF-16LE/BE, Latin-1, System, …).
+// QStringEncoder is a concrete QStringConverter that encodes UTF-16 (QString /
+// QStringView) into a byte sequence using a selected encoding (UTF-8,
+// UTF-16LE/BE, Latin-1, System, ...).
 //
-// In Go, QStringEncoder embeds *qstringconverter.QStringConverter, which itself embeds
-// *qstringconverter.QStringConverterBase — reproducing Qt's class hierarchy:
+// In Go, QStringEncoder embeds *QStringConverter, which itself embeds
+// *QStringConverterBase, reproducing Qt's class hierarchy:
 //
-//	QStringEncoder → QStringConverter → QStringConverterBase
+//	QStringEncoder -> QStringConverter -> QStringConverterBase
 //
-// Every public method of QStringConverter (IsValid, Name, ResetState, HasError, State,
-// SetState, Iface, Swap, Encoding) and QStringConverterBase (Flags, …) is available on
-// *QStringEncoder via Go method promotion, without indirection.
+// Every public method of the base chain (IsValid, Name, ResetState, HasError,
+// State, SetState, Iface, Swap, Encoding) is available on *QStringEncoder via
+// Go method promotion.
 //
 // # Type mapping
 //
-//	Qt                                       Go
-//	QStringEncoder                           *qstringencoder.QStringEncoder
-//	QStringEncoder::DecodedData<T>           (*QStringEncoder).Encode / EncodeView → *qbytearray.QByteArray
-//	QStringEncoder::FinalizeResult           (next int, invalid int16, err FinalizeResultError)
-//	QStringEncoder::FinalizeResultError      qstringencoder.FinalizeResultError
+//	Qt                                  Go
+//	QStringEncoder                      *qtext.QStringEncoder
+//	QStringEncoder::DecodedData<T>      Encode / EncodeView -> *qtext.QByteArray
+//	QStringEncoder::FinalizeResult      (next int, invalid int16, err FinalizeResultError)
+//	QString                             *qtext.QString / string
+//	QStringView                         qtext.QStringView / string
+//	QAnyStringView                      qtext.QAnyStringView / string
+//	QByteArray                          *qtext.QByteArray / []byte
+//	qsizetype                           int
 //
-// # Interop with sibling packages
+// # Ownership and lifecycle
 //
-// qstringencoder imports:
-//   - qstringconverter: to embed *QStringConverter / *QStringConverterBase.
-//   - qstring:          for Encode(*qstring.QString).
-//   - qstringview:      for EncodeView / AppendToBuffer (QStringView).
-//   - qbytearray:       for the result of Encode / EncodeView.
-//   - qanystringview:   for NewQStringEncoderFromAny.
+// A *QStringEncoder owns its C++ object. The object is released by Close()
+// (eager) or by runtime.AddCleanup when the wrapper becomes unreachable; both
+// paths race safely through an atomic state slot, so there is no double free.
 //
-// # Protected members exposed
+// The embedded *QStringConverter is a non-owning view over the same C++ object
+// and the same state slot: its Close is a no-op, and after the encoder is
+// closed the converter methods observe a nil handle instead of a dangling
+// pointer.
 //
-// The following protected Qt members are exposed (as requested):
+// # Go-native variants
 //
-//	protected QStringEncoder(const Interface *i) noexcept  → NewQStringEncoderFromInterface
-//	protected ~QStringConverter()                          → (*QStringEncoder).Close / finalizer
+// In addition to the Qt-flavoured methods, the binding provides twins that use
+// plain Go types:
 //
-// All other "protected" members of QStringEncoder (default / Encoding+Flags / QAnyStringView
-// ctors) are public in Qt 6.11.2 and exposed as NewQStringEncoder / FromEncoding / FromName /
-// FromAny.
+//	EncodeString(string) *QByteArray       // QString input
+//	EncodeBytes(*QString) []byte           // QByteArray result
+//	EncodeViewString(string) *QByteArray   // QStringView input
+//	EncodeViewBytes(QStringView) []byte    // QByteArray result
+//	AppendToBufferString([]byte, string) int
 //
-// # Encoding result caching
+// # API summary
 //
-// In Qt, `encode(...)` returns DecodedData<T>, which materializes lazily when implicitly
-// converted to QByteArray. In Go, Encode / EncodeView return *qbytearray.QByteArray directly
-// — semantically identical (both do one C++ pass to encode the whole input using the
-// encoder's current state and then truncate to the actual output size).
+// Constructors:
 //
-// # TODO (not yet bound, or API differences vs Qt 6.11.2)
+//	NewQStringEncoder, NewQStringEncoderFromEncoding,
+//	NewQStringEncoderFromName, NewQStringEncoderFromAny,
+//	NewQStringEncoderFromInterface
 //
-//   - QStringEncoder::operator()  Go has no operator(); use Encode / EncodeView.
+// Encoding:
 //
-//   - QStringEncoder::encode(const QString&) vs encode(QStringView):
-//                                 Go has one method per input type; no overload set.
+//	Encode, EncodeString, EncodeBytes,
+//	EncodeView, EncodeViewString, EncodeViewBytes,
+//	RequiredSpace, AppendToBuffer, AppendToBufferString
 //
-//   - DecodedData<T> as a public type: not exposed; Encode/EncodeView return the materialized
-//                                 QByteArray directly.
+// Finalization:
 //
-//   - QStringBuilder integration: QConcatenable<QStringEncoder::DecodedData<T>> and
-//                                 operator+=(QByteArray&, const DecodedData<T>&) are not
-//                                 exposed. Use the equivalent:
-//                                     ba.AppendQByteArray(enc.EncodeView(sv))
-//                                 or:
-//                                     qstringbuilder.FromQByteArray(enc.EncodeView(sv))
+//	FinalizeBuffer, Finalize
 //
-//   - QString::assign_helper_char8 (C++ helper for QString::assign with UTF-8 iterators):
-//                                 not related to QStringEncoder's public API; not exposed.
+// Lifecycle and interop:
 //
-//   - FinalizeResultChar<Char> template: monomorphized only for char in Qt's public API;
-//                                 exposed as the Go tuple
-//                                 (next int, invalid int16, err FinalizeResultError).
+//	Close, UnsafePtr (qstringconverter_interop.go)
 //
-//   - QStringEncoder::availableCodecs() (inherited static): requires package qstringlist;
-//                                 TODO in the qstringconverter package, not here.
+// # Differences from Qt 6.11
 //
-//   - encodingForData / encodingForHtml (inherited static): available via
-//                                 qstringconverter.EncodingForData / EncodingForHtml.
+//   - QStringEncoder::operator() has no Go equivalent: use Encode / EncodeView.
+//
+//   - DecodedData<T> is not exposed: Encode / EncodeView materialize the
+//     QByteArray immediately (one C++ pass with the current State, then
+//     truncated to the actual output size).
+//
+//   - encode(const QString &) and encode(QStringView) become separate Go
+//     methods; Go has no overload sets.
+//
+//   - QStringBuilder integration (QConcatenable<DecodedData<T>>,
+//     operator+=(QByteArray &, ...)) is not exposed. Use AppendQByteArray or
+//     Concat on the materialized result.
+//
+//   - FinalizeResultChar<Char> is a template; the public char specialization is
+//     returned as the three-value tuple (next, invalid, err).
+//
+//   - availableCodecs(), encodingForData() and encodingForHtml() are inherited
+//     from QStringConverter and are available as qtext.AvailableCodecsStrings /
+//     AvailableCodecs, qtext.EncodingForData / EncodingForDataBytes, and
+//     qtext.EncodingForHtml / EncodingForHtmlBytes.
+//
+// # C bridge
+//
+// QStringConverter, QStringEncoder and QStringDecoder share one C ABI
+// (qstringconverter_c.h) and one implementation (qstringconverter_c.cpp),
+// mirroring QtCore's qstringconverter.h / qstringconverter.cpp. The opaque
+// handles are real subclasses of helper adapters, and all C-type-to-Qt-type
+// conversions are centralized in the cvt namespace, so the bridge contains no
+// handle casts.
 //
 // # Requirements
 //
-// Qt >= 6.11.2, C++17, pkg-config Qt6Core. Version check is performed at compile time in
-// qstringencoder_c.cpp via internal/qt6core/check_qt_version.h.
+// Qt >= 6.11, C++17, pkg-config Qt6Core. The version check is performed at
+// compile time in qstringconverter_c.cpp via internal/qt6core/check_qt_version.h.
 //
 // This package is a subpackage of github.com/vadimlxx/go-qt6core.
 package qtext

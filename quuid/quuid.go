@@ -49,6 +49,7 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/vadimlxx/go-qt6core/qdata"
@@ -58,34 +59,75 @@ import (
 // Id128Bytes mirrors QUuid::Id128Bytes (16 bytes).
 type Id128Bytes [16]byte
 
+type quuidState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *quuidState) cpp() *C.QUuid {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QUuid)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *quuidState) claim() *C.QUuid {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QUuid)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // QUuid wraps a Qt6 QUuid object.
 type QUuid struct {
-	p *C.QUuid
+	// p *C.QUuid
+	state   *quuidState
+	cleanup runtime.Cleanup
 }
 
 func wrapQUuid(p unsafe.Pointer) *QUuid {
 	if p == nil {
 		return nil
 	}
-	q := &QUuid{p: (*C.QUuid)(p)}
-	runtime.SetFinalizer(q, finalizeQUuid)
+
+	st := &quuidState{}
+	st.p.Store((*byte)(p))
+	q := &QUuid{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *quuidState) {
+		if cpp := st.claim(); cpp != nil {
+			C.quuid_delete(cpp)
+		}
+	}, st)
+
 	return q
 }
 
-func finalizeQUuid(q *QUuid) {
-	if q.p != nil {
-		C.quuid_delete(q.p)
-		q.p = nil
+func (q *QUuid) handle() *C.QUuid {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("quuid: use after Close (or nil receiver)")
+}
+
+func (q *QUuid) tryHandle() (*C.QUuid, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
 // Qt: QUuid::~QUuid().
 func (q *QUuid) Close() {
-	if q.p != nil {
-		C.quuid_delete(q.p)
-		q.p = nil
-		runtime.SetFinalizer(q, nil)
+	if q == nil || q.state == nil {
+		return
+	}
+
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.quuid_delete(cpp)
 	}
 }
 
@@ -187,7 +229,7 @@ func NewQUuidFromRfc4122(b []byte) *QUuid {
 // Clone returns a deep copy of the UUID.
 // Qt: QUuid(const QUuid&) — copy constructor.
 func (q *QUuid) Clone() *QUuid {
-	return wrapQUuid(unsafe.Pointer(C.quuid_clone(q.p)))
+	return wrapQUuid(unsafe.Pointer(C.quuid_clone(q.handle())))
 }
 
 // ---- comparison ----------------------------------------------------------
@@ -195,13 +237,13 @@ func (q *QUuid) Clone() *QUuid {
 // Equal reports whether q and other represent the same UUID.
 // Qt: operator==(const QUuid&).
 func (q *QUuid) Equal(other *QUuid) bool {
-	return bool(C.quuid_equal(q.p, other.p))
+	return bool(C.quuid_equal(q.handle(), other.handle()))
 }
 
 // Compare returns -1, 0, or +1 like strcmp (Qt's strong ordering).
 // Qt: operator<=>(const QUuid&) (Qt 6.8+) / operator< / operator>.
 func (q *QUuid) Compare(other *QUuid) int {
-	return int(C.quuid_compare(q.p, other.p))
+	return int(C.quuid_compare(q.handle(), other.handle()))
 }
 
 // ---- conversion ----------------------------------------------------------
@@ -209,7 +251,7 @@ func (q *QUuid) Compare(other *QUuid) int {
 // ToString returns the textual representation in the given format.
 // Qt: QUuid::toString(StringFormat) → QString (returned here as string).
 func (q *QUuid) ToString(format StringFormat) string {
-	p := C.quuid_to_string(q.p, C.int(format))
+	p := C.quuid_to_string(q.handle(), C.int(format))
 	if p == nil {
 		return ""
 	}
@@ -227,7 +269,7 @@ func (q *QUuid) ToQString(format StringFormat) *qtext.QString {
 // Qt: QUuid::toByteArray(StringFormat) → QByteArray (returned here as []byte).
 func (q *QUuid) ToByteArray(format StringFormat) []byte {
 	var n C.size_t
-	p := C.quuid_to_byte_array(q.p, C.int(format), &n)
+	p := C.quuid_to_byte_array(q.handle(), C.int(format), &n)
 	if p == nil || n == 0 {
 		return nil
 	}
@@ -246,7 +288,7 @@ func (q *QUuid) ToQByteArray(format StringFormat) *qtext.QByteArray {
 // Qt: QUuid::toBytes(QSysInfo::Endian) → Id128Bytes.
 func (q *QUuid) ToBytes(order qdata.Endian) Id128Bytes {
 	var out Id128Bytes
-	C.quuid_to_bytes(q.p, C.int(order), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+	C.quuid_to_bytes(q.handle(), C.int(order), (*C.uint8_t)(unsafe.Pointer(&out[0])))
 	return out
 }
 
@@ -254,7 +296,7 @@ func (q *QUuid) ToBytes(order qdata.Endian) Id128Bytes {
 // Qt: QUuid::toRfc4122() → QByteArray (returned here as []byte).
 func (q *QUuid) ToRfc4122() []byte {
 	var n C.size_t
-	p := C.quuid_to_rfc4122(q.p, &n)
+	p := C.quuid_to_rfc4122(q.handle(), &n)
 	if p == nil || n == 0 {
 		return nil
 	}
@@ -266,15 +308,15 @@ func (q *QUuid) ToRfc4122() []byte {
 
 // Variant returns the UUID variant.
 // Qt: QUuid::variant() const.
-func (q *QUuid) Variant() Variant { return Variant(C.quuid_variant(q.p)) }
+func (q *QUuid) Variant() Variant { return Variant(C.quuid_variant(q.handle())) }
 
 // Version returns the UUID version (or VerUnknown).
 // Qt: QUuid::version() const.
-func (q *QUuid) Version() Version { return Version(C.quuid_version(q.p)) }
+func (q *QUuid) Version() Version { return Version(C.quuid_version(q.handle())) }
 
 // IsNull reports whether the UUID is all-zero.
 // Qt: QUuid::isNull() const.
-func (q *QUuid) IsNull() bool { return bool(C.quuid_is_null(q.p)) }
+func (q *QUuid) IsNull() bool { return bool(C.quuid_is_null(q.handle())) }
 
 // ---- static creators ----------------------------------------------------
 
@@ -291,7 +333,7 @@ func CreateUuidV3(ns *QUuid, data []byte) *QUuid {
 	if len(data) > 0 {
 		p = (*C.uint8_t)(unsafe.Pointer(&data[0]))
 	}
-	q := wrapQUuid(unsafe.Pointer(C.quuid_create_uuid_v3(ns.p, p, C.size_t(len(data)))))
+	q := wrapQUuid(unsafe.Pointer(C.quuid_create_uuid_v3(ns.handle(), p, C.size_t(len(data)))))
 	runtime.KeepAlive(data)
 	return q
 }
@@ -309,7 +351,7 @@ func CreateUuidV5(ns *QUuid, data []byte) *QUuid {
 	if len(data) > 0 {
 		p = (*C.uint8_t)(unsafe.Pointer(&data[0]))
 	}
-	q := wrapQUuid(unsafe.Pointer(C.quuid_create_uuid_v5(ns.p, p, C.size_t(len(data)))))
+	q := wrapQUuid(unsafe.Pointer(C.quuid_create_uuid_v5(ns.handle(), p, C.size_t(len(data)))))
 	runtime.KeepAlive(data)
 	return q
 }

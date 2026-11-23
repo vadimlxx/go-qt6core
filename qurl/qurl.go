@@ -48,39 +48,81 @@ import "C"
 import (
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
 
+type qurlState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qurlState) cpp() *C.QUrl {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QUrl)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qurlState) claim() *C.QUrl {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QUrl)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // QUrl wraps a Qt6 QUrl object.
 type QUrl struct {
-	p *C.QUrl
+	// p *C.QUrl
+	state   *qurlState
+	cleanup runtime.Cleanup
 }
 
 func wrapQUrl(p unsafe.Pointer) *QUrl {
 	if p == nil {
 		return nil
 	}
-	q := &QUrl{p: (*C.QUrl)(p)}
-	runtime.SetFinalizer(q, finalizeQUrl)
+
+	st := &qurlState{}
+	st.p.Store((*byte)(p))
+	q := &QUrl{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *qurlState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qurl_delete(cpp)
+		}
+	}, st)
+
 	return q
 }
 
-func finalizeQUrl(q *QUrl) {
-	if q.p != nil {
-		C.qurl_delete(q.p)
-		q.p = nil
+func (q *QUrl) handle() *C.QUrl {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("qurl: use after Close (or nil receiver)")
+}
+
+func (q *QUrl) tryHandle() (*C.QUrl, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
 // Qt: QUrl::~QUrl().
 func (q *QUrl) Close() {
-	if q.p != nil {
-		C.qurl_delete(q.p)
-		q.p = nil
-		runtime.SetFinalizer(q, nil)
+	if q == nil || q.state == nil {
+		return
+	}
+
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.qurl_delete(cpp)
 	}
 }
 
@@ -132,6 +174,8 @@ func NewQUrl(arg ...any) *QUrl {
 				return QUrlFromString(s, mode)
 			case *qtext.QString:
 				return QUrlFromQString(s, mode)
+			case *QUrl:
+				return s.Clone()
 			}
 		}
 	}
@@ -142,13 +186,13 @@ func NewQUrl(arg ...any) *QUrl {
 // Clone returns a deep copy of the URL.
 // Qt: QUrl(const QUrl&) — copy constructor.
 func (q *QUrl) Clone() *QUrl {
-	return wrapQUrl(unsafe.Pointer(C.qurl_new_copy(q.p)))
+	return wrapQUrl(unsafe.Pointer(C.qurl_new_copy(q.handle())))
 }
 
 // Swap exchanges the contents of q and other.
 // Qt: QUrl::swap(QUrl&).
 func (q *QUrl) Swap(other *QUrl) {
-	C.qurl_swap(q.p, other.p)
+	C.qurl_swap(q.handle(), other.handle())
 	runtime.KeepAlive(other)
 }
 
@@ -171,7 +215,7 @@ func (q *QUrl) SetUrlString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_url_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_url_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
@@ -181,7 +225,7 @@ func (q *QUrl) SetUrlString(s string, mode ParsingMode) {
 // Qt: QUrl::url(FormattingOptions) → QString (returned here as string).
 func (q *QUrl) URLString(options FormattingOptions) string {
 	var n C.size_t
-	p := C.qurl_url(q.p, C.int(options), &n)
+	p := C.qurl_url(q.handle(), C.int(options), &n)
 	return goStringN(p, n)
 }
 
@@ -195,7 +239,7 @@ func (q *QUrl) URL(options FormattingOptions) *qtext.QString {
 // Qt: QUrl::toString(FormattingOptions) → QString (returned here as string).
 func (q *QUrl) ToString(options FormattingOptions) string {
 	var n C.size_t
-	p := C.qurl_to_string(q.p, C.int(options), &n)
+	p := C.qurl_to_string(q.handle(), C.int(options), &n)
 	return goStringN(p, n)
 }
 
@@ -209,7 +253,7 @@ func (q *QUrl) ToQString(options FormattingOptions) *qtext.QString {
 // Qt: QUrl::toDisplayString(FormattingOptions) → QString (returned here as string).
 func (q *QUrl) ToDisplayString(options FormattingOptions) string {
 	var n C.size_t
-	p := C.qurl_to_display_string(q.p, C.int(options), &n)
+	p := C.qurl_to_display_string(q.handle(), C.int(options), &n)
 	return goStringN(p, n)
 }
 
@@ -222,14 +266,14 @@ func (q *QUrl) ToDisplayQString(options FormattingOptions) *qtext.QString {
 // Adjusted returns a new URL with the given formatting options applied.
 // Qt: QUrl::adjusted(FormattingOptions) const.
 func (q *QUrl) Adjusted(options FormattingOptions) *QUrl {
-	return wrapQUrl(unsafe.Pointer(C.qurl_adjusted(q.p, C.int(options))))
+	return wrapQUrl(unsafe.Pointer(C.qurl_adjusted(q.handle(), C.int(options))))
 }
 
 // ToEncodedBytes returns the URL in its encoded (percent-escaped) form as []byte.
 // Qt: QUrl::toEncoded(FormattingOptions) → QByteArray (returned here as []byte).
 func (q *QUrl) ToEncodedBytes(options FormattingOptions) []byte {
 	var n C.size_t
-	p := C.qurl_to_encoded(q.p, C.int(options), &n)
+	p := C.qurl_to_encoded(q.handle(), C.int(options), &n)
 	if p == nil || n == 0 {
 		return nil
 	}
@@ -247,11 +291,11 @@ func (q *QUrl) ToEncoded(options FormattingOptions) *qtext.QByteArray {
 
 // IsValid reports whether the URL is syntactically valid.
 // Qt: QUrl::isValid() const.
-func (q *QUrl) IsValid() bool { return bool(C.qurl_is_valid(q.p)) }
+func (q *QUrl) IsValid() bool { return bool(C.qurl_is_valid(q.handle())) }
 
 // ErrorString returns a human-readable description of the last parsing error.
 // Qt: QUrl::errorString() const → QString (returned here as string).
-func (q *QUrl) ErrorString() string { return goString(C.qurl_error_string(q.p)) }
+func (q *QUrl) ErrorString() string { return goString(C.qurl_error_string(q.handle())) }
 
 // ErrorQString returns the error string as a QString.
 // Qt: QUrl::errorString() const → QString.
@@ -259,11 +303,11 @@ func (q *QUrl) ErrorQString() *qtext.QString { return qtext.NewQString(q.ErrorSt
 
 // IsEmpty reports whether the URL has no content.
 // Qt: QUrl::isEmpty() const.
-func (q *QUrl) IsEmpty() bool { return bool(C.qurl_is_empty(q.p)) }
+func (q *QUrl) IsEmpty() bool { return bool(C.qurl_is_empty(q.handle())) }
 
 // Clear resets the URL to empty (invalid).
 // Qt: QUrl::clear().
-func (q *QUrl) Clear() { C.qurl_clear(q.p) }
+func (q *QUrl) Clear() { C.qurl_clear(q.handle()) }
 
 // ---- scheme --------------------------------------------------------------
 
@@ -284,13 +328,13 @@ func (q *QUrl) SetSchemeString(s string) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_scheme_utf8(q.p, p, C.size_t(len(s)))
+	C.qurl_set_scheme_utf8(q.handle(), p, C.size_t(len(s)))
 	runtime.KeepAlive(s)
 }
 
 // SchemeString returns the scheme as a Go string.
 // Qt: QUrl::scheme() const → QString (returned here as string).
-func (q *QUrl) SchemeString() string { return goString(C.qurl_scheme(q.p)) }
+func (q *QUrl) SchemeString() string { return goString(C.qurl_scheme(q.handle())) }
 
 // Scheme returns the scheme as a QString.
 // Qt: QUrl::scheme() const → QString.
@@ -315,14 +359,14 @@ func (q *QUrl) SetAuthorityString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_authority_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_authority_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // Authority returns the authority component as a Go string.
 // Qt: QUrl::authority(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) Authority(options ComponentFormattingOptions) string {
-	return goString(C.qurl_authority(q.p, C.int(options)))
+	return goString(C.qurl_authority(q.handle(), C.int(options)))
 }
 
 // AuthorityQString returns the authority component as a QString.
@@ -343,14 +387,14 @@ func (q *QUrl) SetUserInfoString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_user_info_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_user_info_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // UserInfo returns the user-info component as a Go string.
 // Qt: QUrl::userInfo(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) UserInfo(options ComponentFormattingOptions) string {
-	return goString(C.qurl_user_info(q.p, C.int(options)))
+	return goString(C.qurl_user_info(q.handle(), C.int(options)))
 }
 
 // UserInfoQString returns the user-info component as a QString.
@@ -366,14 +410,14 @@ func (q *QUrl) SetUserNameString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_user_name_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_user_name_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // UserName returns the user-name component as a Go string.
 // Qt: QUrl::userName(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) UserName(options ComponentFormattingOptions) string {
-	return goString(C.qurl_user_name(q.p, C.int(options)))
+	return goString(C.qurl_user_name(q.handle(), C.int(options)))
 }
 
 // UserNameQString returns the user-name component as a QString.
@@ -389,14 +433,14 @@ func (q *QUrl) SetPasswordString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_password_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_password_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // Password returns the password component as a Go string.
 // Qt: QUrl::password(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) Password(options ComponentFormattingOptions) string {
-	return goString(C.qurl_password(q.p, C.int(options)))
+	return goString(C.qurl_password(q.handle(), C.int(options)))
 }
 
 // PasswordQString returns the password component as a QString.
@@ -414,14 +458,14 @@ func (q *QUrl) SetHostString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_host_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_host_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // Host returns the host component as a Go string.
 // Qt: QUrl::host(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) Host(options ComponentFormattingOptions) string {
-	return goString(C.qurl_host(q.p, C.int(options)))
+	return goString(C.qurl_host(q.handle(), C.int(options)))
 }
 
 // HostQString returns the host component as a QString.
@@ -432,11 +476,11 @@ func (q *QUrl) HostQString(options ComponentFormattingOptions) *qtext.QString {
 
 // SetPort sets the port (-1 clears it).
 // Qt: QUrl::setPort(int).
-func (q *QUrl) SetPort(port int) { C.qurl_set_port(q.p, C.int(port)) }
+func (q *QUrl) SetPort(port int) { C.qurl_set_port(q.handle(), C.int(port)) }
 
 // Port returns the port, or defaultPort if not set.
 // Qt: QUrl::port(int) const.
-func (q *QUrl) Port(defaultPort int) int { return int(C.qurl_port(q.p, C.int(defaultPort))) }
+func (q *QUrl) Port(defaultPort int) int { return int(C.qurl_port(q.handle(), C.int(defaultPort))) }
 
 // ---- path / filename -----------------------------------------------------
 
@@ -447,14 +491,14 @@ func (q *QUrl) SetPathString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_path_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_path_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // Path returns the path component as a Go string.
 // Qt: QUrl::path(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) Path(options ComponentFormattingOptions) string {
-	return goString(C.qurl_path(q.p, C.int(options)))
+	return goString(C.qurl_path(q.handle(), C.int(options)))
 }
 
 // PathQString returns the path component as a QString.
@@ -466,7 +510,7 @@ func (q *QUrl) PathQString(options ComponentFormattingOptions) *qtext.QString {
 // FileName returns the last segment of the path as a Go string.
 // Qt: QUrl::fileName(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) FileName(options ComponentFormattingOptions) string {
-	return goString(C.qurl_file_name(q.p, C.int(options)))
+	return goString(C.qurl_file_name(q.handle(), C.int(options)))
 }
 
 // FileNameQString returns the last segment of the path as a QString.
@@ -479,7 +523,7 @@ func (q *QUrl) FileNameQString(options ComponentFormattingOptions) *qtext.QStrin
 
 // HasQuery reports whether a query component is present.
 // Qt: QUrl::hasQuery() const.
-func (q *QUrl) HasQuery() bool { return bool(C.qurl_has_query(q.p)) }
+func (q *QUrl) HasQuery() bool { return bool(C.qurl_has_query(q.handle())) }
 
 // SetQueryString sets the query component from a Go string.
 // Qt: QUrl::setQuery(const QString&, ParsingMode) — with QString::fromUtf8.
@@ -488,7 +532,7 @@ func (q *QUrl) SetQueryString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_query_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_query_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
@@ -499,20 +543,20 @@ func (q *QUrl) SetQueryString(s string, mode ParsingMode) {
 //
 // Passing nil clears the query (equivalent to setting an empty QUrlQuery).
 func (q *QUrl) SetQueryQUrlQuery(query *QUrlQuery) {
-	if query == nil || query.p == nil {
+	if _, ok := query.tryHandle(); !ok {
 		empty := NewQUrlQuery()
 		defer empty.Close()
-		C.qurl_set_query_qurlquery(q.p, empty.p)
+		C.qurl_set_query_qurlquery(q.handle(), empty.handle())
 		return
 	}
-	C.qurl_set_query_qurlquery(q.p, query.p)
+	C.qurl_set_query_qurlquery(q.handle(), query.handle())
 	runtime.KeepAlive(query)
 }
 
 // Query returns the query component as a Go string.
 // Qt: QUrl::query(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) Query(options ComponentFormattingOptions) string {
-	return goString(C.qurl_query(q.p, C.int(options)))
+	return goString(C.qurl_query(q.handle(), C.int(options)))
 }
 
 // QueryQString returns the query component as a QString.
@@ -523,7 +567,7 @@ func (q *QUrl) QueryQString(options ComponentFormattingOptions) *qtext.QString {
 
 // HasFragment reports whether a fragment component is present.
 // Qt: QUrl::hasFragment() const.
-func (q *QUrl) HasFragment() bool { return bool(C.qurl_has_fragment(q.p)) }
+func (q *QUrl) HasFragment() bool { return bool(C.qurl_has_fragment(q.handle())) }
 
 // SetFragmentString sets the fragment component from a Go string.
 // Qt: QUrl::setFragment(const QString&, ParsingMode) — with QString::fromUtf8.
@@ -532,14 +576,14 @@ func (q *QUrl) SetFragmentString(s string, mode ParsingMode) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurl_set_fragment_utf8(q.p, p, C.size_t(len(s)), C.int(mode))
+	C.qurl_set_fragment_utf8(q.handle(), p, C.size_t(len(s)), C.int(mode))
 	runtime.KeepAlive(s)
 }
 
 // Fragment returns the fragment component as a Go string.
 // Qt: QUrl::fragment(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrl) Fragment(options ComponentFormattingOptions) string {
-	return goString(C.qurl_fragment(q.p, C.int(options)))
+	return goString(C.qurl_fragment(q.handle(), C.int(options)))
 }
 
 // FragmentQString returns the fragment component as a QString.
@@ -556,12 +600,12 @@ func (q *QUrl) Resolved(relative *QUrl) *QUrl {
 	if relative == nil {
 		return q.Clone()
 	}
-	return wrapQUrl(unsafe.Pointer(C.qurl_resolved(q.p, relative.p)))
+	return wrapQUrl(unsafe.Pointer(C.qurl_resolved(q.handle(), relative.handle())))
 }
 
 // IsRelative reports whether the URL is relative (no scheme).
 // Qt: QUrl::isRelative() const.
-func (q *QUrl) IsRelative() bool { return bool(C.qurl_is_relative(q.p)) }
+func (q *QUrl) IsRelative() bool { return bool(C.qurl_is_relative(q.handle())) }
 
 // IsParentOf reports whether q is a parent of url.
 // Qt: QUrl::isParentOf(const QUrl&) const.
@@ -569,7 +613,7 @@ func (q *QUrl) IsParentOf(url *QUrl) bool {
 	if url == nil {
 		return false
 	}
-	return bool(C.qurl_is_parent_of(q.p, url.p))
+	return bool(C.qurl_is_parent_of(q.handle(), url.handle()))
 }
 
 // Matches reports whether q matches other under the given formatting options.
@@ -578,18 +622,18 @@ func (q *QUrl) Matches(other *QUrl, options FormattingOptions) bool {
 	if other == nil {
 		return false
 	}
-	return bool(C.qurl_matches(q.p, other.p, C.int(options)))
+	return bool(C.qurl_matches(q.handle(), other.handle(), C.int(options)))
 }
 
 // ---- local files ---------------------------------------------------------
 
 // IsLocalFile reports whether the URL refers to a local file.
 // Qt: QUrl::isLocalFile() const.
-func (q *QUrl) IsLocalFile() bool { return bool(C.qurl_is_local_file(q.p)) }
+func (q *QUrl) IsLocalFile() bool { return bool(C.qurl_is_local_file(q.handle())) }
 
 // ToLocalFile returns the local file path as a Go string.
 // Qt: QUrl::toLocalFile() const → QString (returned here as string).
-func (q *QUrl) ToLocalFile() string { return goString(C.qurl_to_local_file(q.p)) }
+func (q *QUrl) ToLocalFile() string { return goString(C.qurl_to_local_file(q.handle())) }
 
 // ToLocalFileQString returns the local file path as a QString.
 // Qt: QUrl::toLocalFile() const → QString.
@@ -601,11 +645,11 @@ func (q *QUrl) ToLocalFileQString() *qtext.QString {
 
 // Detach detaches the URL from any implicitly shared copies.
 // Qt: QUrl::detach().
-func (q *QUrl) Detach() { C.qurl_detach(q.p) }
+func (q *QUrl) Detach() { C.qurl_detach(q.handle()) }
 
 // IsDetached reports whether the URL is detached from any shared copies.
 // Qt: QUrl::isDetached() const.
-func (q *QUrl) IsDetached() bool { return bool(C.qurl_is_detached(q.p)) }
+func (q *QUrl) IsDetached() bool { return bool(C.qurl_is_detached(q.handle())) }
 
 // ---- static parsers -----------------------------------------------------
 
@@ -765,8 +809,8 @@ func ToStringListStrings(urls []*QUrl, options FormattingOptions) []string {
 	}
 	cUrls := make([]*C.QUrl, len(urls))
 	for i, u := range urls {
-		if u != nil && u.p != nil {
-			cUrls[i] = u.p
+		if up, ok := u.tryHandle(); ok {
+			cUrls[i] = up
 		}
 	}
 	var n C.size_t

@@ -30,6 +30,7 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/vadimlxx/go-qt6core/qtext"
@@ -41,34 +42,75 @@ const QueryValueDelimiterDefault uint16 = '='
 // QueryPairDelimiterDefault is QUrlQuery::defaultQueryPairDelimiter() (u'&').
 const QueryPairDelimiterDefault uint16 = '&'
 
+type qurlqueryState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qurlqueryState) cpp() *C.QUrlQuery {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QUrlQuery)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qurlqueryState) claim() *C.QUrlQuery {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QUrlQuery)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // QUrlQuery wraps a Qt6 QUrlQuery object.
 type QUrlQuery struct {
-	p *C.QUrlQuery
+	// p *C.QUrlQuery
+	state   *qurlqueryState
+	cleanup runtime.Cleanup
 }
 
 func wrapQUrlQuery(p unsafe.Pointer) *QUrlQuery {
 	if p == nil {
 		return nil
 	}
-	q := &QUrlQuery{p: (*C.QUrlQuery)(p)}
-	runtime.SetFinalizer(q, finalizeQUrlQuery)
+
+	st := &qurlqueryState{}
+	st.p.Store((*byte)(p))
+	q := &QUrlQuery{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *qurlqueryState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qurlquery_delete(cpp)
+		}
+	}, st)
+
 	return q
 }
 
-func finalizeQUrlQuery(q *QUrlQuery) {
-	if q.p != nil {
-		C.qurlquery_delete(q.p)
-		q.p = nil
+func (q *QUrlQuery) handle() *C.QUrlQuery {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("qurl: use after Close (or nil receiver)")
+}
+
+func (q *QUrlQuery) tryHandle() (*C.QUrlQuery, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
 // Qt: QUrlQuery::~QUrlQuery().
 func (q *QUrlQuery) Close() {
-	if q.p != nil {
-		C.qurlquery_delete(q.p)
-		q.p = nil
-		runtime.SetFinalizer(q, nil)
+	if q == nil || q.state == nil {
+		return
+	}
+
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.qurlquery_delete(cpp)
 	}
 }
 
@@ -88,6 +130,8 @@ func NewQUrlQuery(arg ...any) *QUrlQuery {
 		return QUrlQueryFromQString(v)
 	case string:
 		return QUrlQueryFromString(v)
+	case *QUrlQuery:
+		return v.Clone()
 	}
 
 	panic("NewQUrlQuery invalid argument")
@@ -99,7 +143,7 @@ func QUrlQueryFromUrl(url *QUrl) *QUrlQuery {
 	if url == nil {
 		return NewQUrlQuery()
 	}
-	return wrapQUrlQuery(unsafe.Pointer(C.qurlquery_new_from_url(url.p)))
+	return wrapQUrlQuery(unsafe.Pointer(C.qurlquery_new_from_url(url.handle())))
 }
 
 // QUrlQueryFromQString parses a query string (QString).
@@ -126,13 +170,13 @@ func QUrlQueryFromString(s string) *QUrlQuery {
 // Clone returns a deep copy of the query.
 // Qt: QUrlQuery(const QUrlQuery&) — copy constructor.
 func (q *QUrlQuery) Clone() *QUrlQuery {
-	return wrapQUrlQuery(unsafe.Pointer(C.qurlquery_new_copy(q.p)))
+	return wrapQUrlQuery(unsafe.Pointer(C.qurlquery_new_copy(q.handle())))
 }
 
 // Swap exchanges the contents of q and other.
 // Qt: QUrlQuery::swap(QUrlQuery&).
 func (q *QUrlQuery) Swap(other *QUrlQuery) {
-	C.qurlquery_swap(q.p, other.p)
+	C.qurlquery_swap(q.handle(), other.handle())
 	runtime.KeepAlive(other)
 }
 
@@ -140,15 +184,15 @@ func (q *QUrlQuery) Swap(other *QUrlQuery) {
 
 // IsEmpty reports whether the query has no items.
 // Qt: QUrlQuery::isEmpty() const.
-func (q *QUrlQuery) IsEmpty() bool { return bool(C.qurlquery_is_empty(q.p)) }
+func (q *QUrlQuery) IsEmpty() bool { return bool(C.qurlquery_is_empty(q.handle())) }
 
 // IsDetached reports whether the query is detached from any shared copy.
 // Qt: QUrlQuery::isDetached() const.
-func (q *QUrlQuery) IsDetached() bool { return bool(C.qurlquery_is_detached(q.p)) }
+func (q *QUrlQuery) IsDetached() bool { return bool(C.qurlquery_is_detached(q.handle())) }
 
 // Clear removes all query items.
 // Qt: QUrlQuery::clear().
-func (q *QUrlQuery) Clear() { C.qurlquery_clear(q.p) }
+func (q *QUrlQuery) Clear() { C.qurlquery_clear(q.handle()) }
 
 // ---- query string --------------------------------------------------------
 
@@ -156,7 +200,7 @@ func (q *QUrlQuery) Clear() { C.qurlquery_clear(q.p) }
 // Qt: QUrlQuery::query(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrlQuery) QueryString(encoding ComponentFormattingOptions) string {
 	var n C.size_t
-	p := C.qurlquery_query(q.p, C.int(encoding), &n)
+	p := C.qurlquery_query(q.handle(), C.int(encoding), &n)
 	return qurlQueryGoStringN(p, n)
 }
 
@@ -170,7 +214,7 @@ func (q *QUrlQuery) Query(encoding ComponentFormattingOptions) *qtext.QString {
 // Qt: QUrlQuery::toString(ComponentFormattingOptions) const → QString (as string).
 func (q *QUrlQuery) ToString(encoding ComponentFormattingOptions) string {
 	var n C.size_t
-	p := C.qurlquery_to_string(q.p, C.int(encoding), &n)
+	p := C.qurlquery_to_string(q.handle(), C.int(encoding), &n)
 	return qurlQueryGoStringN(p, n)
 }
 
@@ -197,7 +241,7 @@ func (q *QUrlQuery) SetQueryString(s string) {
 	if len(s) > 0 {
 		p = (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 	}
-	C.qurlquery_set_query_utf8(q.p, p, C.size_t(len(s)))
+	C.qurlquery_set_query_utf8(q.handle(), p, C.size_t(len(s)))
 	runtime.KeepAlive(s)
 }
 
@@ -206,20 +250,20 @@ func (q *QUrlQuery) SetQueryString(s string) {
 // SetQueryDelimiters sets the value and pair delimiters.
 // Qt: QUrlQuery::setQueryDelimiters(QChar, QChar).
 func (q *QUrlQuery) SetQueryDelimiters(valueDelim, pairDelim qtext.QChar) {
-	C.qurlquery_set_query_delimiters(q.p, C.uint16_t(valueDelim.Unicode()),
+	C.qurlquery_set_query_delimiters(q.handle(), C.uint16_t(valueDelim.Unicode()),
 		C.uint16_t(pairDelim.Unicode()))
 }
 
 // QueryValueDelimiter returns the value delimiter.
 // Qt: QUrlQuery::queryValueDelimiter() const → QChar.
 func (q *QUrlQuery) QueryValueDelimiter() qtext.QChar {
-	return qtext.NewQChar(uint16(C.qurlquery_query_value_delimiter(q.p)))
+	return qtext.NewQChar(uint16(C.qurlquery_query_value_delimiter(q.handle())))
 }
 
 // QueryPairDelimiter returns the pair delimiter.
 // Qt: QUrlQuery::queryPairDelimiter() const → QChar.
 func (q *QUrlQuery) QueryPairDelimiter() qtext.QChar {
-	return qtext.NewQChar(uint16(C.qurlquery_query_pair_delimiter(q.p)))
+	return qtext.NewQChar(uint16(C.qurlquery_query_pair_delimiter(q.handle())))
 }
 
 // ---- items (map) ---------------------------------------------------------
@@ -268,7 +312,7 @@ func (q *QUrlQuery) SetQueryItems(items map[string]string) {
 	if len(data) > 0 {
 		dataPtr = (*C.char)(unsafe.Pointer(&data[0]))
 	}
-	C.qurlquery_set_query_items(q.p, dataPtr,
+	C.qurlquery_set_query_items(q.handle(), dataPtr,
 		(*C.size_t)(unsafe.Pointer(&keyOffsets[0])),
 		(*C.size_t)(unsafe.Pointer(&valOffsets[0])),
 		C.size_t(len(keys)))
@@ -285,7 +329,7 @@ func (q *QUrlQuery) SetQueryItems(items map[string]string) {
 func (q *QUrlQuery) QueryItems(encoding ComponentFormattingOptions) map[string]string {
 	var ko, vo *C.size_t
 	var count C.size_t
-	buf := C.qurlquery_query_items(q.p, C.int(encoding), &ko, &vo, &count)
+	buf := C.qurlquery_query_items(q.handle(), C.int(encoding), &ko, &vo, &count)
 	if buf == nil || count == 0 {
 		return nil
 	}
@@ -327,7 +371,7 @@ func (q *QUrlQuery) HasQueryItemQString(key *qtext.QString) bool {
 func (q *QUrlQuery) HasQueryItem(key string) bool {
 	var p *C.char
 	if len(key) > 0 { p = (*C.char)(unsafe.Pointer(unsafe.StringData(key))) }
-	r := bool(C.qurlquery_has_query_item_utf8(q.p, p, C.size_t(len(key))))
+	r := bool(C.qurlquery_has_query_item_utf8(q.handle(), p, C.size_t(len(key))))
 	runtime.KeepAlive(key)
 	return r
 }
@@ -347,7 +391,7 @@ func (q *QUrlQuery) AddQueryItem(key, value string) {
 	var kp, vp *C.char
 	if len(key) > 0 { kp = (*C.char)(unsafe.Pointer(unsafe.StringData(key))) }
 	if len(value) > 0 { vp = (*C.char)(unsafe.Pointer(unsafe.StringData(value))) }
-	C.qurlquery_add_query_item_utf8_utf8(q.p, kp, C.size_t(len(key)), vp, C.size_t(len(value)))
+	C.qurlquery_add_query_item_utf8_utf8(q.handle(), kp, C.size_t(len(key)), vp, C.size_t(len(value)))
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
 }
@@ -366,7 +410,7 @@ func (q *QUrlQuery) RemoveQueryItemQString(key *qtext.QString) {
 func (q *QUrlQuery) RemoveQueryItem(key string) {
 	var p *C.char
 	if len(key) > 0 { p = (*C.char)(unsafe.Pointer(unsafe.StringData(key))) }
-	C.qurlquery_remove_query_item_utf8(q.p, p, C.size_t(len(key)))
+	C.qurlquery_remove_query_item_utf8(q.handle(), p, C.size_t(len(key)))
 	runtime.KeepAlive(key)
 }
 
@@ -385,7 +429,7 @@ func (q *QUrlQuery) QueryItemValue(key string, encoding ComponentFormattingOptio
 	var p *C.char
 	if len(key) > 0 { p = (*C.char)(unsafe.Pointer(unsafe.StringData(key))) }
 	var n C.size_t
-	out := C.qurlquery_query_item_value_utf8(q.p, p, C.size_t(len(key)), C.int(encoding), &n)
+	out := C.qurlquery_query_item_value_utf8(q.handle(), p, C.size_t(len(key)), C.int(encoding), &n)
 	runtime.KeepAlive(key)
 	return qurlQueryGoStringN(out, n)
 }
@@ -407,7 +451,7 @@ func (q *QUrlQuery) AllQueryItemValues(key string, encoding ComponentFormattingO
 	if len(key) > 0 { p = (*C.char)(unsafe.Pointer(unsafe.StringData(key))) }
 	var offs *C.size_t
 	var count C.size_t
-	buf := C.qurlquery_all_query_item_values_utf8(q.p, p, C.size_t(len(key)), C.int(encoding), &offs, &count)
+	buf := C.qurlquery_all_query_item_values_utf8(q.handle(), p, C.size_t(len(key)), C.int(encoding), &offs, &count)
 	runtime.KeepAlive(key)
 	if buf == nil || count == 0 {
 		return nil
@@ -443,7 +487,7 @@ func (q *QUrlQuery) RemoveAllQueryItemsQString(key *qtext.QString) {
 func (q *QUrlQuery) RemoveAllQueryItems(key string) {
 	var p *C.char
 	if len(key) > 0 { p = (*C.char)(unsafe.Pointer(unsafe.StringData(key))) }
-	C.qurlquery_remove_all_query_items_utf8(q.p, p, C.size_t(len(key)))
+	C.qurlquery_remove_all_query_items_utf8(q.handle(), p, C.size_t(len(key)))
 	runtime.KeepAlive(key)
 }
 

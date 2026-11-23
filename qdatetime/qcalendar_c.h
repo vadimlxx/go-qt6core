@@ -1,14 +1,3 @@
-/* C ABI for Qt 6.11 QtCore/QCalendar.
- *
- * QCalendar is a trivially copyable value type: a single pointer (d_ptr). We pass it by
- * value everywhere — no heap allocation, no lifecycle management.
- *
- * In C++ mode go_qcalendar_t is typedef'd directly to QCalendar; in C mode it falls back
- * to a single-pointer POD struct with the same layout (8 bytes on LP64, 4 on ILP32).
- *
- * String outputs use void** out-parameter; the Go side wraps the result via
- * qtext.QStringFromUnsafePtr.
- */
 #ifndef GO_QT6CORE_QDATETIME_QCALENDAR_C_H
 #define GO_QT6CORE_QDATETIME_QCALENDAR_C_H
 
@@ -16,35 +5,47 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* FIX: qstring_c.h lives in ../qtext/, not next to us. */
+#include "../qtext/qstring_c.h"
+
+/* FIX: qdate_c.h now defines go_qdate_t, go_qcalendar_t and go_qymd_t.
+ * We pull them in here. We do NOT include qlocale_c.h / qdatetime_c.h
+ * (they include us; we'd cycle). We forward-declare go_qlocale_t /
+ * go_qdatetime_t below — they are used only via pointers here. */
+#include "qdate_c.h"
+#include "qtime_c.h"
+
 #ifdef __cplusplus
-#include <QCalendar>
-typedef QCalendar go_qcalendar_t;
+class QLocale;
+class QDateTime;
+typedef QLocale*  go_qlocale_t;
+typedef QDateTime go_qdatetime_t;
 extern "C" {
 #else
-typedef struct go_qcalendar_s {
-    const void* d_ptr;
-} go_qcalendar_t;
+typedef struct go_qlocale_s go_qlocale_s;
+typedef go_qlocale_s* go_qlocale_t;
+typedef struct QDateTime go_qdatetime_t;
 #endif
 
-/* --- Construction (return by value, no allocation) --- */
-go_qcalendar_t qcalendar_default(void);
-go_qcalendar_t qcalendar_from_system(int system);
-go_qcalendar_t qcalendar_from_systemid(uintptr_t id);
-go_qcalendar_t qcalendar_from_any(const void* data, ptrdiff_t size, int tag);
+/* ---- Construction ---- */
+go_qcalendar_t qcalendar_default(void);                    /* QCalendar() — Gregorian */
+go_qcalendar_t qcalendar_from_system(int system);          /* QCalendar(System) */
+go_qcalendar_t qcalendar_from_systemid(uintptr_t id);      /* QCalendar(SystemId) */
+go_qcalendar_t qcalendar_from_any(const void* data, ptrdiff_t size, int tag); /* QCalendar(QAnyStringView) */
 
-/* --- Validity --- */
+/* ---- Validity ---- */
 bool qcalendar_is_valid(go_qcalendar_t self);
 
-/* --- Date queries --- */
+/* ---- Date queries ---- */
 int  qcalendar_days_in_month(go_qcalendar_t self, int month, int year);
 int  qcalendar_days_in_year(go_qcalendar_t self, int year);
 int  qcalendar_months_in_year(go_qcalendar_t self, int year);
 bool qcalendar_is_date_valid(go_qcalendar_t self, int year, int month, int day);
 
-/* --- Leap years --- */
+/* ---- Leap years ---- */
 bool qcalendar_is_leap_year(go_qcalendar_t self, int year);
 
-/* --- Calendar properties --- */
+/* ---- Calendar properties ---- */
 bool qcalendar_is_gregorian(go_qcalendar_t self);
 bool qcalendar_is_lunar(go_qcalendar_t self);
 bool qcalendar_is_luni_solar(go_qcalendar_t self);
@@ -56,7 +57,34 @@ int  qcalendar_minimum_days_in_month(go_qcalendar_t self);
 int  qcalendar_maximum_months_in_year(go_qcalendar_t self);
 void qcalendar_name(go_qcalendar_t self, void** out_qstr);
 
+/* ---- QDate conversions ---- */
+go_qdate_t qcalendar_date_from_parts(go_qcalendar_t self, int year, int month, int day);
+go_qdate_t qcalendar_date_from_ymd(go_qcalendar_t self, go_qymd_t ymd);
+go_qdate_t qcalendar_match_century_to_weekday(go_qcalendar_t self, go_qymd_t ymd, int dow);
+go_qymd_t  qcalendar_parts_from_date(go_qcalendar_t self, go_qdate_t date);
+int        qcalendar_day_of_week(go_qcalendar_t self, go_qdate_t date);
+
+/* ---- Month / weekday names ---- */
+void qcalendar_month_name(go_qcalendar_t self, const go_qlocale_t locale,
+                          int month, int year, int format, void** out_qstr);
+void qcalendar_standalone_month_name(go_qcalendar_t self, const go_qlocale_t locale,
+                                     int month, int year, int format, void** out_qstr);
+void qcalendar_week_day_name(go_qcalendar_t self, const go_qlocale_t locale,
+                             int day, int format, void** out_qstr);
+void qcalendar_standalone_week_day_name(go_qcalendar_t self, const go_qlocale_t locale,
+                                        int day, int format, void** out_qstr);
+
+/* ---- Date-time formatting ---- */
+void qcalendar_date_time_to_string(go_qcalendar_t self, const char* format, ptrdiff_t format_len,
+                                   const go_qdatetime_t* dt, go_qdate_t date_only,
+                                   go_qtime_t time_only, const go_qlocale_t locale,
+                                   void** out_qstr);
+
+/* ---- Available calendars ---- */
+QString** qcalendar_available_calendars(ptrdiff_t* out_count);
+void      qcalendar_free_string_array(QString** arr);
+
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif /* GO_QT6CORE_QDATETIME_QCALENDAR_C_H */

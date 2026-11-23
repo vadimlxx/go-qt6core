@@ -1,6 +1,7 @@
 package qtext
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -199,11 +200,11 @@ func TestQStringConverterState(t *testing.T) {
 	got := q.State()
 	if got.InternalState != 0 || got.RemainingChars != 0 || got.InvalidChars != 0 ||
 		got.Data != [4]uint32{} {
-			t.Fatalf("after ResetState: progress not cleared: %+v", got)
-		}
-		if got.Flags != want.Flags {
-			t.Fatalf("after ResetState: Flags = %v, want preserved %v", got.Flags, want.Flags)
-		}
+		t.Fatalf("after ResetState: progress not cleared: %+v", got)
+	}
+	if got.Flags != want.Flags {
+		t.Fatalf("after ResetState: Flags = %v, want preserved %v", got.Flags, want.Flags)
+	}
 }
 
 func TestQStringConverterSwap(t *testing.T) {
@@ -263,4 +264,119 @@ func TestQStringConverterFlagHas(t *testing.T) {
 	if f.Has(FlagStateless) {
 		t.Fatal("Stateless must not be set")
 	}
+}
+
+func TestQStringConverterAvailableCodecs(t *testing.T) {
+	names := AvailableCodecsStrings()
+	if len(names) == 0 {
+		t.Fatal("AvailableCodecsStrings returned no codecs")
+	}
+	for i, n := range names {
+		if n == "" {
+			t.Fatalf("codec %d has an empty name", i)
+		}
+	}
+
+	list := AvailableCodecs()
+	if list == nil {
+		t.Fatal("AvailableCodecs returned nil")
+	}
+	defer list.Close()
+	if list.Size() != len(names) {
+		t.Fatalf("QStringList size %d, []string size %d", list.Size(), len(names))
+	}
+	for i := 0; i < list.Size(); i++ {
+		s := list.At(i)
+		if s == nil {
+			t.Fatalf("nil element at %d", i)
+		}
+		got := s.GoString()
+		s.Close()
+		if got != names[i] {
+			t.Fatalf("element %d: %q vs %q", i, got, names[i])
+		}
+	}
+}
+
+func TestQStringConverterEncodingForDataBytes(t *testing.T) {
+	e, ok := EncodingForDataBytes([]byte{0xFF, 0xFE, 0x41, 0x00}, 0)
+	if !ok || e != Utf16LE {
+		t.Fatalf("EncodingForDataBytes(UTF-16LE BOM): %v, %v", e, ok)
+	}
+	if e, ok := EncodingForDataBytes([]byte{0xEF, 0xBB, 0xBF, 0x41}, 0); !ok || e != Utf8 {
+		t.Fatalf("EncodingForDataBytes(UTF-8 BOM): %v, %v", e, ok)
+	}
+}
+
+func TestQStringConverterEncodingForHtmlBytes(t *testing.T) {
+	html := []byte("<html><head><meta charset=\"UTF-8\"></head></html>")
+	if e, ok := EncodingForHtmlBytes(html); !ok || e != Utf8 {
+		t.Fatalf("EncodingForHtmlBytes: %v, %v", e, ok)
+	}
+}
+
+func TestQStringConverterFromUnsafePtr(t *testing.T) {
+	src := NewQStringConverterFromEncoding(Utf16, FlagDefault)
+	defer src.Close()
+
+	alias := NewQStringConverterFromUnsafePtr(src.UnsafePtr())
+	if alias == nil {
+		t.Fatal("NewQStringConverterFromUnsafePtr returned nil")
+	}
+	if alias.Name() != "UTF-16" {
+		t.Fatalf("alias.Name: %q", alias.Name())
+	}
+	// Non-owning alias: Close must not destroy the owner's object.
+	alias.Close()
+	if !src.IsValid() {
+		t.Fatal("owner converter was invalidated by alias.Close")
+	}
+	if NewQStringConverterFromUnsafePtr(nil) != nil {
+		t.Fatal("NewQStringConverterFromUnsafePtr(nil) must be nil")
+	}
+}
+
+func TestQStringConverterEmbeddedBaseCloseIsNoop(t *testing.T) {
+	q := NewQStringConverterFromEncoding(Utf16, FlagDefault)
+	defer q.Close()
+
+	q.QStringConverterBase.Close()
+	if !q.IsValid() {
+		t.Fatal("embedded base Close must not delete the converter")
+	}
+	if q.Name() != "UTF-16" {
+		t.Fatalf("Name after base Close: %q", q.Name())
+	}
+}
+
+func TestQStringConverterCloseIdempotent(t *testing.T) {
+	q := NewQStringConverterFromEncoding(Utf8, FlagDefault)
+	q.Close()
+	q.Close()
+	if q.IsValid() {
+		t.Fatal("closed converter must be invalid")
+	}
+	if q.Name() != "" {
+		t.Fatalf("name of closed converter: %q", q.Name())
+	}
+}
+
+func TestQStringConverterCleanup(t *testing.T) {
+	for i := 0; i < 32; i++ {
+		q := NewQStringConverterFromEncoding(Utf16, FlagDefault)
+		if q.Name() != "UTF-16" {
+			t.Fatalf("iteration %d: %q", i, q.Name())
+		}
+	}
+	runtime.GC()
+	runtime.GC()
+}
+
+func TestQStringConverterBaseLifecycle(t *testing.T) {
+	b := NewQStringConverterBase()
+	if b == nil {
+		t.Fatal("NewQStringConverterBase returned nil")
+	}
+	b.Close()
+	b.Close()
 }

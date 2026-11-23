@@ -1,53 +1,57 @@
 package qdatetime
 
 /*
- QDateTime — биндинг Qt 6.11 QtCore/QDateTime как HANDLE.
+QDateTime — handle над C++ QDateTime; владение через runtime.AddCleanup + Close().
 
- QDateTime использует COW (Q_DECLARE_SHARED) и НЕ является trivially copyable.
- В Go хранится указатель на C++ QDateTime. Все геттеры/сеттеры идут напрямую в C++.
- Для получения независимой копии используйте Clone().
+# Семантика
 
- Семантика значений vs ссылок:
-   - QDateTime — ссылочный тип (handle). Копирование Go-указателя не создаёт новый объект.
-   - Для независимой копии — Clone().
-   - Go-нулевое значение QDateTime{} невалидно. Используйте NewQDateTime().
+QDateTime использует COW (Q_DECLARE_SHARED), но в Go представлен как handle.
+Копирование Go-указателя не создаёт новый объект — для независимой копии
+используйте Clone().
 
- Управление памятью:
-   - Конструкторы и Clone создают НОВЫЙ heap-объект.
-   - Close() освобождает немедленно; иначе срабатывает finalizer.
+# Владение
 
- Соглашения:
-   - Конструкторы: NewQDateTime (null), NewQDateTimeFromDateTime(date, time).
-   - Геттеры: Date, Time, TimeSpec (qdata.TimeSpec), OffsetFromUtc,
-     ToMSecsSinceEpoch, ToSecsSinceEpoch, IsNull, IsValid.
-   - Сеттеры: SetDate, SetTime, SetMSecsSinceEpoch, SetSecsSinceEpoch.
-   - Арифметика: AddDays, AddMonths, AddYears, AddSecs, AddMSecs,
-     DaysTo, SecsTo, MsecsTo.
-   - Статические: NewQDateTimeCurrentDateTime, NewQDateTimeCurrentDateTimeUtc,
-     NewQDateTimeFromMSecsSinceEpoch, NewQDateTimeFromSecsSinceEpoch,
-     QDateTimeCurrentMSecsSinceEpoch, QDateTimeCurrentSecsSinceEpoch.
-   - Строки: ToString (qdata.DateFormat), ToStringFormat, ToStringFormatCal,
-     NewQDateTimeFromString (qdata.DateFormat), NewQDateTimeFromStringFormat.
-   - Сравнение: Equals.
-   - Конвертация: ToLocalTime, ToUTC, ToOffsetFromUtc.
+C++ объект освобождается одним из двух способов:
+  - Close() — немедленно, детерминированно;
+  - runtime.AddCleanup — когда *QDateTime становится недостижим.
 
- Типы DateFormat и TimeSpec импортируются из пакета qdata
- (github.com/vadimlxx/go-qt6core/qdata) как единый источник истины.
+Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
+гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
+двойного free нет.
 
- Что не реализовано (см. qdatetime_doc.go):
-   - TransitionResolution в сигнатурах конструкторов и сеттеров (пока только enum).
-   - YearRange.
-   - std::chrono interop.
-   - QDataStream / QDebug операторы, qHash.
-   - fromCFDate/toCFDate, fromNSDate/toNSDate (Darwin).
-   - Deprecated overloads (toTimeSpec, setTimeSpec, setOffsetFromUtc).
-   - QDateTime(QDate, QTime, QCalendar) — в Qt 6.11 такого конструктора нет.
-     Для календарно-зависимого форматирования используйте ToStringFormatCal.
+# Use after Close
+
+После Close() любой метод, кроме Close(), паникует
+("qdatetime: use after Close (or nil receiver)").
+
+# Интеграция с QLocale
+
+handle() возвращает *C.go_qdatetime_t, который QLocale использует напрямую
+(см. QLocale.ToStringDateTime*).
+
+# Что нового по сравнению с прошлой версией
+
+  - FromStringCal / FromStringBaseYear / FromStringBaseYearCal —
+    QDateTime::fromString с QCalendar и/или baseYear.
+  - TimeZoneAbbreviation() *qtext.QString — QDateTime::timeZoneAbbreviation.
+  - IsDaylightTime() bool — QDateTime::isDaylightTime.
+  - Free-функции QDateStartOfDay / QDateEndOfDay / QDateStartOfDayZone /
+    QDateEndOfDayZone — обёртки над QDate::startOfDay/endOfDay.
+  - XxxString() варианты для ToString/ToStringFormat/ToStringFormatCal.
+
+# Что всё ещё не реализовано (TODO)
+
+  - TransitionResolution в сигнатурах конструкторов и сеттеров.
+  - YearRange.
+  - std::chrono interop (fromStdTimePoint / fromStdLocalTime / toStdSysMilliseconds /
+    toStdSysSeconds / addDuration) — покрыто через FromMSecsSinceEpoch/AddMSecs.
+  - QDataStream / QDebug операторы, qHash.
+  - Darwin: fromCFDate/toCFDate, fromNSDate/toNSDate.
 */
 
 /*
 #cgo pkg-config: Qt6Core
-#cgo CXXFLAGS: -std=c++17 -fPIC -Wno-sfinae-incomplete
+#cgo CXXFLAGS: -std=c++17 -fPIC
 #cgo LDFLAGS: -lstdc++
 #include "qdatetime_c.h"
 */
@@ -55,258 +59,579 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/vadimlxx/go-qt6core/qdata"
 	"github.com/vadimlxx/go-qt6core/qtext"
 )
 
+// qdatetimeState holds the C++ QDateTime pointer in an atomic slot so that
+// Close() and the runtime cleanup can race safely.
+type qdatetimeState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qdatetimeState) cpp() *C.go_qdatetime_t {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.go_qdatetime_t)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qdatetimeState) claim() *C.go_qdatetime_t {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.go_qdatetime_t)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // QDateTime wraps a heap-allocated Qt6 QDateTime (COW handle).
 type QDateTime struct {
-	p *C.go_qdatetime_t
+	state   *qdatetimeState
+	cleanup runtime.Cleanup
 }
 
 func wrapQDateTime(p *C.go_qdatetime_t) *QDateTime {
 	if p == nil {
 		return nil
 	}
-	dt := &QDateTime{p: p}
-	runtime.SetFinalizer(dt, finalizeQDateTime)
+	st := &qdatetimeState{}
+	st.p.Store((*byte)(unsafe.Pointer(p)))
+	dt := &QDateTime{state: st}
+	dt.cleanup = runtime.AddCleanup(dt, func(st *qdatetimeState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qdatetime_delete(cpp)
+		}
+	}, st)
 	return dt
 }
 
-func finalizeQDateTime(dt *QDateTime) {
-	if dt.p != nil {
-		C.qdatetime_delete(dt.p)
-		dt.p = nil
+func (dt *QDateTime) handle() *C.go_qdatetime_t {
+	if p, ok := dt.tryHandle(); ok {
+		return p
+	}
+	panic("qdatetime: use after Close (or nil receiver)")
+}
+
+func (dt *QDateTime) tryHandle() (*C.go_qdatetime_t, bool) {
+	if dt == nil || dt.state == nil {
+		return nil, false
+	}
+	if p := dt.state.cpp(); p != nil {
+		return p, true
+	}
+	return nil, false
+}
+
+// Close releases the underlying C++ object immediately and cancels the
+// cleanup. Close is optional, idempotent, and nil-safe.
+// Qt: QDateTime::~QDateTime().
+func (dt *QDateTime) Close() {
+	if dt == nil || dt.state == nil {
+		return
+	}
+	dt.cleanup.Stop()
+	if p := dt.state.claim(); p != nil {
+		C.qdatetime_delete(p)
 	}
 }
 
-// Close releases the underlying C++ object immediately and disables the finalizer.
-func (dt *QDateTime) Close() {
-	if dt.p != nil {
-		C.qdatetime_delete(dt.p)
-		dt.p = nil
-		runtime.SetFinalizer(dt, nil)
+// qdateToJD / qdateFromJD bridge value-typed QDate and int64 julian day.
+func qdateToJD(d QDate) int64     { return d.ToJulianDay() }
+func qdateFromJD(jd int64) QDate  { return NewQDateFromJulianDay(jd) }
+
+// qtimeToMSecs / qtimeFromMSecs bridge value-typed QTime and int32 msecs.
+func qtimeToMSecs(t QTime) int32  { return int32(t.MSecsSinceStartOfDay()) }
+func qtimeFromMSecs(ms int32) QTime { return NewQTimeFromMSecsSinceStartOfDay(int(ms)) }
+
+// cstr returns the internal data pointer of s (nil for empty string).
+func cstr(s string) *C.char {
+	if len(s) == 0 {
+		return nil
 	}
+	return (*C.char)(unsafe.Pointer(unsafe.StringData(s)))
 }
 
 // ---- Construction --------------------------------------------------------
 
-// NewQDateTime returns a null QDateTime (mirrors Qt QDateTime()).
+// NewQDateTime — Qt: QDateTime().
 func NewQDateTime() *QDateTime { return wrapQDateTime(C.qdatetime_new_default()) }
 
-// NewQDateTimeFromDateTime returns QDateTime(date, time).
-// If either date or time is null (see QDate.IsNull / QTime.IsNull), the resulting
-// QDateTime is null.
+// NewQDateTimeFromDateTime — Qt: QDateTime(QDate, QTime).
 func NewQDateTimeFromDateTime(date QDate, time QTime) *QDateTime {
-	return wrapQDateTime(C.qdatetime_new_from_date_time(C.int64_t(date), C.int32_t(time)))
+	return wrapQDateTime(C.qdatetime_new_from_date_time(
+		C.int64_t(qdateToJD(date)), C.int32_t(qtimeToMSecs(time))))
 }
 
-// NewQDateTimeFromString returns QDateTime::fromString(str, format).
+// NewQDateTimeFromString — Qt: QDateTime::fromString(QStringView, Qt::DateFormat).
 func NewQDateTimeFromString(str string, format qdata.DateFormat) *QDateTime {
-	var p *C.char
-	if len(str) > 0 {
-		p = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
-	}
-	dt := wrapQDateTime(C.qdatetime_from_string_utf8(p, C.ptrdiff_t(len(str)), C.int(format)))
+	dt := wrapQDateTime(C.qdatetime_from_string_utf8(cstr(str), C.ptrdiff_t(len(str)), C.int(format)))
 	runtime.KeepAlive(str)
 	return dt
 }
 
-// NewQDateTimeFromStringFormat returns QDateTime::fromString(str, formatQString).
+// NewQDateTimeFromStringFormat — Qt: QDateTime::fromString(QStringView, QStringView).
 func NewQDateTimeFromStringFormat(str, format string) *QDateTime {
-	var ps, pf *C.char
-	if len(str) > 0 {
-		ps = (*C.char)(unsafe.Pointer(unsafe.StringData(str)))
-	}
-	if len(format) > 0 {
-		pf = (*C.char)(unsafe.Pointer(unsafe.StringData(format)))
-	}
 	dt := wrapQDateTime(C.qdatetime_from_string_format_utf8(
-		ps, C.ptrdiff_t(len(str)),
-		pf, C.ptrdiff_t(len(format)),
-	))
+		cstr(str), C.ptrdiff_t(len(str)),
+		cstr(format), C.ptrdiff_t(len(format))))
 	runtime.KeepAlive(str)
 	runtime.KeepAlive(format)
 	return dt
 }
 
-// Clone returns a heap copy of dt (independent C++ object).
+// NewQDateTimeFromStringCal — Qt: QDateTime::fromString(QStringView, QStringView, QCalendar).
+// Uses QLocale::DefaultTwoDigitBaseYear (1900).
+func NewQDateTimeFromStringCal(str, format string, cal QCalendar) *QDateTime {
+	dt := wrapQDateTime(C.qdatetime_from_string_format_cal(
+		cstr(str), C.ptrdiff_t(len(str)),
+		cstr(format), C.ptrdiff_t(len(format)),
+		cal.v))
+	runtime.KeepAlive(str)
+	runtime.KeepAlive(format)
+	return dt
+}
+
+// NewQDateTimeFromStringBaseYear — Qt: QDateTime::fromString(QStringView, QStringView, int).
+func NewQDateTimeFromStringBaseYear(str, format string, baseYear int) *QDateTime {
+	dt := wrapQDateTime(C.qdatetime_from_string_format_base_year(
+		cstr(str), C.ptrdiff_t(len(str)),
+		cstr(format), C.ptrdiff_t(len(format)),
+		C.int(baseYear)))
+	runtime.KeepAlive(str)
+	runtime.KeepAlive(format)
+	return dt
+}
+
+// NewQDateTimeFromStringBaseYearCal — Qt: QDateTime::fromString(QStringView, QStringView, int, QCalendar).
+func NewQDateTimeFromStringBaseYearCal(str, format string, baseYear int, cal QCalendar) *QDateTime {
+	dt := wrapQDateTime(C.qdatetime_from_string_format_base_year_cal(
+		cstr(str), C.ptrdiff_t(len(str)),
+		cstr(format), C.ptrdiff_t(len(format)),
+		C.int(baseYear), cal.v))
+	runtime.KeepAlive(str)
+	runtime.KeepAlive(format)
+	return dt
+}
+
+// Clone — Qt: QDateTime(const QDateTime&).
 func (dt *QDateTime) Clone() *QDateTime {
-	return wrapQDateTime(C.qdatetime_clone(dt.p))
+	r := wrapQDateTime(C.qdatetime_clone(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// Swap — Qt: QDateTime::swap(QDateTime&).
+func (dt *QDateTime) Swap(other *QDateTime) {
+	if op, ok := other.tryHandle(); ok {
+		C.qdatetime_swap(dt.handle(), op)
+		runtime.KeepAlive(dt)
+		runtime.KeepAlive(other)
+	}
 }
 
 // ---- Static constructors -------------------------------------------------
 
-// NewQDateTimeCurrentDateTime returns QDateTime::currentDateTime().
+// NewQDateTimeCurrentDateTime — Qt: QDateTime::currentDateTime().
 func NewQDateTimeCurrentDateTime() *QDateTime {
 	return wrapQDateTime(C.qdatetime_current_date_time())
 }
 
-// NewQDateTimeCurrentDateTimeUtc returns QDateTime::currentDateTimeUtc().
+// NewQDateTimeCurrentDateTimeUtc — Qt: QDateTime::currentDateTimeUtc().
 func NewQDateTimeCurrentDateTimeUtc() *QDateTime {
 	return wrapQDateTime(C.qdatetime_current_date_time_utc())
 }
 
-// NewQDateTimeFromMSecsSinceEpoch returns QDateTime::fromMSecsSinceEpoch(msecs).
+// NewQDateTimeFromMSecsSinceEpoch — Qt: QDateTime::fromMSecsSinceEpoch(qint64).
 func NewQDateTimeFromMSecsSinceEpoch(msecs int64) *QDateTime {
 	return wrapQDateTime(C.qdatetime_from_msecs_since_epoch(C.int64_t(msecs)))
 }
 
-// NewQDateTimeFromSecsSinceEpoch returns QDateTime::fromSecsSinceEpoch(secs).
+// NewQDateTimeFromSecsSinceEpoch — Qt: QDateTime::fromSecsSinceEpoch(qint64).
 func NewQDateTimeFromSecsSinceEpoch(secs int64) *QDateTime {
 	return wrapQDateTime(C.qdatetime_from_secs_since_epoch(C.int64_t(secs)))
 }
 
-// QDateTimeCurrentMSecsSinceEpoch returns QDateTime::currentMSecsSinceEpoch().
+// QDateTimeCurrentMSecsSinceEpoch — Qt: QDateTime::currentMSecsSinceEpoch().
 func QDateTimeCurrentMSecsSinceEpoch() int64 {
 	return int64(C.qdatetime_current_msecs_since_epoch())
 }
 
-// QDateTimeCurrentSecsSinceEpoch returns QDateTime::currentSecsSinceEpoch().
+// QDateTimeCurrentSecsSinceEpoch — Qt: QDateTime::currentSecsSinceEpoch().
 func QDateTimeCurrentSecsSinceEpoch() int64 {
 	return int64(C.qdatetime_current_secs_since_epoch())
 }
 
 // ---- Accessors -----------------------------------------------------------
 
-func (dt *QDateTime) IsNull() bool  { return bool(C.qdatetime_is_null(dt.p)) }
-func (dt *QDateTime) IsValid() bool { return bool(C.qdatetime_is_valid(dt.p)) }
-func (dt *QDateTime) Date() QDate   { return QDate(C.qdatetime_date(dt.p)) }
-func (dt *QDateTime) Time() QTime   { return QTime(C.qdatetime_time(dt.p)) }
+// IsNull — Qt: QDateTime::isNull() const.
+func (dt *QDateTime) IsNull() bool {
+	r := bool(C.qdatetime_is_null(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// IsValid — Qt: QDateTime::isValid() const.
+func (dt *QDateTime) IsValid() bool {
+	r := bool(C.qdatetime_is_valid(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// IsDaylightTime — Qt: QDateTime::isDaylightTime() const.
+func (dt *QDateTime) IsDaylightTime() bool {
+	r := bool(C.qdatetime_is_daylight_time(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// Date — Qt: QDateTime::date() const.
+func (dt *QDateTime) Date() QDate {
+	r := qdateFromJD(int64(C.qdatetime_date(dt.handle())))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// Time — Qt: QDateTime::time() const.
+func (dt *QDateTime) Time() QTime {
+	r := qtimeFromMSecs(int32(C.qdatetime_time(dt.handle())))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// TimeSpec — Qt: QDateTime::timeSpec() const.
 func (dt *QDateTime) TimeSpec() qdata.TimeSpec {
-	return qdata.TimeSpec(C.qdatetime_time_spec(dt.p))
+	r := qdata.TimeSpec(C.qdatetime_time_spec(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// OffsetFromUtc — Qt: QDateTime::offsetFromUtc() const.
 func (dt *QDateTime) OffsetFromUtc() int {
-	return int(C.qdatetime_offset_from_utc(dt.p))
+	r := int(C.qdatetime_offset_from_utc(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// ToMSecsSinceEpoch — Qt: QDateTime::toMSecsSinceEpoch() const.
 func (dt *QDateTime) ToMSecsSinceEpoch() int64 {
-	return int64(C.qdatetime_to_msecs_since_epoch(dt.p))
+	r := int64(C.qdatetime_to_msecs_since_epoch(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// ToSecsSinceEpoch — Qt: QDateTime::toSecsSinceEpoch() const.
 func (dt *QDateTime) ToSecsSinceEpoch() int64 {
-	return int64(C.qdatetime_to_secs_since_epoch(dt.p))
+	r := int64(C.qdatetime_to_secs_since_epoch(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
+}
+
+// TimeZoneAbbreviation — Qt: QDateTime::timeZoneAbbreviation() const.
+func (dt *QDateTime) TimeZoneAbbreviation() *qtext.QString {
+	var out unsafe.Pointer
+	C.qdatetime_time_zone_abbreviation(dt.handle(), &out)
+	runtime.KeepAlive(dt)
+	return qtext.QStringFromUnsafePtr(out)
+}
+
+// TimeZoneAbbreviationString — Go-string variant of TimeZoneAbbreviation.
+func (dt *QDateTime) TimeZoneAbbreviationString() string {
+	s := dt.TimeZoneAbbreviation()
+	if s == nil {
+		return ""
+	}
+	defer s.Close()
+	return s.GoString()
 }
 
 // ---- Setters -------------------------------------------------------------
 
+// SetDate — Qt: QDateTime::setDate(QDate).
 func (dt *QDateTime) SetDate(date QDate) {
-	C.qdatetime_set_date(dt.p, C.int64_t(date))
+	C.qdatetime_set_date(dt.handle(), C.int64_t(qdateToJD(date)))
+	runtime.KeepAlive(dt)
 }
+
+// SetTime — Qt: QDateTime::setTime(QTime).
 func (dt *QDateTime) SetTime(time QTime) {
-	C.qdatetime_set_time(dt.p, C.int32_t(time))
+	C.qdatetime_set_time(dt.handle(), C.int32_t(qtimeToMSecs(time)))
+	runtime.KeepAlive(dt)
 }
+
+// SetMSecsSinceEpoch — Qt: QDateTime::setMSecsSinceEpoch(qint64).
 func (dt *QDateTime) SetMSecsSinceEpoch(msecs int64) {
-	C.qdatetime_set_msecs_since_epoch(dt.p, C.int64_t(msecs))
+	C.qdatetime_set_msecs_since_epoch(dt.handle(), C.int64_t(msecs))
+	runtime.KeepAlive(dt)
 }
+
+// SetSecsSinceEpoch — Qt: QDateTime::setSecsSinceEpoch(qint64).
 func (dt *QDateTime) SetSecsSinceEpoch(secs int64) {
-	C.qdatetime_set_secs_since_epoch(dt.p, C.int64_t(secs))
+	C.qdatetime_set_secs_since_epoch(dt.handle(), C.int64_t(secs))
+	runtime.KeepAlive(dt)
 }
 
-// ---- Arithmetic (each returns a new *QDateTime) --------------------------
+// ---- Arithmetic ----------------------------------------------------------
 
+// AddDays — Qt: QDateTime::addDays(qint64) const.
 func (dt *QDateTime) AddDays(days int64) *QDateTime {
-	return wrapQDateTime(C.qdatetime_add_days(dt.p, C.int64_t(days)))
+	r := wrapQDateTime(C.qdatetime_add_days(dt.handle(), C.int64_t(days)))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// AddMonths — Qt: QDateTime::addMonths(int) const.
 func (dt *QDateTime) AddMonths(months int) *QDateTime {
-	return wrapQDateTime(C.qdatetime_add_months(dt.p, C.int(months)))
+	r := wrapQDateTime(C.qdatetime_add_months(dt.handle(), C.int(months)))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// AddYears — Qt: QDateTime::addYears(int) const.
 func (dt *QDateTime) AddYears(years int) *QDateTime {
-	return wrapQDateTime(C.qdatetime_add_years(dt.p, C.int(years)))
+	r := wrapQDateTime(C.qdatetime_add_years(dt.handle(), C.int(years)))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// AddSecs — Qt: QDateTime::addSecs(qint64) const.
 func (dt *QDateTime) AddSecs(secs int64) *QDateTime {
-	return wrapQDateTime(C.qdatetime_add_secs(dt.p, C.int64_t(secs)))
+	r := wrapQDateTime(C.qdatetime_add_secs(dt.handle(), C.int64_t(secs)))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// AddMSecs — Qt: QDateTime::addMSecs(qint64) const.
 func (dt *QDateTime) AddMSecs(msecs int64) *QDateTime {
-	return wrapQDateTime(C.qdatetime_add_msecs(dt.p, C.int64_t(msecs)))
+	r := wrapQDateTime(C.qdatetime_add_msecs(dt.handle(), C.int64_t(msecs)))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// DaysTo — Qt: QDateTime::daysTo(const QDateTime&) const.
 func (dt *QDateTime) DaysTo(other *QDateTime) int64 {
-	return int64(C.qdatetime_days_to(dt.p, other.p))
+	op, ok := other.tryHandle()
+	if !ok {
+		return 0
+	}
+	r := int64(C.qdatetime_days_to(dt.handle(), op))
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(other)
+	return r
 }
+
+// SecsTo — Qt: QDateTime::secsTo(const QDateTime&) const.
 func (dt *QDateTime) SecsTo(other *QDateTime) int64 {
-	return int64(C.qdatetime_secs_to(dt.p, other.p))
+	op, ok := other.tryHandle()
+	if !ok {
+		return 0
+	}
+	r := int64(C.qdatetime_secs_to(dt.handle(), op))
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(other)
+	return r
 }
+
+// MsecsTo — Qt: QDateTime::msecsTo(const QDateTime&) const.
 func (dt *QDateTime) MsecsTo(other *QDateTime) int64 {
-	return int64(C.qdatetime_msecs_to(dt.p, other.p))
+	op, ok := other.tryHandle()
+	if !ok {
+		return 0
+	}
+	r := int64(C.qdatetime_msecs_to(dt.handle(), op))
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(other)
+	return r
 }
 
 // ---- Strings -------------------------------------------------------------
 
+// ToString — Qt: QDateTime::toString(Qt::DateFormat) const.
 func (dt *QDateTime) ToString(format qdata.DateFormat) *qtext.QString {
 	var out unsafe.Pointer
-	C.qdatetime_to_string(dt.p, C.int(format), &out)
+	C.qdatetime_to_string(dt.handle(), C.int(format), &out)
+	runtime.KeepAlive(dt)
 	return qtext.QStringFromUnsafePtr(out)
 }
 
+// ToStringString — Go-string variant of ToString.
+func (dt *QDateTime) ToStringString(format qdata.DateFormat) string {
+	s := dt.ToString(format)
+	if s == nil {
+		return ""
+	}
+	defer s.Close()
+	return s.GoString()
+}
+
+// ToStringFormat — Qt: QDateTime::toString(QStringView) const.
 func (dt *QDateTime) ToStringFormat(format string) *qtext.QString {
-	var p *C.char
-	if len(format) > 0 {
-		p = (*C.char)(unsafe.Pointer(unsafe.StringData(format)))
-	}
 	var out unsafe.Pointer
-	C.qdatetime_to_string_format(dt.p, p, C.ptrdiff_t(len(format)), &out)
+	C.qdatetime_to_string_format(dt.handle(), cstr(format), C.ptrdiff_t(len(format)), &out)
+	runtime.KeepAlive(dt)
 	runtime.KeepAlive(format)
 	return qtext.QStringFromUnsafePtr(out)
 }
 
-func (dt *QDateTime) ToStringFormatCal(format string, cal QCalendar) *qtext.QString {
-	var p *C.char
-	if len(format) > 0 {
-		p = (*C.char)(unsafe.Pointer(unsafe.StringData(format)))
+// ToStringFormatString — Go-string variant.
+func (dt *QDateTime) ToStringFormatString(format string) string {
+	s := dt.ToStringFormat(format)
+	if s == nil {
+		return ""
 	}
+	defer s.Close()
+	return s.GoString()
+}
+
+// ToStringFormatCal — Qt: QDateTime::toString(QStringView, QCalendar) const.
+func (dt *QDateTime) ToStringFormatCal(format string, cal QCalendar) *qtext.QString {
 	var out unsafe.Pointer
-	C.qdatetime_to_string_format_cal(dt.p, p, C.ptrdiff_t(len(format)), cal.v, &out)
+	C.qdatetime_to_string_format_cal(dt.handle(),
+		cstr(format), C.ptrdiff_t(len(format)), cal.v, &out)
+	runtime.KeepAlive(dt)
 	runtime.KeepAlive(format)
 	return qtext.QStringFromUnsafePtr(out)
+}
+
+// ToStringFormatCalString — Go-string variant.
+func (dt *QDateTime) ToStringFormatCalString(format string, cal QCalendar) string {
+	s := dt.ToStringFormatCal(format, cal)
+	if s == nil {
+		return ""
+	}
+	defer s.Close()
+	return s.GoString()
 }
 
 // ---- Comparison ----------------------------------------------------------
 
-// Equals reports whether dt and other hold the same datetime.
+// Equals — Qt: QDateTime::operator==(const QDateTime&).
 func (dt *QDateTime) Equals(other *QDateTime) bool {
-	return bool(C.qdatetime_equals(dt.p, other.p))
+	op, ok := other.tryHandle()
+	if !ok {
+		return false
+	}
+	r := bool(C.qdatetime_equals(dt.handle(), op))
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(other)
+	return r
 }
 
-// ---- Conversions (each returns a new *QDateTime) -------------------------
+// ---- Conversions ---------------------------------------------------------
 
+// ToLocalTime — Qt: QDateTime::toLocalTime() const.
 func (dt *QDateTime) ToLocalTime() *QDateTime {
-	return wrapQDateTime(C.qdatetime_to_local_time(dt.p))
+	r := wrapQDateTime(C.qdatetime_to_local_time(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// ToUTC — Qt: QDateTime::toUTC() const.
 func (dt *QDateTime) ToUTC() *QDateTime {
-	return wrapQDateTime(C.qdatetime_to_utc(dt.p))
+	r := wrapQDateTime(C.qdatetime_to_utc(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
 }
+
+// ToOffsetFromUtc — Qt: QDateTime::toOffsetFromUtc(int) const.
 func (dt *QDateTime) ToOffsetFromUtc(offsetSeconds int) *QDateTime {
-	return wrapQDateTime(C.qdatetime_to_offset_from_utc(dt.p, C.int(offsetSeconds)))
+	r := wrapQDateTime(C.qdatetime_to_offset_from_utc(dt.handle(), C.int(offsetSeconds)))
+	runtime.KeepAlive(dt)
+	return r
 }
 
-// ------------------------------- QTimeZone ---------------------------------
+// ---- QTimeZone integration -----------------------------------------------
 
-// TimeZone returns the time zone of the datetime.
+// TimeZone — Qt: QDateTime::timeZone() const.
 func (dt *QDateTime) TimeZone() *QTimeZone {
-	return wrapQTimeZone(C.qdatetime_time_zone(dt.p))
+	r := wrapQTimeZone(C.qdatetime_time_zone(dt.handle()))
+	runtime.KeepAlive(dt)
+	return r
 }
 
-// SetTimeZone sets the datetime's time zone.
+// SetTimeZone — Qt: QDateTime::setTimeZone(const QTimeZone&).
 func (dt *QDateTime) SetTimeZone(tz *QTimeZone) {
-	C.qdatetime_set_time_zone(dt.p, tz.p)
+	if tz == nil || tz.p == nil {
+		return
+	}
+	C.qdatetime_set_time_zone(dt.handle(), tz.p)
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(tz)
 }
 
-// ToTimeZone returns a copy of dt converted to the given time zone.
+// ToTimeZone — Qt: QDateTime::toTimeZone(const QTimeZone&) const.
 func (dt *QDateTime) ToTimeZone(tz *QTimeZone) *QDateTime {
-	return wrapQDateTime(C.qdatetime_to_time_zone(dt.p, tz.p))
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdatetime_to_time_zone(dt.handle(), tz.p))
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(tz)
+	return r
 }
 
-// CurrentDateTimeZone returns the current datetime in the given time zone.
+// CurrentDateTimeZone — Qt: QDateTime::currentDateTime(const QTimeZone&).
 func CurrentDateTimeZone(tz *QTimeZone) *QDateTime {
-	return wrapQDateTime(C.qdatetime_current_date_time_zone(tz.p))
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdatetime_current_date_time_zone(tz.p))
+	runtime.KeepAlive(tz)
+	return r
 }
 
-// FromMSecsSinceEpochZone returns a QDateTime from epoch milliseconds in the given zone.
+// FromMSecsSinceEpochZone — Qt: QDateTime::fromMSecsSinceEpoch(qint64, const QTimeZone&).
 func FromMSecsSinceEpochZone(msecs int64, tz *QTimeZone) *QDateTime {
-	return wrapQDateTime(C.qdatetime_from_msecs_since_epoch_zone(C.int64_t(msecs), tz.p))
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdatetime_from_msecs_since_epoch_zone(C.int64_t(msecs), tz.p))
+	runtime.KeepAlive(tz)
+	return r
 }
 
-// FromSecsSinceEpochZone returns a QDateTime from epoch seconds in the given zone.
+// FromSecsSinceEpochZone — Qt: QDateTime::fromSecsSinceEpoch(qint64, const QTimeZone&).
 func FromSecsSinceEpochZone(secs int64, tz *QTimeZone) *QDateTime {
-	return wrapQDateTime(C.qdatetime_from_secs_since_epoch_zone(C.int64_t(secs), tz.p))
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdatetime_from_secs_since_epoch_zone(C.int64_t(secs), tz.p))
+	runtime.KeepAlive(tz)
+	return r
+}
+
+// ---- QDate::startOfDay / endOfDay (free functions) -----------------------
+// These wrap QDate methods. They live here (not in qdate.go) so that
+// QDateTime can be returned without QDate importing QDateTime types.
+// Once qdate.go adds these methods, these free functions can be deprecated.
+
+// QDateStartOfDay — Qt: QDate::startOfDay() const.
+func QDateStartOfDay(d QDate) *QDateTime {
+	return wrapQDateTime(C.qdate_start_of_day(C.int64_t(qdateToJD(d))))
+}
+
+// QDateEndOfDay — Qt: QDate::endOfDay() const.
+func QDateEndOfDay(d QDate) *QDateTime {
+	return wrapQDateTime(C.qdate_end_of_day(C.int64_t(qdateToJD(d))))
+}
+
+// QDateStartOfDayZone — Qt: QDate::startOfDay(const QTimeZone&) const.
+func QDateStartOfDayZone(d QDate, tz *QTimeZone) *QDateTime {
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdate_start_of_day_zone(C.int64_t(qdateToJD(d)), tz.p))
+	runtime.KeepAlive(tz)
+	return r
+}
+
+// QDateEndOfDayZone — Qt: QDate::endOfDay(const QTimeZone&) const.
+func QDateEndOfDayZone(d QDate, tz *QTimeZone) *QDateTime {
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdate_end_of_day_zone(C.int64_t(qdateToJD(d)), tz.p))
+	runtime.KeepAlive(tz)
+	return r
 }

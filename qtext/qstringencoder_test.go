@@ -2,6 +2,7 @@ package qtext
 
 import (
 	"bytes"
+	"runtime"
 	"testing"
 	"unicode/utf16"
 )
@@ -218,4 +219,74 @@ func TestQStringEncoderEncodeThenEncodeAgain(t *testing.T) {
 		}
 		out.Close()
 	}
+}
+
+func TestQStringEncoderGoVariants(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
+	defer e.Close()
+
+	out := e.EncodeString("héllo")
+	defer out.Close()
+	if !bytes.Equal(out.Bytes(), []byte("héllo")) {
+		t.Fatalf("EncodeString: %v", out.Bytes())
+	}
+
+	q := NewQStringFromString("héllo")
+	defer q.Close()
+	if got := e.EncodeBytes(q); !bytes.Equal(got, []byte("héllo")) {
+		t.Fatalf("EncodeBytes: %v", got)
+	}
+
+	outView := e.EncodeViewString("日本")
+	defer outView.Close()
+	if !bytes.Equal(outView.Bytes(), []byte("日本")) {
+		t.Fatalf("EncodeViewString: %v", outView.Bytes())
+	}
+
+	sv := QStringViewFromUtf16(utf16.Encode([]rune("日本")))
+	if got := e.EncodeViewBytes(sv); !bytes.Equal(got, []byte("日本")) {
+		t.Fatalf("EncodeViewBytes: %v", got)
+	}
+
+	buf := make([]byte, e.RequiredSpace(5))
+	n := e.AppendToBufferString(buf, "hello")
+	if n != 5 || string(buf[:n]) != "hello" {
+		t.Fatalf("AppendToBufferString: n=%d buf=%q", n, buf[:n])
+	}
+}
+
+func TestQStringEncoderCloseSharedState(t *testing.T) {
+	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
+	if e.QStringConverter == nil || !e.QStringConverter.IsValid() {
+		t.Fatal("embedded converter must be valid before Close")
+	}
+
+	e.Close()
+	e.Close()
+
+	if e.IsValid() {
+		t.Fatal("closed encoder must be invalid")
+	}
+	if e.Name() != "" {
+		t.Fatalf("Name after Close: %q", e.Name())
+	}
+	if e.QStringConverter.IsValid() {
+		t.Fatal("embedded converter must observe the closed state")
+	}
+	out := e.EncodeString("x")
+	defer out.Close()
+	if out.Size() != 0 {
+		t.Fatalf("EncodeString after Close: size=%d", out.Size())
+	}
+}
+
+func TestQStringEncoderCleanup(t *testing.T) {
+	for i := 0; i < 32; i++ {
+		e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
+		if e.Name() != "UTF-8" {
+			t.Fatalf("iteration %d: %q", i, e.Name())
+		}
+	}
+	runtime.GC()
+	runtime.GC()
 }

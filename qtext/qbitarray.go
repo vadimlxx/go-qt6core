@@ -1,56 +1,56 @@
 package qtext
 
 /*
-QBitArray — handle над C++ QBitArray; владение через runtime.AddCleanup + Close().
+	QBitArray — handle над C++ QBitArray; владение через runtime.AddCleanup + Close().
 
-# Семантика
+	# Семантика
 
-Каждый *QBitArray — handle на C++ QBitArray (COW-массив битов).
-Копирование (Clone) дёшево (COW refcount++). Мутирующие методы detach-ят
-внутри Qt.
+	Каждый *QBitArray — handle на C++ QBitArray (COW-массив битов).
+	Копирование (Clone) дёшево (COW refcount++). Мутирующие методы detach-ят
+	внутри Qt.
 
-# Владение
+	# Владение
 
-C++ объект освобождается одним из двух способов:
-  - Close() — немедленно, детерминированно;
-  - runtime.AddCleanup — когда *QBitArray становится недостижим.
+	C++ объект освобождается одним из двух способов:
+	- Close() — немедленно, детерминированно;
+	- runtime.AddCleanup — когда *QBitArray становится недостижим.
 
-Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
-гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
-двойного free нет.
+	Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
+	гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
+	двойного free нет.
 
-# Use after Close
+	# Use after Close
 
-После Close() любой метод, кроме Close(), паникует
-("qbitarray: use after Close (or nil receiver)").
+	После Close() любой метод, кроме Close(), паникует
+	("qbitarray: use after Close (or nil receiver)").
 
-# QBitRef
+	# QBitRef
 
-QBitRef — Go-side прокси {array, index}, без отдельного C++ объекта.
-Он держит родительский *QBitArray живым, но не защищает от структурных
-изменений родителя. Не вызывайте Resize/Clear/Fill/FillSized/Close на
-родителе, пока QBitRef в работе. После Close родителя QBitRef паникует
-при любом обращении (через родительский handle()).
+	QBitRef — Go-side прокси {array, index}, без отдельного C++ объекта.
+	Он держит родительский *QBitArray живым, но не защищает от структурных
+	изменений родителя. Не вызывайте Resize/Clear/Fill/FillSized/Close на
+	родителе, пока QBitRef в работе. После Close родителя QBitRef паникует
+	при любом обращении (через родительский handle()).
 
-# Соглашения по именам
+	# Соглашения по именам
 
-Все конструкторы QBitArray начинаются с NewQBitArray* (NewQBitArray,
-NewQBitArraySized, NewQBitArrayFromBits). Пакетные операторы And/Or/Xor/Not
-соответствуют C++-операторам &/|/^/~ и имени New не имеют — это не
-конструкторы, а операторные эквиваленты.
+	Все конструкторы QBitArray начинаются с NewQBitArray* (NewQBitArray,
+	NewQBitArraySized, NewQBitArrayFromBits). Пакетные операторы And/Or/Xor/Not
+	соответствуют C++-операторам &/|/^/~ и имени New не имеют — это не
+	конструкторы, а операторные эквиваленты.
 
-# Что сознательно не вошло (TODO, не блокирует текущий API)
+	# Что сознательно не вошло (TODO, не блокирует текущий API)
 
-  - QDataStream operator<< / operator>> — требует qdatastream (TODO).
-  - qHash(QBitArray) — требует qhash (TODO); в Go хешируйте срез из Bits()
-    (crypto/sha256, hash/fnv и т.п.).
-  - QDebug operator<< — неприменимо в Go.
-  - QBitArray::count() без аргумента (deprecated alias size()) — используйте Size().
-  - data_ptr() (DataPtr = QByteArray::DataPointer) — внутренняя деталь; для
-    raw-доступа используйте Bits()/NewQBitArrayFromBits.
-  - Перегрузки bitwise-операторов на rvalue (& &, |, ^ с moves) — не
-    экспортируются; AndAssign/OrAssign/XorAssign + Clone покрывают те же
-    сценарии.
+	- QDataStream operator<< / operator>> — требует qdatastream (TODO).
+	- qHash(QBitArray) — требует qhash (TODO); в Go хешируйте срез из Bits()
+		(crypto/sha256, hash/fnv и т.п.).
+	- QDebug operator<< — неприменимо в Go.
+	- QBitArray::count() без аргумента (deprecated alias size()) — используйте Size().
+	- data_ptr() (DataPtr = QByteArray::DataPointer) — внутренняя деталь; для
+		raw-доступа используйте Bits()/NewQBitArrayFromBits.
+	- Перегрузки bitwise-операторов на rvalue (& &, |, ^ с moves) — не
+		экспортируются; AndAssign/OrAssign/XorAssign + Clone покрывают те же
+		сценарии.
 */
 
 /*

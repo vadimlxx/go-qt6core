@@ -50,39 +50,82 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
 // QTextBoundaryFinder wraps a Qt6 QTextBoundaryFinder object.
+
+type qtextbfState struct {
+	p atomic.Pointer[byte]
+}
+
+func (s *qtextbfState) cpp() *C.QTextBoundaryFinder {
+	if bp := s.p.Load(); bp != nil {
+		return (*C.QTextBoundaryFinder)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
+func (s *qtextbfState) claim() *C.QTextBoundaryFinder {
+	if bp := s.p.Swap(nil); bp != nil {
+		return (*C.QTextBoundaryFinder)(unsafe.Pointer(bp))
+	}
+	return nil
+}
+
 // Each *QTextBoundaryFinder owns a heap-allocated C++ QTextBoundaryFinder;
 // the finalizer (and explicit Close) frees it.
 type QTextBoundaryFinder struct {
-	p *C.QTextBoundaryFinder
+	// p *C.QTextBoundaryFinder
+	state   *qtextbfState
+	cleanup runtime.Cleanup
 }
 
 func wrapQTextBoundaryFinder(p unsafe.Pointer) *QTextBoundaryFinder {
 	if p == nil {
 		return nil
 	}
-	q := &QTextBoundaryFinder{p: (*C.QTextBoundaryFinder)(p)}
-	runtime.SetFinalizer(q, finalizeQTextBoundaryFinder)
+
+	st := &qtextbfState{}
+	st.p.Store((*byte)(p))
+	q := &QTextBoundaryFinder{state: st}
+	q.cleanup = runtime.AddCleanup(q, func(st *qtextbfState) {
+		if cpp := st.claim(); cpp != nil {
+			C.qtextboundaryfinder_delete(cpp)
+		}
+	}, st)
+
 	return q
 }
 
-func finalizeQTextBoundaryFinder(q *QTextBoundaryFinder) {
-	if q.p != nil {
-		C.qtextboundaryfinder_delete(q.p)
-		q.p = nil
+func (q *QTextBoundaryFinder) handle() *C.QTextBoundaryFinder {
+	if cpp, ok := q.tryHandle(); ok {
+		return cpp
 	}
+	panic("qtextboundaryfinder: use after Close (or nil receiver)")
+}
+
+func (q *QTextBoundaryFinder) tryHandle() (*C.QTextBoundaryFinder, bool) {
+	if q == nil || q.state == nil {
+		return nil, false
+	}
+	if cpp := q.state.cpp(); cpp != nil {
+		return cpp, true
+	}
+	return nil, false
 }
 
 // Close releases the underlying C++ object immediately and disables the finalizer.
 // Qt: QTextBoundaryFinder::~QTextBoundaryFinder().
 func (q *QTextBoundaryFinder) Close() {
-	if q.p != nil {
-		C.qtextboundaryfinder_delete(q.p)
-		q.p = nil
-		runtime.SetFinalizer(q, nil)
+	if q == nil || q.state == nil {
+		return
+	}
+
+	q.cleanup.Stop()
+	if cpp := q.state.claim(); cpp != nil {
+		C.qtextboundaryfinder_delete(cpp)
 	}
 }
 
@@ -108,11 +151,11 @@ func NewQTextBoundaryFinder(arg ...any) *QTextBoundaryFinder {
 		if ok {
 			switch s := arg[1].(type) {
 			case string:
-				return QTextBoundaryFinderFromString(t, s)
+				return NewQTextBoundaryFinderFromString(t, s)
 			case *QString:
-				return QTextBoundaryFinderFromQString(t, s)
+				return NewQTextBoundaryFinderFromQString(t, s)
 			case QStringView:
-				return QTextBoundaryFinderFromView(t, s)
+				return NewQTextBoundaryFinderFromView(t, s)
 			}
 		}
 	}
@@ -120,9 +163,9 @@ func NewQTextBoundaryFinder(arg ...any) *QTextBoundaryFinder {
 	panic("NewQTextBoundaryFinder invalid argument")
 }
 
-// QTextBoundaryFinderFromQString creates a finder for the given QString.
+// NewQTextBoundaryFinderFromQString creates a finder for the given QString.
 // Qt: QTextBoundaryFinder(BoundaryType, const QString&).
-func QTextBoundaryFinderFromQString(t BoundaryType, s *QString) *QTextBoundaryFinder {
+func NewQTextBoundaryFinderFromQString(t BoundaryType, s *QString) *QTextBoundaryFinder {
 	if s == nil || s.handle() == nil {
 		return NewQTextBoundaryFinder()
 	}
@@ -131,15 +174,15 @@ func QTextBoundaryFinderFromQString(t BoundaryType, s *QString) *QTextBoundaryFi
 	return q
 }
 
-// QTextBoundaryFinderFromString creates a finder for a Go string (UTF-8).
+// NewQTextBoundaryFinderFromString creates a finder for a Go string (UTF-8).
 // Qt: QTextBoundaryFinder(BoundaryType, const QString&) — with QString::fromUtf8.
-func QTextBoundaryFinderFromString(t BoundaryType, s string) *QTextBoundaryFinder {
+func NewQTextBoundaryFinderFromString(t BoundaryType, s string) *QTextBoundaryFinder {
 	qs := NewQStringFromString(s)
 	defer qs.Close()
-	return QTextBoundaryFinderFromQString(t, qs)
+	return NewQTextBoundaryFinderFromQString(t, qs)
 }
 
-// QTextBoundaryFinderFromView creates a finder over the given QStringView.
+// NewQTextBoundaryFinderFromView creates a finder over the given QStringView.
 // The view's underlying buffer is copied by Qt (see note below).
 // Qt: QTextBoundaryFinder(BoundaryType, QStringView, unsigned char*, qsizetype).
 //
@@ -147,7 +190,7 @@ func QTextBoundaryFinderFromString(t BoundaryType, s string) *QTextBoundaryFinde
 // (QTextBoundaryFinder::s) plus a QStringView into it, so the data is copied
 // regardless of the view's origin. The Go-side keepAlive is therefore not
 // needed beyond the call, but we still call KeepAlive defensively.
-func QTextBoundaryFinderFromView(t BoundaryType, v QStringView) *QTextBoundaryFinder {
+func NewQTextBoundaryFinderFromView(t BoundaryType, v QStringView) *QTextBoundaryFinder {
 	q := wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_from_view(
 		C.int(t), (*C.uint16_t)(v.Utf16Unsafe()), C.ptrdiff_t(v.Size()))))
 	runtime.KeepAlive(v)
@@ -157,13 +200,13 @@ func QTextBoundaryFinderFromView(t BoundaryType, v QStringView) *QTextBoundaryFi
 // Clone returns a deep copy of the finder (independent internal state).
 // Qt: QTextBoundaryFinder(const QTextBoundaryFinder&) — copy constructor.
 func (q *QTextBoundaryFinder) Clone() *QTextBoundaryFinder {
-	return wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_copy(q.p)))
+	return wrapQTextBoundaryFinder(unsafe.Pointer(C.qtextboundaryfinder_new_copy(q.handle())))
 }
 
 // Swap exchanges the contents of q and other.
 // Qt: QTextBoundaryFinder::swap(QTextBoundaryFinder&).
 func (q *QTextBoundaryFinder) Swap(other *QTextBoundaryFinder) {
-	C.qtextboundaryfinder_swap(q.p, other.p)
+	C.qtextboundaryfinder_swap(q.handle(), other.handle())
 	runtime.KeepAlive(other)
 }
 
@@ -172,19 +215,19 @@ func (q *QTextBoundaryFinder) Swap(other *QTextBoundaryFinder) {
 // IsValid reports whether the finder has been properly initialized with a string.
 // Qt: QTextBoundaryFinder::isValid() const.
 func (q *QTextBoundaryFinder) IsValid() bool {
-	return bool(C.qtextboundaryfinder_is_valid(q.p))
+	return bool(C.qtextboundaryfinder_is_valid(q.handle()))
 }
 
 // Type returns the boundary type this finder was constructed for.
 // Qt: QTextBoundaryFinder::type() const.
 func (q *QTextBoundaryFinder) Type() BoundaryType {
-	return BoundaryType(C.qtextboundaryfinder_type(q.p))
+	return BoundaryType(C.qtextboundaryfinder_type(q.handle()))
 }
 
 // String returns a copy of the string this finder operates on.
 // Qt: QTextBoundaryFinder::string() const.
 func (q *QTextBoundaryFinder) String() *QString {
-	return wrapQString(unsafe.Pointer(C.qtextboundaryfinder_string(q.p)))
+	return wrapQString(unsafe.Pointer(C.qtextboundaryfinder_string(q.handle())))
 }
 
 // ---- navigation ---------------------------------------------------------
@@ -192,19 +235,19 @@ func (q *QTextBoundaryFinder) String() *QString {
 // ToStart moves the finder to position 0.
 // Qt: QTextBoundaryFinder::toStart().
 func (q *QTextBoundaryFinder) ToStart() {
-	C.qtextboundaryfinder_to_start(q.p)
+	C.qtextboundaryfinder_to_start(q.handle())
 }
 
 // ToEnd moves the finder to the end of the string.
 // Qt: QTextBoundaryFinder::toEnd().
 func (q *QTextBoundaryFinder) ToEnd() {
-	C.qtextboundaryfinder_to_end(q.p)
+	C.qtextboundaryfinder_to_end(q.handle())
 }
 
 // Position returns the current position in the string.
 // Qt: QTextBoundaryFinder::position() const.
 func (q *QTextBoundaryFinder) Position() int {
-	return int(C.qtextboundaryfinder_position(q.p))
+	return int(C.qtextboundaryfinder_position(q.handle()))
 }
 
 // SetPosition sets the current position. Panics if pos is negative.
@@ -213,21 +256,21 @@ func (q *QTextBoundaryFinder) SetPosition(pos int) {
 	if pos < 0 {
 		panic("qtextboundaryfinder: SetPosition negative position")
 	}
-	C.qtextboundaryfinder_set_position(q.p, C.ptrdiff_t(pos))
+	C.qtextboundaryfinder_set_position(q.handle(), C.ptrdiff_t(pos))
 }
 
 // ToNextBoundary advances to the next boundary and returns the new position,
 // or -1 if there is no next boundary.
 // Qt: QTextBoundaryFinder::toNextBoundary().
 func (q *QTextBoundaryFinder) ToNextBoundary() int {
-	return int(C.qtextboundaryfinder_to_next_boundary(q.p))
+	return int(C.qtextboundaryfinder_to_next_boundary(q.handle()))
 }
 
 // ToPreviousBoundary retreats to the previous boundary and returns the new
 // position, or -1 if there is no previous boundary.
 // Qt: QTextBoundaryFinder::toPreviousBoundary().
 func (q *QTextBoundaryFinder) ToPreviousBoundary() int {
-	return int(C.qtextboundaryfinder_to_previous_boundary(q.p))
+	return int(C.qtextboundaryfinder_to_previous_boundary(q.handle()))
 }
 
 // ---- predicates ----------------------------------------------------------
@@ -235,12 +278,12 @@ func (q *QTextBoundaryFinder) ToPreviousBoundary() int {
 // IsAtBoundary reports whether the finder is currently on a boundary.
 // Qt: QTextBoundaryFinder::isAtBoundary() const.
 func (q *QTextBoundaryFinder) IsAtBoundary() bool {
-	return bool(C.qtextboundaryfinder_is_at_boundary(q.p))
+	return bool(C.qtextboundaryfinder_is_at_boundary(q.handle()))
 }
 
 // BoundaryReasons returns the bitmask of reasons why the current position
 // is a boundary. NotAtBoundary (0) means "not on a boundary".
 // Qt: QTextBoundaryFinder::boundaryReasons() const.
 func (q *QTextBoundaryFinder) BoundaryReasons() BoundaryReasons {
-	return BoundaryReasons(C.qtextboundaryfinder_boundary_reasons(q.p))
+	return BoundaryReasons(C.qtextboundaryfinder_boundary_reasons(q.handle()))
 }

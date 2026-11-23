@@ -1,6 +1,7 @@
 package qtext
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -257,10 +258,10 @@ func TestQStringDecoderDecodeReusesState(t *testing.T) {
 func TestQStringDecoderDecoderForHtml(t *testing.T) {
 	html := "<html><head><meta charset=\"UTF-8\"><title>x</title></head></html>"
 	bv := NewQByteArrayView(html)
-	d := DecoderForHtml(bv)
+	d := NewQStringDecoderForHtml(bv)
 	defer d.Close()
 	if !d.IsValid() {
-		t.Fatal("DecoderForHtml must return a valid decoder for UTF-8 HTML")
+		t.Fatal("NewQStringDecoderForHtml must return a valid decoder for UTF-8 HTML")
 	}
 
 	// Sanity: the returned decoder is usable.
@@ -269,6 +270,86 @@ func TestQStringDecoderDecoderForHtml(t *testing.T) {
 	out := d.Decode(ba)
 	defer out.Close()
 	if out.GoString() != "hello" {
-		t.Fatalf("Decode via DecoderForHtml: %q", out.GoString())
+		t.Fatalf("Decode via NewQStringDecoderForHtml: %q", out.GoString())
 	}
+}
+
+func TestQStringDecoderGoVariants(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
+	defer d.Close()
+
+	ba := NewQByteArray("héllo")
+	defer ba.Close()
+	if got := d.DecodeString(ba); got != "héllo" {
+		t.Fatalf("DecodeString: %q", got)
+	}
+
+	out := d.DecodeBytes([]byte("héllo"))
+	if out.GoString() != "héllo" {
+		t.Fatalf("DecodeBytes: %q", out.GoString())
+	}
+	out.Close()
+
+	v := NewQByteArrayView("héllo")
+	if got := d.DecodeViewString(v); got != "héllo" {
+		t.Fatalf("DecodeViewString: %q", got)
+	}
+
+	outView := d.DecodeViewBytes([]byte("héllo"))
+	if outView.GoString() != "héllo" {
+		t.Fatalf("DecodeViewBytes: %q", outView.GoString())
+	}
+	outView.Close()
+
+	buf := make([]uint16, d.RequiredSpace(5))
+	n := d.AppendToBufferBytes(buf, []byte("hello"))
+	if n != 5 || string(rune16ToRunes(buf[:n])) != "hello" {
+		t.Fatalf("AppendToBufferBytes: n=%d units=%q", n, string(rune16ToRunes(buf[:n])))
+	}
+}
+
+func TestQStringDecoderForHtmlBytes(t *testing.T) {
+	html := []byte("<html><head><meta charset=\"UTF-8\"></head></html>")
+	d := NewQStringDecoderForHtmlBytes(html)
+	if d == nil || !d.IsValid() {
+		t.Fatal("NewQStringDecoderForHtmlBytes must return a valid decoder")
+	}
+	defer d.Close()
+	if got := d.DecodeString(NewQByteArray("hello")); got != "hello" {
+		t.Fatalf("DecodeString: %q", got)
+	}
+}
+
+func TestQStringDecoderCloseSharedState(t *testing.T) {
+	d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
+	if d.QStringConverter == nil || !d.QStringConverter.IsValid() {
+		t.Fatal("embedded converter must be valid before Close")
+	}
+
+	d.Close()
+	d.Close()
+
+	if d.IsValid() {
+		t.Fatal("closed decoder must be invalid")
+	}
+	if d.Name() != "" {
+		t.Fatalf("Name after Close: %q", d.Name())
+	}
+	if d.QStringConverter.IsValid() {
+		t.Fatal("embedded converter must observe the closed state")
+	}
+	if got := d.DecodeString(nil); got != "" {
+		t.Fatalf("DecodeString after Close: %q", got)
+	}
+}
+
+func TestQStringDecoderCleanup(t *testing.T) {
+	for i := 0; i < 32; i++ {
+		d := NewQStringDecoderFromEncoding(Utf8, FlagDefault)
+		if d.Name() != "UTF-8" {
+			t.Fatalf("iteration %d: %q", i, d.Name())
+		}
+	}
+	runtime.GC()
+	runtime.GC()
 }

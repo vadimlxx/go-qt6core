@@ -1,48 +1,47 @@
 package qtext
 
-// Package qstringdecoder: QStringDecoder — конкретный декодер байты → UTF-16.
-
 /*
- ВАЖНО (Qt 6.11.2):
-   - QStringDecoder наследует QStringConverter (тот — QStringConverterBase).
-     В Go структура *QStringDecoder встраивает *QStringConverter,
-     который встраивает *QStringConverterBase — точное воспроизведение
-     иерархии Qt. Все публичные методы базы доступны через promotion.
-   - decode(...) в Qt возвращает EncodedData<T>, лениво конвертируемый в QString.
-     В Go Decode/DecodeView сразу возвращают *qstring.QString — семантически эквивалентно.
-   - finalize(char16_t*, qsizetype) возвращает FinalizeResultChar<char16_t>; в Go — тройка
-     (next int, invalid int16, err FinalizeResultError). QChar* и char16_t* перегрузки
-     finalize/appendToBuffer для Go идентичны, поскольку QChar == uint16.
-   - AdoptUnsafePtr используется для того, чтобы встроенный
-     *QStringConverter не владел C++-объектом: владелец — *QStringDecoder.
+QStringDecoder — конкретный декодер Qt 6.11 QtCore (байты -> UTF-16).
 
- не реализовано:
-   - operator() / decode(const QByteArray&) vs decode(QByteArrayView) — в Go разные методы
-     (Decode / DecodeView), без перегрузки оператора ().
-   - implicit conversion EncodedData<T> → QString — в Go не нужен.
-   - QStringBuilder integration:
-       QConcatenable<QStringDecoder::EncodedData<T>> и operator+=(QString&, …) —
-       используйте s.AppendQString(dec.DecodeView(bv)) или
-       qstringbuilder.Concat(s, dec.DecodeView(bv)).ToQString().
-   - QString::assign_helper_char8 — внутренняя деталь QString, не относится к
-     QStringDecoder; не экспонируется.
-   - FinalizeResultChar<Char> — в публичном API только для char16_t / QChar; в Go —
-     тройка значений (next, invalid, err).
-   - decoderForHtml(QByteArrayView) — экспонирован как пакетная функция DecoderForHtml.
-   - availableCodecs() (inherited static) — требует qstringlist; TODO в qstringconverter.
-   - encodingForData/encodingForHtml — доступны через EncodingForData /
-     EncodingForHtml.
+Иерархия воспроизведена встраиванием, как в Qt:
+
+	QStringDecoder -> QStringConverter -> QStringConverterBase
+
+*QStringDecoder владеет C++ объектом: он освобождается Close() или
+runtime.AddCleanup (когда Go-обёртка становится недостижимой). Встроенная
+*QStringConverter — не владеющая проекция на тот же объект и тот же qscState:
+после Close()/cleanup конвертер видит nil, а не висячий указатель.
+
+C++-мост общий для QStringConverter/QStringEncoder/QStringDecoder
+(qstringconverter_c.cpp/.h), как qstringconverter.cpp/.h в самом QtCore.
+
+Go-варианты:
+
+  - DecodeBytes / DecodeViewBytes / AppendToBufferBytes принимают []byte вместо
+    QByteArray/QByteArrayView;
+  - DecodeString / DecodeViewString возвращают string вместо *QString;
+  - NewQStringDecoderForHtmlBytes принимает []byte.
+
+Не реализовано:
+
+  - operator() — в Go нет перегрузки операторов; используйте Decode/DecodeView.
+  - EncodedData<T> как публичный тип — не экспонируется; Decode сразу
+    материализует QString.
+  - QStringBuilder-интеграция (QConcatenable, operator+=) — используйте
+    AppendQString/Concat.
+  - FinalizeResultChar<Char> — шаблон; QChar и char16_t перегрузки в Go
+    совпадают (QChar == uint16), результат — тройка (next, invalid, err).
+  - Перегрузка finalize(QChar*) отдельно не нужна: используется char16_t*.
 */
 
 /*
 #cgo pkg-config: Qt6Core
 #cgo CXXFLAGS: -std=c++17 -fPIC -Wno-sfinae-incomplete
 #cgo LDFLAGS: -lstdc++
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "qstringdecoder_c.h"
+#include "qstringconverter_c.h"
 */
 import "C"
 
@@ -51,101 +50,131 @@ import (
 	"unsafe"
 )
 
-
-// QStringDecoder mirrors Qt 6.11.2 QStringDecoder.
+// QStringDecoder mirrors Qt 6.11's QStringDecoder.
 //
-// It embeds *QStringConverter (which itself embeds
-// *QStringConverterBase), reproducing Qt's class hierarchy:
+// It embeds *QStringConverter (which embeds *QStringConverterBase), matching
+// Qt's class hierarchy. The embedded converter is a non-owning view over the
+// same C++ object and the same qscState; the *QStringDecoder wrapper owns the
+// object.
 //
-//	QStringDecoder → QStringConverter → QStringConverterBase
-//
-// Every public method of the base chain (IsValid, Name, ResetState, HasError, State, SetState,
-// Iface, Swap, Encoding, Flags, …) is available on *QStringDecoder via Go method promotion.
+// Qt: QStringDecoder.
 type QStringDecoder struct {
 	*QStringConverter
-	p *C.go_qsd_t
+	state   *qscState
+	cleanup runtime.Cleanup
 }
 
+// newQStringDecoderFromC takes ownership of a C++ QStringDecoder object, builds
+// the embedded non-owning converter view over the same state, and registers a
+// runtime cleanup for the decoder.
+//
+// Qt: no direct counterpart — internal constructor helper.
 func newQStringDecoderFromC(c *C.go_qsd_t) *QStringDecoder {
 	if c == nil {
 		return nil
 	}
-	// AdoptUnsafePtr creates a non-owning *QStringConverter alias over the same C++ object.
-	// Ownership stays with the *QStringDecoder wrapper (its finalizer calls qstringdecoder_delete).
-	base := QStringConverterAdoptUnsafePtr(unsafe.Pointer(c))
+	st := &qscState{}
+	st.p.Store((*byte)(unsafe.Pointer(c)))
 	dec := &QStringDecoder{
-		QStringConverter: base,
-		p:                c,
+		QStringConverter: newQStringConverterAlias(st),
+		state:            st,
 	}
-	runtime.SetFinalizer(dec, finalizeQStringDecoder)
+	dec.cleanup = runtime.AddCleanup(dec, func(st *qscState) {
+		if p := st.claim(); p != nil {
+			C.qstringdecoder_delete((*C.go_qsd_t)(p))
+		}
+	}, st)
 	return dec
 }
 
-func finalizeQStringDecoder(dec *QStringDecoder) {
-	if dec.p != nil {
-		C.qstringdecoder_delete(dec.p)
-		dec.p = nil
-		// Drop the alias; its C++ memory is gone.
-		dec.QStringConverter = nil
+// tryHandle returns the underlying C++ QStringDecoder pointer and whether it is
+// still alive. It does not panic: closed and nil decoders are reported as false.
+//
+// Qt: no direct counterpart — internal handle helper.
+func (d *QStringDecoder) tryHandle() (*C.go_qsd_t, bool) {
+	if d == nil || d.state == nil {
+		return nil, false
 	}
+	if p := d.state.cpp(); p != nil {
+		return (*C.go_qsd_t)(p), true
+	}
+	return nil, false
 }
 
 // NewQStringDecoder creates an invalid decoder (null iface, FlagDefault).
-// Mirrors QStringDecoder().
+//
+// Qt: QStringDecoder::QStringDecoder().
 func NewQStringDecoder() *QStringDecoder {
 	return newQStringDecoderFromC(C.qstringdecoder_new_default())
 }
 
-// NewQStringDecoderFromEncoding creates a decoder for the given encoding and flags.
-// Mirrors QStringDecoder(Encoding e, Flags f = Flag::Default).
+// NewQStringDecoderFromEncoding creates a decoder for the given encoding and
+// flags.
+//
+// Qt: QStringDecoder::QStringDecoder(Encoding e, Flags f).
 func NewQStringDecoderFromEncoding(e Encoding, f Flags) *QStringDecoder {
-	return newQStringDecoderFromC(C.qstringdecoder_new_from_encoding(C.int(int(e)), C.int(int(f))))
+	return newQStringDecoderFromC(C.qstringdecoder_new_from_encoding(C.int(e), C.int(f)))
 }
 
-// NewQStringDecoderFromName creates a decoder by encoding name (e.g. "UTF-8", "ISO-8859-1").
-// Mirrors QStringDecoder(QAnyStringView name, Flags f) with a Go string.
+// NewQStringDecoderFromName creates a decoder by encoding name (for example
+// "UTF-8" or "ISO-8859-1"). The Go string is passed as UTF-8 QAnyStringView.
 // Returns an invalid decoder if the name is unknown.
+//
+// Qt: QStringDecoder::QStringDecoder(QAnyStringView name, Flags f) — Go string form.
 func NewQStringDecoderFromName(name string, f Flags) *QStringDecoder {
 	var p unsafe.Pointer
 	if len(name) > 0 {
 		p = unsafe.Pointer(unsafe.StringData(name))
 	}
 	dec := newQStringDecoderFromC(C.qstringdecoder_new_from_any(
-		p, C.ptrdiff_t(len(name)), 0, C.int(int(f))))
+		p, C.ptrdiff_t(len(name)), 0, C.int(f)))
 	runtime.KeepAlive(name)
 	return dec
 }
 
-// NewQStringDecoderFromAny creates a decoder from a QAnyStringView name and flags.
-// Mirrors QStringDecoder(QAnyStringView name, Flags f).
+// NewQStringDecoderFromAny creates a decoder from a QAnyStringView name and
+// flags.
+//
+// Qt: QStringDecoder::QStringDecoder(QAnyStringView name, Flags f) — QAnyStringView form.
 func NewQStringDecoderFromAny(name QAnyStringView, f Flags) *QStringDecoder {
 	dec := newQStringDecoderFromC(C.qstringdecoder_new_from_any(
-		name.DataUnsafe(), C.ptrdiff_t(name.Size()), C.int(int(name.Kind())), C.int(int(f))))
+		name.DataUnsafe(), C.ptrdiff_t(name.Size()), C.int(name.Kind()), C.int(f)))
 	runtime.KeepAlive(name)
 	return dec
 }
 
-// NewQStringDecoderFromInterface wraps the protected QStringDecoder(const Interface*) ctor.
-// If iface is nil, the decoder is invalid.
+// NewQStringDecoderFromInterface creates a decoder from an existing Interface
+// pointer (the protected constructor is exposed). If i is null, the decoder is
+// invalid.
+//
+// Qt: QStringDecoder::QStringDecoder(const Interface *i) (protected).
 func NewQStringDecoderFromInterface(i Interface) *QStringDecoder {
 	return newQStringDecoderFromC(C.qstringdecoder_new_from_iface(i.UnsafePtr()))
 }
 
-// Close frees the underlying C++ object immediately and disables the finalizer.
-// After Close, all methods on d (including promoted base methods) are UB.
+// Close frees the underlying C++ object immediately and cancels the cleanup.
+// Close is optional, idempotent and nil-safe. The embedded converter view
+// shares the state slot, so after Close its methods observe a nil handle.
+//
+// Qt: QStringDecoder::~QStringDecoder().
 func (d *QStringDecoder) Close() {
-	if d.p != nil {
-		C.qstringdecoder_delete(d.p)
-		d.p = nil
-		d.QStringConverter = nil
-		runtime.SetFinalizer(d, nil)
+	if d == nil || d.state == nil {
+		return
+	}
+	d.cleanup.Stop()
+	if p := d.state.claim(); p != nil {
+		C.qstringdecoder_delete((*C.go_qsd_t)(p))
 	}
 }
 
-// Decode decodes the contents of ba as a fresh *QString.
-// Equivalent to Qt's implicit conversion of QStringDecoder::decode(const QByteArray&) to QString.
+// Decode decodes ba and returns a fresh *QString. For an invalid decoder the
+// result is empty and HasError becomes true.
+//
+// Qt: QStringDecoder::decode(const QByteArray &ba) (EncodedData<const QByteArray &>
+// materialized as QString).
 func (d *QStringDecoder) Decode(ba *QByteArray) *QString {
-	if d.p == nil || ba == nil {
+	p, ok := d.tryHandle()
+	if !ok || ba == nil {
 		return NewQString()
 	}
 	n := ba.Size()
@@ -154,16 +183,36 @@ func (d *QStringDecoder) Decode(ba *QByteArray) *QString {
 		data = (*C.char)(ba.ConstDataUnsafe())
 	}
 	var out unsafe.Pointer
-	C.qstringdecoder_decode(d.p, data, C.ptrdiff_t(n), &out)
+	C.qstringdecoder_decode(p, data, C.ptrdiff_t(n), &out)
 	runtime.KeepAlive(ba)
-	//return AdoptQStringUnsafePtr(out)
 	return wrapQString(out)
 }
 
-// DecodeView decodes v as a fresh *QString.
-// Equivalent to Qt's implicit conversion of QStringDecoder::decode(QByteArrayView) to QString.
+// DecodeBytes decodes b and returns a fresh *QString.
+//
+// Qt: QStringDecoder::decode(const QByteArray &ba) — []byte form.
+func (d *QStringDecoder) DecodeBytes(b []byte) *QString {
+	ba := NewQByteArrayFromBytes(b)
+	defer ba.Close()
+	return d.Decode(ba)
+}
+
+// DecodeString decodes ba and returns the result as a Go string.
+//
+// Qt: QStringDecoder::decode(const QByteArray &ba) — Go string result.
+func (d *QStringDecoder) DecodeString(ba *QByteArray) string {
+	r := d.Decode(ba)
+	defer r.Close()
+	return r.GoString()
+}
+
+// DecodeView decodes the view v and returns a fresh *QString.
+//
+// Qt: QStringDecoder::decode(QByteArrayView ba) (EncodedData<QByteArrayView>
+// materialized as QString).
 func (d *QStringDecoder) DecodeView(v QByteArrayView) *QString {
-	if d.p == nil {
+	p, ok := d.tryHandle()
+	if !ok {
 		return NewQString()
 	}
 	n := v.Size()
@@ -172,27 +221,50 @@ func (d *QStringDecoder) DecodeView(v QByteArrayView) *QString {
 		data = (*C.char)(v.DataUnsafe())
 	}
 	var out unsafe.Pointer
-	C.qstringdecoder_decode(d.p, data, C.ptrdiff_t(n), &out)
+	C.qstringdecoder_decode(p, data, C.ptrdiff_t(n), &out)
 	runtime.KeepAlive(v)
-	//return AdoptQStringUnsafePtr(out)
 	return wrapQString(out)
 }
 
-// RequiredSpace returns the maximum number of UTF-16 code units needed to decode
-// inputLength bytes (mirrors QStringDecoder::requiredSpace). Returns 0 for an invalid decoder.
-func (d *QStringDecoder) RequiredSpace(inputLength int) int {
-	if d.p == nil {
-		return 0
-	}
-	return int(C.qstringdecoder_required_space(d.p, C.ptrdiff_t(inputLength)))
+// DecodeViewBytes decodes b as a QByteArrayView and returns a fresh *QString.
+//
+// Qt: QStringDecoder::decode(QByteArrayView ba) — []byte form.
+func (d *QStringDecoder) DecodeViewBytes(b []byte) *QString {
+	v := NewQByteArrayViewFromBytes(b)
+	r := d.DecodeView(v)
+	runtime.KeepAlive(b)
+	return r
 }
 
-// AppendToBuffer decodes v into buf (at buf[0]) and returns the number of UTF-16 code units
-// written. The caller must ensure len(buf) >= RequiredSpace(v.Size()).
-// For an invalid decoder, nothing is written, the decoder's HasError becomes true, and 0 is
-// returned. Mirrors QStringDecoder::appendToBuffer.
+// DecodeViewString decodes the view v and returns the result as a Go string.
+//
+// Qt: QStringDecoder::decode(QByteArrayView ba) — Go string result.
+func (d *QStringDecoder) DecodeViewString(v QByteArrayView) string {
+	r := d.DecodeView(v)
+	defer r.Close()
+	return r.GoString()
+}
+
+// RequiredSpace returns the maximum number of UTF-16 code units needed to
+// decode inputLength bytes. Returns 0 for an invalid decoder.
+//
+// Qt: QStringDecoder::requiredSpace(qsizetype inputLength) const.
+func (d *QStringDecoder) RequiredSpace(inputLength int) int {
+	p, ok := d.tryHandle()
+	if !ok {
+		return 0
+	}
+	return int(C.qstringdecoder_required_space(p, C.ptrdiff_t(inputLength)))
+}
+
+// AppendToBuffer decodes v into buf and returns the number of UTF-16 code units
+// written. The caller must ensure len(buf) >= RequiredSpace(v.Size()). For an
+// invalid decoder nothing is written, HasError becomes true, and 0 is returned.
+//
+// Qt: QStringDecoder::appendToBuffer(char16_t *out, QByteArrayView ba).
 func (d *QStringDecoder) AppendToBuffer(buf []uint16, v QByteArrayView) int {
-	if d.p == nil {
+	p, ok := d.tryHandle()
+	if !ok {
 		return 0
 	}
 	var bufPtr unsafe.Pointer
@@ -204,21 +276,32 @@ func (d *QStringDecoder) AppendToBuffer(buf []uint16, v QByteArrayView) int {
 	if n > 0 {
 		data = (*C.char)(v.DataUnsafe())
 	}
-	written := C.qstringdecoder_append_to_buffer(d.p, bufPtr, C.ptrdiff_t(len(buf)),
+	written := C.qstringdecoder_append_to_buffer(p, bufPtr, C.ptrdiff_t(len(buf)),
 		data, C.ptrdiff_t(n))
 	runtime.KeepAlive(buf)
 	runtime.KeepAlive(v)
 	return int(written)
 }
 
-// FinalizeBuffer flushes pending decoder state into buf (capacity len(buf), UTF-16 units).
-// Returns (next int, invalid int16, err FinalizeResultError) where:
-//   - next is the number of UTF-16 code units written into buf,
-//   - invalid is the number of invalid characters seen during this finalize call,
-//   - err is NoError / InvalidCharacters / NotEnoughSpace.
-// Mirrors QStringDecoder::finalize(char16_t *out, qsizetype maxlen).
+// AppendToBufferBytes decodes b and writes the UTF-16 code units into buf,
+// returning the number of code units written.
+//
+// Qt: QStringDecoder::appendToBuffer(char16_t *out, QByteArrayView ba) — []byte form.
+func (d *QStringDecoder) AppendToBufferBytes(buf []uint16, b []byte) int {
+	v := NewQByteArrayViewFromBytes(b)
+	n := d.AppendToBuffer(buf, v)
+	runtime.KeepAlive(b)
+	return n
+}
+
+// FinalizeBuffer flushes pending decoder state into buf (capacity len(buf),
+// UTF-16 code units). Returns (next int, invalid int16, err
+// FinalizeResultError), where next is the number of code units written.
+//
+// Qt: QStringDecoder::finalize(char16_t *out, qsizetype maxlen).
 func (d *QStringDecoder) FinalizeBuffer(buf []uint16) (int, int16, FinalizeResultError) {
-	if d.p == nil {
+	p, ok := d.tryHandle()
+	if !ok {
 		return 0, 0, FinalizeNotEnoughSpace
 	}
 	var bufPtr unsafe.Pointer
@@ -228,29 +311,32 @@ func (d *QStringDecoder) FinalizeBuffer(buf []uint16) (int, int16, FinalizeResul
 	var next C.ptrdiff_t
 	var invalid C.int16_t
 	var errCode C.int
-	C.qstringdecoder_finalize(d.p, bufPtr, C.ptrdiff_t(len(buf)), &next, &invalid, &errCode)
+	C.qstringdecoder_finalize(p, bufPtr, C.ptrdiff_t(len(buf)), &next, &invalid, &errCode)
 	runtime.KeepAlive(buf)
 	return int(next), int16(invalid), FinalizeResultError(errCode)
 }
 
-// Finalize flushes pending decoder state without providing a buffer.
-// Returns (invalid int16, err FinalizeResultError).
-// Mirrors QStringDecoder::finalize() (the no-argument overload).
+// Finalize flushes pending decoder state without providing a buffer. Returns
+// (invalid int16, err FinalizeResultError).
+//
+// Qt: QStringDecoder::finalize().
 func (d *QStringDecoder) Finalize() (int16, FinalizeResultError) {
-	if d.p == nil {
+	p, ok := d.tryHandle()
+	if !ok {
 		return 0, FinalizeNotEnoughSpace
 	}
 	var next C.ptrdiff_t
 	var invalid C.int16_t
 	var errCode C.int
-	C.qstringdecoder_finalize(d.p, nil, 0, &next, &invalid, &errCode)
+	C.qstringdecoder_finalize(p, nil, 0, &next, &invalid, &errCode)
 	return int16(invalid), FinalizeResultError(errCode)
 }
 
-// DecoderForHtml returns a decoder for the encoding declared in the HTML <meta> charset
-// of data (or UTF-8 if none is found).
-// Mirrors the static QStringDecoder::decoderForHtml(QByteArrayView).
-func DecoderForHtml(data QByteArrayView) *QStringDecoder {
+// NewQStringDecoderForHtml returns a decoder for the encoding declared in the
+// HTML <meta> charset of data (or UTF-8 if none is found).
+//
+// Qt: QStringDecoder::decoderForHtml(QByteArrayView data) static — QByteArrayView form.
+func NewQStringDecoderForHtml(data QByteArrayView) *QStringDecoder {
 	n := data.Size()
 	var p *C.char
 	if n > 0 {
@@ -259,4 +345,24 @@ func DecoderForHtml(data QByteArrayView) *QStringDecoder {
 	c := C.qstringdecoder_decoder_for_html(p, C.ptrdiff_t(n))
 	runtime.KeepAlive(data)
 	return newQStringDecoderFromC(c)
+}
+
+// NewQStringDecoderForHtmlBytes is NewQStringDecoderForHtml accepting a []byte
+// directly.
+//
+// Qt: QStringDecoder::decoderForHtml(QByteArrayView data) static — []byte form.
+func NewQStringDecoderForHtmlBytes(data []byte) *QStringDecoder {
+	v := NewQByteArrayViewFromBytes(data)
+	d := NewQStringDecoderForHtml(v)
+	runtime.KeepAlive(data)
+	return d
+}
+
+// DecoderForHtml is a deprecated alias for NewQStringDecoderForHtml.
+//
+// Deprecated: use NewQStringDecoderForHtml.
+//
+// Qt: QStringDecoder::decoderForHtml(QByteArrayView data) static.
+func DecoderForHtml(data QByteArrayView) *QStringDecoder {
+	return NewQStringDecoderForHtml(data)
 }
