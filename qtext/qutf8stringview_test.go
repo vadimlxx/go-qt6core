@@ -147,7 +147,7 @@ func TestQUtf8StringViewCompareQChar(t *testing.T) {
 
 func TestQUtf8StringViewCompareQStringView(t *testing.T) {
 	v := NewQUtf8StringView("hello")
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("hello")))
 
 	if v.CompareQStringView(sv, true) != 0 {
 		t.Fatal("CompareQStringView equal")
@@ -171,7 +171,7 @@ func TestQUtf8StringViewCompareQLatin1StringView(t *testing.T) {
 
 func TestQUtf8StringViewCaseInsensitive(t *testing.T) {
 	v := NewQUtf8StringView("Hello")
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("HELLO")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("HELLO")))
 
 	if v.CompareQStringView(sv, true) == 0 {
 		t.Fatal("case-sensitive must differ")

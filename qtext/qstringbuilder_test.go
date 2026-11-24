@@ -93,7 +93,7 @@ func TestQStringBuilderConcatQLatin1Char(t *testing.T) {
 }
 
 func TestQStringBuilderConcatQStringView(t *testing.T) {
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	b := Concat(sv, ", ", "world")
 	if !b.IsQStringFlavored() {
 		t.Fatal("QStringView must be QString-flavored")

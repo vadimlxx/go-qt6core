@@ -33,7 +33,7 @@ func TestQRegularExpressionMatch(t *testing.T) {
 
 func TestQRegularExpressionMatchView(t *testing.T) {
 	re := NewQRegularExpressionFromString(`(\d+)`, NoPatternOption)
-	subject := QStringViewFromString("abc 42 def")
+	subject := NewQStringViewFromString("abc 42 def")
 	m := re.MatchView(subject, 0, NormalMatch, NoMatchOption)
 	if !m.HasMatch() {
 		t.Fatal("expected match")

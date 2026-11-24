@@ -7,7 +7,7 @@ import (
 )
 
 func fromStr(s string) QStringView {
-	return QStringViewFromUtf16(utf16.Encode([]rune(s)))
+	return NewQStringViewFromUtf16(utf16.Encode([]rune(s)))
 }
 
 func TestQStringViewEmpty(t *testing.T) {
@@ -32,7 +32,7 @@ func TestQStringViewFromUtf16(t *testing.T) {
 
 func TestQStringViewFromQChars(t *testing.T) {
 	chars := []QChar{'h', 'e', 'l', 'l', 'o'}
-	v := QStringViewFromQChars(chars)
+	v := NewStringView(chars)
 	if v.GoString() != "hello" {
 		t.Fatalf("FromQChars: %q", v.GoString())
 	}
@@ -237,7 +237,7 @@ func TestQStringViewMaxSize(t *testing.T) {
 // Sanity: ToUtf8 returns an independently owned QByteArray.
 func TestToUtf8IsOwning(t *testing.T) {
 	units := utf16.Encode([]rune("hello"))
-	v := QStringViewFromUtf16(units)
+	v := NewQStringViewFromUtf16(units)
 	ba := v.ToUtf8()
 	defer ba.Close()
 

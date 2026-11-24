@@ -139,20 +139,20 @@ func TestSearchQStringView(t *testing.T) {
 	v := NewQLatin1StringViewFromString("a,b,c,,d")
 
 	// QStringView interop: search for "," as UTF-16 code unit.
-	sv := QStringViewFromUtf16(utf16.Encode([]rune(",")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune(",")))
 	if v.IndexOfQStringView(sv, 0, true) != 1 {
 		t.Fatalf("IndexOfQStringView(','): %d", v.IndexOfQStringView(sv, 0, true))
 	}
 
 	// "b,c" as QStringView
-	svBC := QStringViewFromUtf16(utf16.Encode([]rune("b,c")))
+	svBC := NewQStringViewFromUtf16(utf16.Encode([]rune("b,c")))
 	if !v.ContainsQStringView(svBC, true) {
 		t.Fatal("ContainsQStringView(b,c)")
 	}
 
 	// StartsWith/EndsWith
-	svA := QStringViewFromUtf16(utf16.Encode([]rune("a,")))
-	svD := QStringViewFromUtf16(utf16.Encode([]rune("d")))
+	svA := NewQStringViewFromUtf16(utf16.Encode([]rune("a,")))
+	svD := NewQStringViewFromUtf16(utf16.Encode([]rune("d")))
 	if !v.StartsWithQStringView(svA, true) || !v.EndsWithQStringView(svD, true) {
 		t.Fatal("StartsWithQStringView/EndsWithQStringView")
 	}
@@ -177,7 +177,7 @@ func TestQLatin1StringViewCompare(t *testing.T) {
 
 func TestCompareQStringView(t *testing.T) {
 	a := NewQLatin1StringViewFromString("hello")
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	if a.CompareQStringView(sv, true) != 0 {
 		t.Fatal("CompareQStringView equal views must compare 0")
 	}

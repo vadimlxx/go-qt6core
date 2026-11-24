@@ -151,16 +151,15 @@ func (c *QCollator) Close() {
 //
 // Qt: QCollator(), QCollator(const QLocale &), QCollator(const QCollator &).
 func NewQCollator(arg ...any) *QCollator {
-	switch len(arg) {
-	case 0:
+	if len(arg) == 0 || arg[0] == nil {
 		return wrapQCollator(C.qcollator_new_default())
-	case 1:
-		switch v := arg[0].(type) {
-		case *QLocale:
-			return NewQCollatorFromLocale(v)
-		case *QCollator:
-			return NewQCollatorCopy(v)
-		}
+	}
+
+	switch v := arg[0].(type) {
+	case *QLocale:
+		return NewQCollatorFromLocale(v)
+	case *QCollator:
+		return NewQCollatorCopy(v)
 	}
 
 	panic("NewQCollator: unsupported argument combination")

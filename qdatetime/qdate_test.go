@@ -2,6 +2,7 @@ package qdatetime
 
 import (
 	"testing"
+	"time"
 
 	"github.com/vadimlxx/go-qt6core/qdata"
 )
@@ -112,5 +113,93 @@ func TestQDateFromStringFormatCal(t *testing.T) {
 	d := NewQDateFromStringFormatCal("15.01.2024", "dd.MM.yyyy", NewQCalendar())
 	if d.Year() != 2024 || d.Month() != 1 || d.Day() != 15 {
 		t.Fatalf("NewQDateFromStringFormatCal: %d-%d-%d", d.Year(), d.Month(), d.Day())
+	}
+}
+
+func TestQDateFromTime(t *testing.T) {
+	ts := time.Date(2024, time.February, 29, 13, 45, 59, 0, time.UTC)
+	d := NewQDateFromTime(ts)
+	if d.Year() != 2024 || d.Month() != 2 || d.Day() != 29 {
+		t.Fatalf("NewQDateFromTime: %d-%d-%d", d.Year(), d.Month(), d.Day())
+	}
+}
+
+func TestQDateToTime(t *testing.T) {
+	d := NewQDateFromYMD(2024, 1, 15)
+	got := d.ToTime()
+	if got.Year() != 2024 || got.Month() != time.January || got.Day() != 15 {
+		t.Fatalf("ToTime date: %v", got)
+	}
+	if got.Hour() != 0 || got.Minute() != 0 || got.Second() != 0 || got.Nanosecond() != 0 {
+		t.Fatalf("ToTime time-of-day: %v", got)
+	}
+
+	if !NewQDate().ToTime().IsZero() {
+		t.Fatal("null QDate must yield the zero time.Time")
+	}
+}
+
+func TestQDateStartOfDay(t *testing.T) {
+	d := NewQDateFromYMD(2024, 1, 15)
+
+	start := d.StartOfDay()
+	if start == nil || !start.IsValid() {
+		t.Fatal("StartOfDay returned an invalid QDateTime")
+	}
+	defer start.Close()
+	if start.Date().Year() != 2024 || start.Date().Month() != 1 || start.Date().Day() != 15 {
+		t.Fatalf("StartOfDay date: %v", start.Date())
+	}
+	if start.Time().Hour() != 0 || start.Time().Minute() != 0 ||
+		start.Time().Second() != 0 || start.Time().Msec() != 0 {
+		t.Fatalf("StartOfDay time: %v", start.Time())
+	}
+
+	end := d.EndOfDay()
+	if end == nil || !end.IsValid() {
+		t.Fatal("EndOfDay returned an invalid QDateTime")
+	}
+	defer end.Close()
+	if end.Time().Hour() != 23 || end.Time().Minute() != 59 ||
+		end.Time().Second() != 59 || end.Time().Msec() != 999 {
+		t.Fatalf("EndOfDay time: %v", end.Time())
+	}
+}
+
+func TestQDateStartOfDaySpecAndZone(t *testing.T) {
+	d := NewQDateFromYMD(2024, 1, 15)
+
+	utcStart := d.StartOfDaySpec(qdata.UTC, 0)
+	if utcStart == nil || !utcStart.IsValid() {
+		t.Fatal("StartOfDaySpec(UTC) returned an invalid QDateTime")
+	}
+	defer utcStart.Close()
+	if utcStart.Time().Hour() != 0 || utcStart.OffsetFromUtc() != 0 {
+		t.Fatalf("StartOfDaySpec(UTC): time=%v offset=%d",
+			utcStart.Time(), utcStart.OffsetFromUtc())
+	}
+
+	tz := NewQTimeZoneFromOffset(2 * 3600)
+	defer tz.Close()
+	zoned := d.StartOfDayZone(tz)
+	if zoned == nil || !zoned.IsValid() {
+		t.Fatal("StartOfDayZone returned an invalid QDateTime")
+	}
+	defer zoned.Close()
+	if zoned.Time().Hour() != 0 || zoned.OffsetFromUtc() != 2*3600 {
+		t.Fatalf("StartOfDayZone(+02:00): time=%v offset=%d",
+			zoned.Time(), zoned.OffsetFromUtc())
+	}
+}
+
+func TestQDateFromStringBaseYear(t *testing.T) {
+	d := NewQDateFromStringBaseYear("15.01.03", "dd.MM.yy", 1900)
+	if d.Year() != 1903 || d.Month() != 1 || d.Day() != 15 {
+		t.Fatalf("NewQDateFromStringBaseYear: %d-%d-%d", d.Year(), d.Month(), d.Day())
+	}
+
+	d2 := NewQDateFromStringBaseYearCal("15.01.03", "dd.MM.yy", 1900, NewQCalendar())
+	if d2.Year() != 1903 || d2.Month() != 1 || d2.Day() != 15 {
+		t.Fatalf("NewQDateFromStringBaseYearCal: %d-%d-%d", d2.Year(), d2.Month(), d2.Day())
 	}
 }

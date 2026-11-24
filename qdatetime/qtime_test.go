@@ -2,6 +2,7 @@ package qdatetime
 
 import (
 	"testing"
+	"time"
 
 	"github.com/vadimlxx/go-qt6core/qdata"
 )
@@ -103,5 +104,30 @@ func TestQTimeFromMSecs(t *testing.T) {
 	tt := NewQTimeFromMSecsSinceStartOfDay(3661000) // 01:01:01
 	if tt.Hour() != 1 || tt.Minute() != 1 || tt.Second() != 1 {
 		t.Fatalf("got %d:%d:%d, want 01:01:01", tt.Hour(), tt.Minute(), tt.Second())
+	}
+}
+
+func TestQTimeFromTime(t *testing.T) {
+	ts := time.Date(2024, 1, 2, 13, 45, 59, 123456789, time.UTC)
+	tt := NewQTimeFromTime(ts)
+	if tt.Hour() != 13 || tt.Minute() != 45 || tt.Second() != 59 || tt.Msec() != 123 {
+		t.Fatalf("NewQTimeFromTime: %d:%d:%d.%d",
+			tt.Hour(), tt.Minute(), tt.Second(), tt.Msec())
+	}
+}
+
+func TestQTimeToTime(t *testing.T) {
+	tt := NewQTimeFromHMS(13, 45, 59, 123)
+	got := tt.ToTime()
+	if got.Year() != 1970 || got.Month() != time.January || got.Day() != 1 {
+		t.Fatalf("ToTime date: %v", got)
+	}
+	if got.Hour() != 13 || got.Minute() != 45 || got.Second() != 59 ||
+		got.Nanosecond() != 123*1_000_000 {
+		t.Fatalf("ToTime time: %v", got)
+	}
+
+	if !NewQTime().ToTime().IsZero() {
+		t.Fatal("null QTime must yield the zero time.Time")
 	}
 }

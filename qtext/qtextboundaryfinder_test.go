@@ -44,7 +44,7 @@ func TestNewQTextBoundaryFinderFromString(t *testing.T) {
 }
 
 func TestNewQTextBoundaryFinderFromView(t *testing.T) {
-	v := QStringViewFromString("a b c")
+	v := NewQStringViewFromString("a b c")
 	f := NewQTextBoundaryFinderFromView(Word, v)
 	defer f.Close()
 	if !f.IsValid() {

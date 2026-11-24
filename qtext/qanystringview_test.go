@@ -40,7 +40,7 @@ func TestQAnyStringViewFromBytesUtf8(t *testing.T) {
 }
 
 func TestQAnyStringViewFromQStringView(t *testing.T) {
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("héllo")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("héllo")))
 	v := NewQAnyStringView(sv)
 	if v.Kind() != KindUtf16 || v.Size() != 5 || v.SizeBytes() != 10 {
 		t.Fatalf("kind=%v size=%d sizeBytes=%d", v.Kind(), v.Size(), v.SizeBytes())
@@ -119,7 +119,7 @@ func TestQAnyStringViewSlicing(t *testing.T) {
 }
 
 func TestQAnyStringViewSlicingPreservesKind(t *testing.T) {
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	v := NewQAnyStringView(sv)
 
 	if v.Left(3).Kind() != KindUtf16 {
@@ -167,7 +167,7 @@ func TestQAnyStringViewCompareEqual(t *testing.T) {
 
 func TestQAnyStringViewCompareCrossEncoding(t *testing.T) {
 	u8 := NewQAnyStringView([]byte("hello"))
-	utf16v := NewQAnyStringView(QStringViewFromUtf16(utf16.Encode([]rune("hello"))))
+	utf16v := NewQAnyStringView(NewQStringViewFromUtf16(utf16.Encode([]rune("hello"))))
 
 	if QAnyStringViewCompare(u8, utf16v, true) != 0 {
 		t.Fatal("UTF-8 'hello' must equal UTF-16 'hello'")

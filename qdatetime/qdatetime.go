@@ -7,46 +7,46 @@ package qdatetime
 
 	QDateTime использует COW (Q_DECLARE_SHARED), но в Go представлен как handle.
 	Копирование Go-указателя не создаёт новый объект — для независимой копии
-	используйте Clone().
-
-	# Владение
-
-	C++ объект освобождается одним из двух способов:
-	- Close() — немедленно, детерминированно;
-	- runtime.AddCleanup — когда *QDateTime становится недостижим.
-
-	Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
-	гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
-	двойного free нет.
-
-	# Use after Close
-
-	После Close() любой метод, кроме Close(), паникует
+	используйте Clone(). C++ объект освобождается Close() (немедленно) или
+	runtime.AddCleanup (когда обёртка становится недостижимой). Close() опционален,
+	идемпотентен и безопасен для nil; после Close() методы паникуют
 	("qdatetime: use after Close (or nil receiver)").
 
-	# Интеграция с QLocale
+	# Реализовано
 
-	handle() возвращает *C.go_qdatetime_t, который QLocale использует напрямую
-	(см. QLocale.ToStringDateTime*).
+	- конструкторы: NewQDateTime, NewQDateTimeFromDateTime,
+		NewQDateTimeFromDateTimeResolve, NewQDateTimeFromDateTimeZone,
+		NewQDateTimeFromDateTimeZoneResolve, NewQDateTimeFromString,
+		NewQDateTimeFromStringFormat, NewQDateTimeFromStringCal,
+		NewQDateTimeFromStringBaseYear, NewQDateTimeFromStringBaseYearCal,
+		NewQDateTimeCurrentDateTime, NewQDateTimeCurrentDateTimeUtc,
+		CurrentDateTimeZone, NewQDateTimeFromMSecsSinceEpoch,
+		NewQDateTimeFromSecsSinceEpoch, FromMSecsSinceEpochZone,
+		FromSecsSinceEpochZone, NewQDateTimeFromTime;
+	- TransitionResolution: конструкторы/сеттеры SetDateResolve, SetTimeResolve,
+		SetTimeZoneResolve и тип TransitionResolution (transition_resolution.go);
+	- timeRepresentation() — метод TimeRepresentation;
+	- startOfDay/endOfDay у QDate — методы QDate.StartOfDay / EndOfDay и их варианты,
+		а также совместимые пакетные функции QDateStartOfDay*;
+	- конвертация в time.Time и обратно: QDateTime.ToTime /
+		NewQDateTimeFromTime (миллисекундная точность, UTC);
+	- строки: ToString/ToStringFormat/ToStringFormatCal и их String-варианты;
+	- зоны: TimeZone, SetTimeZone, ToTimeZone, ToLocalTime, ToUTC,
+		ToOffsetFromUtc, TimeZoneAbbreviation(+String).
 
-	# Что нового по сравнению с прошлой версией
+	# C-часть
 
-	- FromStringCal / FromStringBaseYear / FromStringBaseYearCal —
-		QDateTime::fromString с QCalendar и/или baseYear.
-	- TimeZoneAbbreviation() *qtext.QString — QDateTime::timeZoneAbbreviation.
-	- IsDaylightTime() bool — QDateTime::isDaylightTime.
-	- Free-функции QDateStartOfDay / QDateEndOfDay / QDateStartOfDayZone /
-		QDateEndOfDayZone — обёртки над QDate::startOfDay/endOfDay.
-	- XxxString() варианты для ToString/ToStringFormat/ToStringFormatCal.
+	QDate, QTime и QDateTime используют общий C-мост qdatetime_c.h /
+	qdatetime_c.cpp (как qdatetime.h/.cpp в QtCore). Go-файлы и тесты остаются
+	раздельными: qdate.go, qtime.go, qdatetime.go.
 
-	# Что всё ещё не реализовано (TODO)
+	# Не реализовано
 
-	- TransitionResolution в сигнатурах конструкторов и сеттеров.
-	- YearRange.
-	- std::chrono interop (fromStdTimePoint / fromStdLocalTime / toStdSysMilliseconds /
-		toStdSysSeconds / addDuration) — покрыто через FromMSecsSinceEpoch/AddMSecs.
-	- QDataStream / QDebug операторы, qHash.
-	- Darwin: fromCFDate/toCFDate, fromNSDate/toNSDate.
+	- std::chrono interop: fromStdTimePoint/fromStdLocalTime,
+		toStdSysMilliseconds/toStdSysSeconds, addDuration;
+	- QDataStream/QDebug-операторы и qHash;
+	- Darwin: fromCFDate/toCFDate, fromNSDate/toNSDate;
+	- операторы сравнения — используйте Equals/DaysTo/SecsTo/MsecsTo.
 */
 
 /*
@@ -60,6 +60,7 @@ import "C"
 import (
 	"runtime"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/vadimlxx/go-qt6core/qdata"
@@ -72,6 +73,8 @@ type qdatetimeState struct {
 	p atomic.Pointer[byte]
 }
 
+// cpp returns the stored QDateTime pointer, or nil if the handle was claimed.
+// Qt: no direct counterpart — internal helper.
 func (s *qdatetimeState) cpp() *C.go_qdatetime_t {
 	if bp := s.p.Load(); bp != nil {
 		return (*C.go_qdatetime_t)(unsafe.Pointer(bp))
@@ -79,6 +82,8 @@ func (s *qdatetimeState) cpp() *C.go_qdatetime_t {
 	return nil
 }
 
+// claim atomically clears the slot and returns the stored pointer.
+// Qt: no direct counterpart — internal helper.
 func (s *qdatetimeState) claim() *C.go_qdatetime_t {
 	if bp := s.p.Swap(nil); bp != nil {
 		return (*C.go_qdatetime_t)(unsafe.Pointer(bp))
@@ -92,6 +97,9 @@ type QDateTime struct {
 	cleanup runtime.Cleanup
 }
 
+// wrapQDateTime takes ownership of a raw QDateTime pointer and registers the
+// runtime cleanup.
+// Qt: no direct counterpart — internal constructor helper.
 func wrapQDateTime(p *C.go_qdatetime_t) *QDateTime {
 	if p == nil {
 		return nil
@@ -107,6 +115,8 @@ func wrapQDateTime(p *C.go_qdatetime_t) *QDateTime {
 	return dt
 }
 
+// handle returns the underlying C++ pointer, panicking if the handle is closed.
+// Qt: no direct counterpart — internal handle helper.
 func (dt *QDateTime) handle() *C.go_qdatetime_t {
 	if p, ok := dt.tryHandle(); ok {
 		return p
@@ -114,6 +124,8 @@ func (dt *QDateTime) handle() *C.go_qdatetime_t {
 	panic("qdatetime: use after Close (or nil receiver)")
 }
 
+// tryHandle is the non-panicking variant of handle.
+// Qt: no direct counterpart — internal handle helper.
 func (dt *QDateTime) tryHandle() (*C.go_qdatetime_t, bool) {
 	if dt == nil || dt.state == nil {
 		return nil, false
@@ -138,14 +150,26 @@ func (dt *QDateTime) Close() {
 }
 
 // qdateToJD / qdateFromJD bridge value-typed QDate and int64 julian day.
-func qdateToJD(d QDate) int64    { return d.ToJulianDay() }
+// qdateToJD converts a value QDate to its Julian day.
+// Qt: no direct counterpart — internal helper.
+func qdateToJD(d QDate) int64 { return d.ToJulianDay() }
+
+// qdateFromJD converts a Julian day to a value QDate.
+// Qt: no direct counterpart — internal helper.
 func qdateFromJD(jd int64) QDate { return NewQDateFromJulianDay(jd) }
 
 // qtimeToMSecs / qtimeFromMSecs bridge value-typed QTime and int32 msecs.
-func qtimeToMSecs(t QTime) int32    { return int32(t.MsecsSinceStartOfDay()) }
+// qtimeToMSecs converts a value QTime to milliseconds since midnight.
+// Qt: no direct counterpart — internal helper.
+func qtimeToMSecs(t QTime) int32 { return int32(t.MsecsSinceStartOfDay()) }
+
+// qtimeFromMSecs converts milliseconds since midnight to a value QTime.
+// Qt: no direct counterpart — internal helper.
 func qtimeFromMSecs(ms int32) QTime { return NewQTimeFromMSecsSinceStartOfDay(int(ms)) }
 
 // cstr returns the internal data pointer of s (nil for empty string).
+// cstr returns the internal data pointer of s (nil for an empty string).
+// Qt: no direct counterpart — internal helper.
 func cstr(s string) *C.char {
 	if len(s) == 0 {
 		return nil
@@ -162,6 +186,51 @@ func NewQDateTime() *QDateTime { return wrapQDateTime(C.qdatetime_new_default())
 func NewQDateTimeFromDateTime(date QDate, time QTime) *QDateTime {
 	return wrapQDateTime(C.qdatetime_new_from_date_time(
 		C.int64_t(qdateToJD(date)), C.int32_t(qtimeToMSecs(time))))
+}
+
+// NewQDateTimeFromDateTimeResolve creates a datetime using a transition
+// resolution for ambiguous or skipped local times.
+// Qt: QDateTime::QDateTime(QDate date, QTime time, TransitionResolution resolve).
+func NewQDateTimeFromDateTimeResolve(date QDate, time QTime, resolve TransitionResolution) *QDateTime {
+	return wrapQDateTime(C.qdatetime_new_from_date_time_resolve(
+		C.int64_t(qdateToJD(date)), C.int32_t(qtimeToMSecs(time)), C.int(resolve)))
+}
+
+// NewQDateTimeFromDateTimeZone creates a datetime from date, time and zone.
+// Qt: QDateTime::QDateTime(QDate date, QTime time, const QTimeZone &timeZone).
+func NewQDateTimeFromDateTimeZone(date QDate, time QTime, tz *QTimeZone) *QDateTime {
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdatetime_new_from_date_time_zone(
+		C.int64_t(qdateToJD(date)), C.int32_t(qtimeToMSecs(time)), tz.p))
+	runtime.KeepAlive(tz)
+	return r
+}
+
+// NewQDateTimeFromDateTimeZoneResolve creates a datetime from date, time, zone
+// and transition resolution.
+// Qt: QDateTime::QDateTime(QDate, QTime, const QTimeZone &, TransitionResolution).
+func NewQDateTimeFromDateTimeZoneResolve(date QDate, time QTime, tz *QTimeZone,
+	resolve TransitionResolution) *QDateTime {
+	if tz == nil || tz.p == nil {
+		return nil
+	}
+	r := wrapQDateTime(C.qdatetime_new_from_date_time_zone_resolve(
+		C.int64_t(qdateToJD(date)), C.int32_t(qtimeToMSecs(time)), tz.p, C.int(resolve)))
+	runtime.KeepAlive(tz)
+	return r
+}
+
+// NewQDateTimeFromTime creates a datetime from a Go time.Time (millisecond
+// precision; the absolute instant is preserved and represented in UTC).
+// Qt: QDateTime::fromMSecsSinceEpoch(qint64 msecs).toUTC() — no direct
+// time.Time counterpart, so the instant is used.
+func NewQDateTimeFromTime(t time.Time) *QDateTime {
+	dt := NewQDateTimeFromMSecsSinceEpoch(t.UnixMilli())
+	utc := dt.ToUTC()
+	dt.Close()
+	return utc
 }
 
 // NewQDateTimeFromString — Qt: QDateTime::fromString(QStringView, Qt::DateFormat).
@@ -336,7 +405,8 @@ func (dt *QDateTime) TimeZoneAbbreviation() *qtext.QString {
 	return qtext.QStringFromUnsafePtr(out)
 }
 
-// TimeZoneAbbreviationString — Go-string variant of TimeZoneAbbreviation.
+// TimeZoneAbbreviationString returns the zone abbreviation as a Go string.
+// Qt: QDateTime::timeZoneAbbreviation() const — Go string form.
 func (dt *QDateTime) TimeZoneAbbreviationString() string {
 	s := dt.TimeZoneAbbreviation()
 	if s == nil {
@@ -357,6 +427,20 @@ func (dt *QDateTime) SetDate(date QDate) {
 // SetTime — Qt: QDateTime::setTime(QTime).
 func (dt *QDateTime) SetTime(time QTime) {
 	C.qdatetime_set_time(dt.handle(), C.int32_t(qtimeToMSecs(time)))
+	runtime.KeepAlive(dt)
+}
+
+// SetDateResolve changes the date using the given transition resolution.
+// Qt: QDateTime::setDate(QDate date, TransitionResolution resolve).
+func (dt *QDateTime) SetDateResolve(date QDate, resolve TransitionResolution) {
+	C.qdatetime_set_date_resolve(dt.handle(), C.int64_t(qdateToJD(date)), C.int(resolve))
+	runtime.KeepAlive(dt)
+}
+
+// SetTimeResolve changes the time using the given transition resolution.
+// Qt: QDateTime::setTime(QTime time, TransitionResolution resolve).
+func (dt *QDateTime) SetTimeResolve(time QTime, resolve TransitionResolution) {
+	C.qdatetime_set_time_resolve(dt.handle(), C.int32_t(qtimeToMSecs(time)), C.int(resolve))
 	runtime.KeepAlive(dt)
 }
 
@@ -445,6 +529,23 @@ func (dt *QDateTime) MsecsTo(other *QDateTime) int64 {
 	return r
 }
 
+// TimeRepresentation returns the datetime's time representation as a QTimeZone.
+// Qt: QDateTime::timeRepresentation() const.
+func (dt *QDateTime) TimeRepresentation() *QTimeZone {
+	return wrapQTimeZone(C.qdatetime_time_representation(dt.handle()))
+}
+
+// ToTime returns the absolute instant as a Go time.Time in UTC (millisecond
+// precision). A null/invalid QDateTime yields the zero time.Time.
+// Qt: QDateTime::toMSecsSinceEpoch() converted to time.Time (no direct Qt
+// counterpart — Qt has no time.Time conversion).
+func (dt *QDateTime) ToTime() time.Time {
+	if !dt.IsValid() {
+		return time.Time{}
+	}
+	return time.UnixMilli(dt.ToMSecsSinceEpoch()).UTC()
+}
+
 // ---- Strings -------------------------------------------------------------
 
 // ToString — Qt: QDateTime::toString(Qt::DateFormat) const.
@@ -455,7 +556,8 @@ func (dt *QDateTime) ToString(format qdata.DateFormat) *qtext.QString {
 	return qtext.QStringFromUnsafePtr(out)
 }
 
-// ToStringString — Go-string variant of ToString.
+// ToStringString formats the datetime as a Go string.
+// Qt: QDateTime::toString(Qt::DateFormat format) const — Go string form.
 func (dt *QDateTime) ToStringString(format qdata.DateFormat) string {
 	s := dt.ToString(format)
 	if s == nil {
@@ -474,7 +576,8 @@ func (dt *QDateTime) ToStringFormat(format string) *qtext.QString {
 	return qtext.QStringFromUnsafePtr(out)
 }
 
-// ToStringFormatString — Go-string variant.
+// ToStringFormatString formats the datetime with a format string.
+// Qt: QDateTime::toString(const QString &format) const — Go string form.
 func (dt *QDateTime) ToStringFormatString(format string) string {
 	s := dt.ToStringFormat(format)
 	if s == nil {
@@ -494,7 +597,8 @@ func (dt *QDateTime) ToStringFormatCal(format string, cal QCalendar) *qtext.QStr
 	return qtext.QStringFromUnsafePtr(out)
 }
 
-// ToStringFormatCalString — Go-string variant.
+// ToStringFormatCalString formats the datetime with a format string and calendar.
+// Qt: QDateTime::toString(const QString &format, QCalendar cal) const — Go string form.
 func (dt *QDateTime) ToStringFormatCalString(format string, cal QCalendar) string {
 	s := dt.ToStringFormatCal(format, cal)
 	if s == nil {
@@ -560,6 +664,17 @@ func (dt *QDateTime) SetTimeZone(tz *QTimeZone) {
 	runtime.KeepAlive(tz)
 }
 
+// SetTimeZoneResolve sets the time zone using the given transition resolution.
+// Qt: QDateTime::setTimeZone(const QTimeZone &toZone, TransitionResolution resolve).
+func (dt *QDateTime) SetTimeZoneResolve(tz *QTimeZone, resolve TransitionResolution) {
+	if tz == nil || tz.p == nil {
+		return
+	}
+	C.qdatetime_set_time_zone_resolve(dt.handle(), tz.p, C.int(resolve))
+	runtime.KeepAlive(dt)
+	runtime.KeepAlive(tz)
+}
+
 // ToTimeZone — Qt: QDateTime::toTimeZone(const QTimeZone&) const.
 func (dt *QDateTime) ToTimeZone(tz *QTimeZone) *QDateTime {
 	if tz == nil || tz.p == nil {
@@ -606,32 +721,18 @@ func FromSecsSinceEpochZone(secs int64, tz *QTimeZone) *QDateTime {
 // QDateTime can be returned without QDate importing QDateTime types.
 // Once qdate.go adds these methods, these free functions can be deprecated.
 
-// QDateStartOfDay — Qt: QDate::startOfDay() const.
-func QDateStartOfDay(d QDate) *QDateTime {
-	return wrapQDateTime(C.qdate_start_of_day(C.int64_t(qdateToJD(d))))
-}
+// QDateStartOfDay returns the first moment of d's day in local time.
+// Qt: QDate::startOfDay() const.
+func QDateStartOfDay(d QDate) *QDateTime { return d.StartOfDay() }
 
-// QDateEndOfDay — Qt: QDate::endOfDay() const.
-func QDateEndOfDay(d QDate) *QDateTime {
-	return wrapQDateTime(C.qdate_end_of_day(C.int64_t(qdateToJD(d))))
-}
+// QDateEndOfDay returns the last moment of d's day in local time.
+// Qt: QDate::endOfDay() const.
+func QDateEndOfDay(d QDate) *QDateTime { return d.EndOfDay() }
 
-// QDateStartOfDayZone — Qt: QDate::startOfDay(const QTimeZone&) const.
-func QDateStartOfDayZone(d QDate, tz *QTimeZone) *QDateTime {
-	if tz == nil || tz.p == nil {
-		return nil
-	}
-	r := wrapQDateTime(C.qdate_start_of_day_zone(C.int64_t(qdateToJD(d)), tz.p))
-	runtime.KeepAlive(tz)
-	return r
-}
+// QDateStartOfDayZone returns the first moment of d's day in tz.
+// Qt: QDate::startOfDay(const QTimeZone &zone) const.
+func QDateStartOfDayZone(d QDate, tz *QTimeZone) *QDateTime { return d.StartOfDayZone(tz) }
 
-// QDateEndOfDayZone — Qt: QDate::endOfDay(const QTimeZone&) const.
-func QDateEndOfDayZone(d QDate, tz *QTimeZone) *QDateTime {
-	if tz == nil || tz.p == nil {
-		return nil
-	}
-	r := wrapQDateTime(C.qdate_end_of_day_zone(C.int64_t(qdateToJD(d)), tz.p))
-	runtime.KeepAlive(tz)
-	return r
-}
+// QDateEndOfDayZone returns the last moment of d's day in tz.
+// Qt: QDate::endOfDay(const QTimeZone &zone) const.
+func QDateEndOfDayZone(d QDate, tz *QTimeZone) *QDateTime { return d.EndOfDayZone(tz) }

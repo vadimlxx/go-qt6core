@@ -72,7 +72,7 @@ func TestQStringFromQByteArray(t *testing.T) {
 }
 
 func TestQStringFromQStringView(t *testing.T) {
-	v := QStringViewFromString("héllo")
+	v := NewQStringViewFromString("héllo")
 	s := NewQString(v)
 	defer s.Close()
 	if s.GoString() != "héllo" {

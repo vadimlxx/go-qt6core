@@ -55,7 +55,7 @@ type QStringView struct {
 // ---- construction --------------------------------------------------------
 
 // Empty returns a null QStringView (matches QStringView()).
-func EmptyQStringView() QStringView { return QStringView{} }
+func NewEmptyQStringView() QStringView { return QStringView{} }
 
 // NewUnsafe builds a view directly from a raw UTF-16 pointer and size.
 // Caller is solely responsible for keeping the underlying data alive
@@ -69,9 +69,9 @@ func QStringViewNewUnsafe(data unsafe.Pointer, size int) QStringView {
 
 // FromUtf16 returns a view over units. The Go slice is kept alive by
 // the view; mutations of units are visible through the view.
-func QStringViewFromUtf16(units []uint16) QStringView {
+func NewQStringViewFromUtf16(units []uint16) QStringView {
 	if len(units) == 0 {
-		return EmptyQStringView()
+		return NewEmptyQStringView()
 	}
 	return QStringView{
 		data:      unsafe.Pointer(&units[0]),
@@ -83,9 +83,9 @@ func QStringViewFromUtf16(units []uint16) QStringView {
 // FromQChars returns a view over chars. Zero-copy: qchar.QChar is a
 // 16-bit type in Go, so []qchar.QChar shares layout with []uint16.
 // The slice is kept alive by the view.
-func QStringViewFromQChars(chars []QChar) QStringView {
+func NewQStringViewFromQChars(chars []QChar) QStringView {
 	if len(chars) == 0 {
-		return EmptyQStringView()
+		return NewEmptyQStringView()
 	}
 	return QStringView{
 		data:      unsafe.Pointer(&chars[0]),
@@ -98,9 +98,9 @@ func QStringViewFromQChars(chars []QChar) QStringView {
 // resulting units. The conversion allocates; the view owns and keeps the
 // converted buffer alive. For zero-copy from existing UTF-16 data, use
 // FromUtf16 directly.
-func QStringViewFromString(s string) QStringView {
+func NewQStringViewFromString(s string) QStringView {
 	if len(s) == 0 {
-		return EmptyQStringView()
+		return NewEmptyQStringView()
 	}
 	units := utf16.Encode([]rune(s))
 	return QStringView{
@@ -108,6 +108,25 @@ func QStringViewFromString(s string) QStringView {
 		size:      len(units),
 		keepAlive: units,
 	}
+}
+
+func NewStringView(arg ...any) QStringView {
+	if len(arg) == 0 || arg[0] == nil {
+		return NewEmptyQStringView()
+	}
+
+	switch s := arg[0].(type) {
+	case string:
+		return NewQStringViewFromString(s)
+	case []byte:
+		return NewQStringViewFromString(string(s))
+	case []uint16:
+		return NewQStringViewFromUtf16(s)
+	case []QChar:
+		return NewQStringViewFromQChars(s)
+	}
+
+	panic("NewStringView: unsupported argument combination")
 }
 
 // newQStringViewWithOwner builds a QStringView over raw UTF-16 data and attaches an

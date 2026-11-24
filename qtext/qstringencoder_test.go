@@ -70,7 +70,7 @@ func TestQStringEncoderEncodeView(t *testing.T) {
 	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("日本")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("日本")))
 	out := e.EncodeView(sv)
 	defer out.Close()
 
@@ -110,7 +110,7 @@ func TestQStringEncoderAppendToBuffer(t *testing.T) {
 	e := NewQStringEncoderFromEncoding(Utf8, FlagDefault)
 	defer e.Close()
 
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("hello")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("hello")))
 	buf := make([]byte, e.RequiredSpace(sv.Size()))
 	n := e.AppendToBuffer(buf, sv)
 	if n != 5 || string(buf[:n]) != "hello" {
@@ -243,7 +243,7 @@ func TestQStringEncoderGoVariants(t *testing.T) {
 		t.Fatalf("EncodeViewString: %v", outView.Bytes())
 	}
 
-	sv := QStringViewFromUtf16(utf16.Encode([]rune("日本")))
+	sv := NewQStringViewFromUtf16(utf16.Encode([]rune("日本")))
 	if got := e.EncodeViewBytes(sv); !bytes.Equal(got, []byte("日本")) {
 		t.Fatalf("EncodeViewBytes: %v", got)
 	}

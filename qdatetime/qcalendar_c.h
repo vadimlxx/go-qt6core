@@ -8,23 +8,18 @@
 /* FIX: qstring_c.h lives in ../qtext/, not next to us. */
 #include "../qtext/qstring_c.h"
 
-/* FIX: qdate_c.h now defines go_qdate_t, go_qcalendar_t and go_qymd_t.
- * We pull them in here. We do NOT include qlocale_c.h / qdatetime_c.h
- * (they include us; we'd cycle). We forward-declare go_qlocale_t /
- * go_qdatetime_t below — they are used only via pointers here. */
-#include "qdate_c.h"
-#include "qtime_c.h"
+/* qdatetime_c.h defines go_qdate_t, go_qtime_t, go_qcalendar_t and go_qymd_t.
+ * It does not include us, so there is no cycle. go_qlocale_t is still
+ * forward-declared here (QCalendar only uses QLocale through pointers). */
+#include "qdatetime_c.h"
 
 #ifdef __cplusplus
 class QLocale;
-class QDateTime;
 typedef QLocale*  go_qlocale_t;
-typedef QDateTime go_qdatetime_t;
 extern "C" {
 #else
 typedef struct go_qlocale_s go_qlocale_s;
 typedef go_qlocale_s* go_qlocale_t;
-typedef struct QDateTime go_qdatetime_t;
 #endif
 
 /* ---- Construction ---- */

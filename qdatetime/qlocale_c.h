@@ -6,20 +6,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../qtext/qstring_c.h"   /* QString* (opaque in C mode) */
-#include "qdate_c.h"
+#include "qdatetime_c.h"
 #include "qcalendar_c.h"
 
 /* go_qlocale_t: handle (heap QLocale*). We own this typedef. */
 #ifdef __cplusplus
 class QLocale;
-class QDateTime;
-typedef QLocale*  go_qlocale_t;
-typedef QDateTime go_qdatetime_t;   /* same typedef as qdatetime_c.h / qtimezone_c.h */
+typedef QLocale*  go_qlocale_t;   /* go_qdatetime_t comes from qtimezone_c.h */
 extern "C" {
 #else
 typedef struct go_qlocale_s go_qlocale_s;
 typedef go_qlocale_s*      go_qlocale_t;
-typedef struct QDateTime   go_qdatetime_t;
 #endif
 
 // #ifdef __cplusplus

@@ -197,6 +197,12 @@ The Go zero value QTimeZone{} is invalid (nil pointer). Use NewQTimeZone() for a
 
 QCollator::operator= (copy assignment) → use Clone() or Swap().
 
+- QElapsedTimer
+
+Equal(other) bool — QElapsedTimer::operator==
+
+Less(other) bool  — QElapsedTimer::operator<
+
 
 #### UUID class is assigned to quuid:
 

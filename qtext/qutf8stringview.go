@@ -66,7 +66,7 @@ type QUtf8StringView struct {
 // FromBytes returns a zero-copy view over b, interpreted as UTF-8.
 // The Go slice b is kept alive by the view.
 // Use IsValidUtf8() to verify the buffer contains valid UTF-8.
-func QUtf8StringViewFromBytes(b []byte) QUtf8StringView {
+func NewQUtf8StringViewFromBytes(b []byte) QUtf8StringView {
 	if len(b) == 0 {
 		return QUtf8StringView{}
 	}
@@ -80,7 +80,7 @@ func QUtf8StringViewFromBytes(b []byte) QUtf8StringView {
 // FromString returns a zero-copy view over s interpreted as UTF-8.
 // Go strings are immutable, so the view is effectively read-only.
 // Use IsValidUtf8() to verify the buffer contains valid UTF-8.
-func QUtf8StringViewFromString(s string) QUtf8StringView {
+func NewQUtf8StringViewFromString(s string) QUtf8StringView {
 	if len(s) == 0 {
 		return QUtf8StringView{}
 	}
@@ -94,7 +94,7 @@ func QUtf8StringViewFromString(s string) QUtf8StringView {
 // FromQByteArray returns a zero-copy view over q's internal buffer,
 // interpreting the bytes as UTF-8. The view keeps q alive.
 // Do NOT mutate or Close q while the view exists.
-func QUtf8StringViewFromQByteArray(q *QByteArray) QUtf8StringView {
+func NewQUtf8StringViewFromQByteArray(q *QByteArray) QUtf8StringView {
 	if q == nil || q.IsNull() {
 		return QUtf8StringView{}
 	}
@@ -109,7 +109,7 @@ func QUtf8StringViewFromQByteArray(q *QByteArray) QUtf8StringView {
 //
 // This allocates a temporary UTF-8 QByteArray internally and keeps it alive
 // via the view. Use q.ToQStringView() for zero-copy UTF-16 access instead.
-func QUtf8StringViewFromQString(q *QString) QUtf8StringView {
+func NewQUtf8StringViewFromQString(q *QString) QUtf8StringView {
 	if q == nil || q.IsNull() {
 		return QUtf8StringView{}
 	}
@@ -128,13 +128,13 @@ func NewQUtf8StringView(arg ...any) QUtf8StringView {
 
 	switch s := arg[0].(type) {
 	case []byte:
-		return QUtf8StringViewFromBytes(s)
+		return NewQUtf8StringViewFromBytes(s)
 	case string:
-		return QUtf8StringViewFromString(s)
+		return NewQUtf8StringViewFromString(s)
 	case *QByteArray:
-		return QUtf8StringViewFromQByteArray(s)
+		return NewQUtf8StringViewFromQByteArray(s)
 	case *QString:
-		return QUtf8StringViewFromQString(s)
+		return NewQUtf8StringViewFromQString(s)
 	}
 
 	panic("NewQUtf8StringView invalid argumentes")

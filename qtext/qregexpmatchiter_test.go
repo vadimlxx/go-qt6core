@@ -24,7 +24,7 @@ func TestQRegularExpressionGlobalMatch(t *testing.T) {
 
 func TestQRegularExpressionGlobalMatchView(t *testing.T) {
 	re := NewQRegularExpressionFromString(`\d+`, NoPatternOption)
-	subject := QStringViewFromString("a1 b22")
+	subject := NewQStringViewFromString("a1 b22")
 	it := re.GlobalMatchView(subject, 0, NormalMatch, NoMatchOption)
 	count := 0
 	for it.HasNext() {

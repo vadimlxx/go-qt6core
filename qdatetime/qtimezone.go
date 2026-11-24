@@ -31,7 +31,7 @@ package qdatetime
  Тип TimeSpec импортируется из пакета qdata
  (github.com/vadimlxx/go-qt6core/qdata) как единый источник истины.
 
- Что не реализовано (см. qtimezone_doc.go):
+ Что не реализовано:
    - OffsetDataList transitions() — требует QList<OffsetData>.
    - availableTimeZoneIds() — требует QList<QByteArray>.
    - ianaIdToWindowsId / windowsIdToIanaIds / windowsIdToDefaultIanaId.
