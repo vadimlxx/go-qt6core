@@ -1,48 +1,48 @@
 package qdatetime
 
 /*
-QCalendar — биндинг Qt 6.11 QtCore/QCalendar как VALUE-тип.
+	QCalendar — биндинг Qt 6.11 QtCore/QCalendar как VALUE-тип.
 
-QCalendar в Qt — value-тип: одно поле const QCalendarBackend *d_ptr (8 байт на LP64,
-4 на ILP32), trivially copyable, без COW, без user-defined destructor. В Go хранится
-как плоская структура из тех же байт — полная копия. Присваивание Go-переменной создаёт
-независимую копию (value-семантика). Указателей, финализаторов и Close() НЕТ.
+	QCalendar в Qt — value-тип: одно поле const QCalendarBackend *d_ptr (8 байт на LP64,
+	4 на ILP32), trivially copyable, без COW, без user-defined destructor. В Go хранится
+	как плоская структура из тех же байт — полная копия. Присваивание Go-переменной создаёт
+	независимую копию (value-семантика). Указателей, финализаторов и Close() НЕТ.
 
-ВАЖНО: Qt-конструктор QCalendar() возвращает ВАЛИДНЫЙ Gregorian-календарь
-(d_ptr != nil), а Go-нулевое значение QCalendar{} имеет d_ptr == nil — это
-НЕВАЛИДНЫЙ календарь:
-  - NewQCalendar()                       → QCalendar()      — валидный Gregorian
-  - NewQCalendarFromSystem(sys)          → QCalendar(System)
-  - NewQCalendarFromSystemID(id)         → QCalendar(SystemId)
-  - NewQCalendarFromAny(data, size, tag) → QCalendar(QAnyStringView)
-  - QCalendar{}                          → d_ptr == nil → IsValid() == false
+	ВАЖНО: Qt-конструктор QCalendar() возвращает ВАЛИДНЫЙ Gregorian-календарь
+	(d_ptr != nil), а Go-нулевое значение QCalendar{} имеет d_ptr == nil — это
+	НЕВАЛИДНЫЙ календарь:
+	- NewQCalendar()                       → QCalendar()      — валидный Gregorian
+	- NewQCalendarFromSystem(sys)          → QCalendar(System)
+	- NewQCalendarFromSystemID(id)         → QCalendar(SystemId)
+	- NewQCalendarFromAny(data, size, tag) → QCalendar(QAnyStringView)
+	- QCalendar{}                          → d_ptr == nil → IsValid() == false
 
-# Соглашения
+	# Соглашения
 
-  - Геттеры/запросы: IsValid, IsGregorian, IsLunar, IsLuniSolar, IsSolar,
-    IsProleptic, HasYearZero, MaximumDaysInMonth, MinimumDaysInMonth,
-    MaximumMonthsInYear, DaysInMonth, DaysInYear, MonthsInYear, IsDateValid,
-    IsLeapYear.
-  - Name() → *qtext.QString; NameString() → string.
-  - QDate-конверсии: DateFromParts(year, month, day), DateFromPartsYMD(ymd),
-    MatchCenturyToWeekday(ymd, dow), PartsFromDate(date), DayOfWeek(date).
-  - Имена месяцев/дней: MonthName, StandaloneMonthName, WeekDayName,
-    StandaloneWeekDayName (все принимают *QLocale).
-  - Форматирование: DateTimeToString(format, dt, dateOnly, timeOnly, locale).
-  - Статическое: AvailableCalendars() []string.
+	- Геттеры/запросы: IsValid, IsGregorian, IsLunar, IsLuniSolar, IsSolar,
+		IsProleptic, HasYearZero, MaximumDaysInMonth, MinimumDaysInMonth,
+		MaximumMonthsInYear, DaysInMonth, DaysInYear, MonthsInYear, IsDateValid,
+		IsLeapYear.
+	- Name() → *qtext.QString; NameString() → string.
+	- QDate-конверсии: DateFromParts(year, month, day), DateFromPartsYMD(ymd),
+		MatchCenturyToWeekday(ymd, dow), PartsFromDate(date), DayOfWeek(date).
+	- Имена месяцев/дней: MonthName, StandaloneMonthName, WeekDayName,
+		StandaloneWeekDayName (все принимают *QLocale).
+	- Форматирование: DateTimeToString(format, dt, dateOnly, timeOnly, locale).
+	- Статическое: AvailableCalendars() []string.
 
-# YearMonthDay
+	# YearMonthDay
 
-Go-тип YearMonthDay имеет поля Year, Month, Day (int). Соответствует
-QCalendar::YearMonthDay. Нулевое значение (0,0,0) — невалидно; для явного
-"не задано" используйте (-2147483648, -2147483648, -2147483648) или проверяйте
-IsValid().
+	Go-тип YearMonthDay имеет поля Year, Month, Day (int). Соответствует
+	QCalendar::YearMonthDay. Нулевое значение (0,0,0) — невалидно; для явного
+	"не задано" используйте (-2147483648, -2147483648, -2147483648) или проверяйте
+	IsValid().
 
-# Что НЕ реализовано (TODO)
+	# Что НЕ реализовано (TODO)
 
-  - QDataStream / QDebug операторы.
-  - qHash(QCalendar).
-  - QCalendar(SystemId) для id > System::Last возвращает invalid (не UB).
+	- QDataStream / QDebug операторы.
+	- qHash(QCalendar).
+	- QCalendar(SystemId) для id > System::Last возвращает invalid (не UB).
 */
 
 /*

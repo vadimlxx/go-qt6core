@@ -1,52 +1,52 @@
 package qdatetime
 
 /*
-QDateTime — handle над C++ QDateTime; владение через runtime.AddCleanup + Close().
+	QDateTime — handle над C++ QDateTime; владение через runtime.AddCleanup + Close().
 
-# Семантика
+	# Семантика
 
-QDateTime использует COW (Q_DECLARE_SHARED), но в Go представлен как handle.
-Копирование Go-указателя не создаёт новый объект — для независимой копии
-используйте Clone().
+	QDateTime использует COW (Q_DECLARE_SHARED), но в Go представлен как handle.
+	Копирование Go-указателя не создаёт новый объект — для независимой копии
+	используйте Clone().
 
-# Владение
+	# Владение
 
-C++ объект освобождается одним из двух способов:
-  - Close() — немедленно, детерминированно;
-  - runtime.AddCleanup — когда *QDateTime становится недостижим.
+	C++ объект освобождается одним из двух способов:
+	- Close() — немедленно, детерминированно;
+	- runtime.AddCleanup — когда *QDateTime становится недостижим.
 
-Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
-гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
-двойного free нет.
+	Close() опционален, идемпотентен и безопасен на nil. Если Close() и cleanup
+	гоняются, владение захватывает ровно один участник (атомарный Swap(nil)),
+	двойного free нет.
 
-# Use after Close
+	# Use after Close
 
-После Close() любой метод, кроме Close(), паникует
-("qdatetime: use after Close (or nil receiver)").
+	После Close() любой метод, кроме Close(), паникует
+	("qdatetime: use after Close (or nil receiver)").
 
-# Интеграция с QLocale
+	# Интеграция с QLocale
 
-handle() возвращает *C.go_qdatetime_t, который QLocale использует напрямую
-(см. QLocale.ToStringDateTime*).
+	handle() возвращает *C.go_qdatetime_t, который QLocale использует напрямую
+	(см. QLocale.ToStringDateTime*).
 
-# Что нового по сравнению с прошлой версией
+	# Что нового по сравнению с прошлой версией
 
-  - FromStringCal / FromStringBaseYear / FromStringBaseYearCal —
-    QDateTime::fromString с QCalendar и/или baseYear.
-  - TimeZoneAbbreviation() *qtext.QString — QDateTime::timeZoneAbbreviation.
-  - IsDaylightTime() bool — QDateTime::isDaylightTime.
-  - Free-функции QDateStartOfDay / QDateEndOfDay / QDateStartOfDayZone /
-    QDateEndOfDayZone — обёртки над QDate::startOfDay/endOfDay.
-  - XxxString() варианты для ToString/ToStringFormat/ToStringFormatCal.
+	- FromStringCal / FromStringBaseYear / FromStringBaseYearCal —
+		QDateTime::fromString с QCalendar и/или baseYear.
+	- TimeZoneAbbreviation() *qtext.QString — QDateTime::timeZoneAbbreviation.
+	- IsDaylightTime() bool — QDateTime::isDaylightTime.
+	- Free-функции QDateStartOfDay / QDateEndOfDay / QDateStartOfDayZone /
+		QDateEndOfDayZone — обёртки над QDate::startOfDay/endOfDay.
+	- XxxString() варианты для ToString/ToStringFormat/ToStringFormatCal.
 
-# Что всё ещё не реализовано (TODO)
+	# Что всё ещё не реализовано (TODO)
 
-  - TransitionResolution в сигнатурах конструкторов и сеттеров.
-  - YearRange.
-  - std::chrono interop (fromStdTimePoint / fromStdLocalTime / toStdSysMilliseconds /
-    toStdSysSeconds / addDuration) — покрыто через FromMSecsSinceEpoch/AddMSecs.
-  - QDataStream / QDebug операторы, qHash.
-  - Darwin: fromCFDate/toCFDate, fromNSDate/toNSDate.
+	- TransitionResolution в сигнатурах конструкторов и сеттеров.
+	- YearRange.
+	- std::chrono interop (fromStdTimePoint / fromStdLocalTime / toStdSysMilliseconds /
+		toStdSysSeconds / addDuration) — покрыто через FromMSecsSinceEpoch/AddMSecs.
+	- QDataStream / QDebug операторы, qHash.
+	- Darwin: fromCFDate/toCFDate, fromNSDate/toNSDate.
 */
 
 /*

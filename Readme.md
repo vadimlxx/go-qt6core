@@ -191,6 +191,12 @@ The Go zero value QDateTime{} is invalid (nil pointer). Use NewQDateTime() for a
 
 The Go zero value QTimeZone{} is invalid (nil pointer). Use NewQTimeZone() for a null QTimeZone that mirrors Qt's QTimeZone(). Use Clone() for an independent copy, Close() to free immediately; otherwise a finalizer handles it.
 
+- QCollatorSortKey
+
+- QCollator
+
+QCollator::operator= (copy assignment) → use Clone() or Swap().
+
 
 #### UUID class is assigned to quuid:
 
