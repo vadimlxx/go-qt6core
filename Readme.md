@@ -2,6 +2,10 @@
 
 Qt 6.11
 
+### Layout of classes by packages
+
+If we put each class in a separate package, it will be go-style, but we get cyclic connections or a huge number of bridges between packages. If we do everything in one package, as in C++, we get one big monster of 200+ classes, which is difficult to maintain. Therefore, QtCore is divided into 20+ packages with one-way linear communication. The package combined classes that were cyclically linked to each other.
+
 #### All classes that store and process various data without dependencies are located in qdata.
 
 - QInternal
